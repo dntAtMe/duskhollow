@@ -116,6 +116,7 @@ fn receive(
     mut spell_out: MessageWriter<SpellNet>,
     mut item_out: MessageWriter<ItemNet>,
     mut combat_out: MessageWriter<CombatNet>,
+    mut gaze_out: MessageWriter<crate::gaze::GazeNet>,
 ) {
     loop {
         let msg = match net.conn.incoming.try_recv() {
@@ -288,6 +289,9 @@ fn receive(
             | ServerMsg::ItemError { .. }
             | ServerMsg::Received { .. }) => {
                 item_out.write(ItemNet(msg));
+            }
+            msg @ (ServerMsg::Eye { .. } | ServerMsg::Gaze { .. } | ServerMsg::CairnBound { .. }) => {
+                gaze_out.write(crate::gaze::GazeNet(msg));
             }
         }
     }

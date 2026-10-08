@@ -469,6 +469,7 @@ pub fn apply_effects(
     mut pending: ResMut<PendingEffects>,
     mut units: Query<Victim, Without<Hidden>>,
     attacking: Query<(), With<Attacking>>,
+    gaze: Query<&crate::gaze::GazeMods>,
 ) {
     let now = time.elapsed_secs();
     let due: Vec<Pending> = {
@@ -529,6 +530,7 @@ pub fn apply_effects(
                     spell,
                     eff,
                     t,
+                    gaze.get(p.caster).ok(),
                 );
             }
         }
@@ -549,6 +551,7 @@ fn apply_one(
     spell: &SpellTemplate,
     eff: &SpellEffect,
     t: Entity,
+    gaze: Option<&crate::gaze::GazeMods>,
 ) {
     let spell_id = spell.entry as SpellId;
     let Ok((_, tid, _, tm, mut ts, auras, _, is_npc, _, evading, dead)) = units.get_mut(t) else { return };
@@ -573,6 +576,7 @@ fn apply_one(
             if let Some(a) = &auras {
                 amount = (amount as f32 * (1.0 + a.damage_taken_pct() as f32 / 100.0)).round() as i32;
             }
+            amount = crate::gaze::scale_damage(amount, gaze);
             ts.hp = (ts.hp - amount).max(0);
             outbox.push(
                 near,
@@ -777,11 +781,12 @@ pub fn tick_auras(
 pub fn sync_control(
     mut outbox: ResMut<Outbox>,
     mut last: Local<HashMap<Entity, Control>>,
-    players: Query<(Entity, Option<&Auras>), With<Player>>,
+    players: Query<(Entity, Option<&Auras>, Option<&crate::gaze::GazeMods>), With<Player>>,
 ) {
     let mut seen = HashMap::new();
-    for (e, auras) in &players {
-        let c = control_of(auras);
+    for (e, auras, gaze) in &players {
+        let mut c = control_of(auras);
+        c.speed_mult *= gaze.map_or(1.0, |g| g.speed);
         if last.get(&e) != Some(&c) {
             outbox.push(
                 Scope::To(e),

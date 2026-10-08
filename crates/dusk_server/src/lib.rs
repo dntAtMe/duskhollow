@@ -3,6 +3,7 @@
 
 pub mod ai;
 pub mod combat;
+pub mod gaze;
 pub mod items;
 pub mod net;
 pub mod spells;
@@ -25,10 +26,12 @@ pub struct ServerConfig {
 /// (the embedded server shares the client's logger).
 pub fn build_app(config: &ServerConfig, acceptor: net::Acceptor) -> anyhow::Result<App> {
     let world = world::GameWorld::load(&config.assets, config.start_map.as_deref())?;
+    let gaze = gaze::Gaze::load(&config.assets, &world);
     info!("loaded {} maps; players start on map {} at {:?}", world.maps.len(), world.start.0, world.start.1);
     let mut app = App::new();
     app.add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1.0 / TICK_HZ))))
         .insert_resource(world)
+        .insert_resource(gaze)
         .insert_resource(acceptor)
         .init_resource::<world::NetIndex>()
         .init_resource::<world::Outbox>()
@@ -64,6 +67,7 @@ pub fn build_app(config: &ServerConfig, acceptor: net::Acceptor) -> anyhow::Resu
                 )
                     .chain(),
                 (items::roll_loot, items::expire_loot).chain(),
+                (gaze::tick_eyes, gaze::update_strain, gaze::npc_mods).chain(),
                 (net::broadcast_motion, net::flush_outbox).chain(),
             )
                 .chain(),
