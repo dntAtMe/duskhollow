@@ -34,7 +34,7 @@ const STOOPED_RISEN: usize = 2;
 /// How long the Eye is forced open at most (it settles earlier when Corvin falls).
 const EYE_OPEN_SECS: f32 = 300.0;
 /// The fight resets after this long without anyone on the quest near the gate.
-const RESET_SECS: f32 = 20.0;
+const RESET_SECS: f32 = 45.0;
 /// Extra cells around the gate radius that still count as "at the fight".
 const FIGHT_MARGIN: f32 = 25.0;
 /// Villagers bark when a player is this close (cells).
@@ -444,6 +444,7 @@ fn encounters(
                     None => raise(&mut commands, &mut world, &mut index, &mut outbox, entry::CORVIN, map, spot, 0.0),
                 };
                 let Some((boss, boss_id)) = boss else { continue };
+                commands.entity(boss).insert(crate::ai::KeepsWounds);
                 let mut risen = Vec::new();
                 for i in 0..STOOPED_RISEN {
                     let a = i as f32 / STOOPED_RISEN as f32 * std::f32::consts::TAU + 0.4;

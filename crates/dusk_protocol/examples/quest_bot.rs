@@ -125,6 +125,12 @@ fn main() {
                 ServerMsg::Health { id, hp, .. } if Some(id) == me && std::env::var_os("QB_DMG").is_some() => {
                     say(format!("hp {hp}"))
                 }
+                ServerMsg::Health { id, hp, max_hp } if Some(id) == boss && std::env::var_os("QB_DMG").is_some() => {
+                    say(format!("boss hp {hp}/{max_hp}"))
+                }
+                ServerMsg::PlayerStats { level, .. } if std::env::var_os("QB_DMG").is_some() => {
+                    say(format!("level {level}"))
+                }
                 ServerMsg::Dialogue { speaker, text, choices } => {
                     say(format!("dialogue: {:?} {choices:?}", text.lines().next().unwrap_or("")));
                     if let Some(i) = choices.iter().position(|c| PICK.contains(&c.as_str())) {

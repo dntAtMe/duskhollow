@@ -249,7 +249,7 @@ pub fn regen(
     mut outbox: ResMut<Outbox>,
     mut units: Query<
         (Entity, &NetId, &OnMap, &Motion, &mut Stats, Option<&CombatClock>, Option<&Player>, Option<&GazeMods>),
-        (Without<Dead>, Without<Hidden>, Without<Attacking>, Without<Evading>),
+        (Without<Dead>, Without<Hidden>, Without<Attacking>, Without<Evading>, Without<crate::ai::KeepsWounds>),
     >,
 ) {
     *acc += time.delta_secs();

@@ -213,16 +213,24 @@ pub fn chase(
     }
 }
 
-/// Evading NPCs walk home, then heal to full.
+/// NPCs that keep their wounds when they lose their target (scripted bosses: each attempt
+/// chips at the same health bar).
+#[derive(Component)]
+pub struct KeepsWounds;
+
+/// Evading NPCs walk home, then heal to full (unless [`KeepsWounds`]).
 pub fn evade(
     mut commands: Commands,
     time: Res<Time>,
     world: Res<GameWorld>,
     mut outbox: ResMut<Outbox>,
-    mut npcs: Query<(Entity, &NetId, &OnMap, &Home, &mut Motion, &mut Stats, Option<&mut Nav>), With<Evading>>,
+    mut npcs: Query<
+        (Entity, &NetId, &OnMap, &Home, &mut Motion, &mut Stats, Option<&mut Nav>, Has<KeepsWounds>),
+        With<Evading>,
+    >,
 ) {
     let dt = time.delta_secs();
-    for (npc, id, map, home, mut m, mut s, nav) in &mut npcs {
+    for (npc, id, map, home, mut m, mut s, nav, keeps_wounds) in &mut npcs {
         let mut fallback = Nav::default();
         let nav = match nav {
             Some(n) => n.into_inner(),
@@ -234,8 +242,10 @@ pub fn evade(
             m.pos = home.pos;
             m.orientation = home.orientation;
             m.moving = false;
-            s.hp = s.max_hp;
-            outbox.push(Scope::Map(map.0), ServerMsg::Health { id: id.0, hp: s.hp, max_hp: s.max_hp });
+            if !keeps_wounds {
+                s.hp = s.max_hp;
+                outbox.push(Scope::Map(map.0), ServerMsg::Health { id: id.0, hp: s.hp, max_hp: s.max_hp });
+            }
             commands.entity(npc).remove::<(Evading, Nav)>();
         } else {
             m.orientation = orientation(next - m.pos);
