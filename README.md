@@ -6,7 +6,29 @@ server, procedurally generated oldschool pre-rendered art and an original soundt
 The engine reads a legacy data pack (`game.db`, `.map` files, sprite archives; formats in
 [docs/formats.md](docs/formats.md)) that is **not** distributed here. Everything under
 `custom_assets/` (sprites, portraits, tiles, icons, UI skin, spell effects, music, the
-`custom_glade` map) is original and progressively replaces legacy visuals with `--art custom`.
+`custom_glade` and `custom_duskhollow` maps) is original and progressively replaces legacy
+visuals with `--art custom`.
+
+![Duskhollow title over the gorge](docs/screenshots/title.jpg)
+
+## First Gaze (demo)
+
+A crimson sky, a rift, and an Eye that never shuts ([world bible](docs/world.md),
+[demo plan](docs/demo-plan.md)). You are an Ender, one of the few who can stand its gaze for a
+while: strain builds under open sky and faster in a fight, shade and roofs slow it, rest cairns
+clear it. Help Ysolde of Lowshade with the glarewolves in the Red Fields, then put Warden Corvin
+to rest at the Glare Gate while the Eye opens wide.
+
+```bash
+cargo run -p dusk_client -- custom_duskhollow --art custom
+```
+
+| | |
+|---|---|
+| ![Ysolde at the rest cairn in Lowshade](docs/screenshots/dialogue.jpg) | ![Canopy shelter in the Red Fields](docs/screenshots/fields.jpg) |
+| Lowshade: Ysolde at the rest cairn | The Red Fields: canopies are the only shade |
+
+![Hollowed Warden Corvin at the Glare Gate, the Eye wide open](docs/screenshots/gate.jpg)
 
 ## Setup
 
