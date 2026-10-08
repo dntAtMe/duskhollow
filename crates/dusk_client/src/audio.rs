@@ -5,6 +5,10 @@
 //! Other modules can trigger a sound by writing a [`PlaySfx`] message.
 //! Keys: `M` toggles music + ambience, `N` toggles sound effects.
 //! `DUSK_AUDIO_LOG=1` logs every sound that starts (at `info` level).
+//! Duskhollow additions (gaze ambience layer, custom NPC voices, cairn fire, footsteps,
+//! `DUSK_GAZE_FAKE`) live in [`custom`].
+
+mod custom;
 
 use crate::{
     combat_ui::UiFont,
@@ -67,6 +71,7 @@ impl Plugin for AudioPlugin {
                 )
                     .chain(),
             );
+        custom::build(app);
     }
 }
 
@@ -275,7 +280,7 @@ fn play_sfx(
         if gain <= 0.0 {
             continue;
         }
-        let Some(path) = resolve_sound(&data.index, &sfx.name) else {
+        let Some(path) = custom::resolve_sfx(&data.index, &sfx.name) else {
             debug!("audio: missing sound {}", sfx.name);
             continue;
         };
@@ -428,6 +433,7 @@ fn on_map_loaded(
     };
     music.region = RegionGrid::new(&map);
     proximity.groups = proximity_groups(&map, &db.0);
+    custom::load_custom_proximity(&mut proximity.groups, &map, &data, &current.name);
     info!(
         "audio: map {}: {} zone chunks, {} area chunks, proximity sounds {:?}",
         current.name,
@@ -659,6 +665,14 @@ fn npc_model<'a>(data: &'a GameData, npc: &Npc) -> Option<&'a str> {
     data.npc_models.get(&template.model_id).map(|m| m.name.as_str())
 }
 
+/// `npc_sounds` lines of a model event, else our own `npc_<model>_<event>.wav` files.
+fn voice_lines(data: &GameData, db: &SoundTables, model: &str, event: &str) -> Vec<String> {
+    match db.npc_sounds(model, event) {
+        [] => custom::custom_voice(&data.index, model, event),
+        lines => lines.to_vec(),
+    }
+}
+
 /// Melee results (`ServerMsg::Swing`) and deaths: hit/miss sounds from the original
 /// client's hard-coded tables, NPC voices from `npc_sounds`.
 #[allow(clippy::too_many_arguments)]
@@ -686,7 +700,7 @@ fn combat_sounds(
         if throttle && last_voice.get(&e).is_some_and(|t| now - t < VOICE_COOLDOWN) {
             return;
         }
-        if let Some(s) = rng.pick(db.0.npc_sounds(model, event)) {
+        if let Some(s) = rng.pick(&voice_lines(&data, &db.0, model, event)) {
             last_voice.insert(e, now);
             out.write(PlaySfx::at_unit(s.clone(), e));
         }
@@ -715,7 +729,7 @@ fn combat_sounds(
                 if let Some(a) = att.filter(|_| att_npc) {
                     let engaged = timers.last_swing.insert(a, now).is_some_and(|t| now - t < AGGRO_GAP);
                     let model = npcs.get(a).ok().and_then(|n| npc_model(&data, n)).unwrap_or_default();
-                    let aggro = !engaged && !db.0.npc_sounds(model, "aggro").is_empty();
+                    let aggro = !engaged && !voice_lines(&data, &db.0, model, "aggro").is_empty();
                     voice(
                         &mut out,
                         &mut rng,
