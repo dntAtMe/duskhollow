@@ -31,16 +31,16 @@ back".
 
 | Char | Kind | Strain per second |
 |---|---|---|
-| `.` | open sky | +1.0 |
-| `s` | shade (canopy, eaves) | +0.25 |
+| `.` | open sky | +0.35 |
+| `s` | shade (canopy, eaves) | −0.6 (+0.15 while fighting) |
 | `S` | deep shelter (overhang, roofed lane) | −5 |
 | `C` | rest cairn (cell centre of a cairn) | — (cells within 3 of a `C` count as cairn range: −15/s, bind) |
 
-- Combat (dealt or took damage within the last 5 s) multiplies gains ×2.5.
+- Combat (dealt or took damage within the last 5 s) multiplies gains ×2.
 - Eye states: `Lidded`, `Opening`, `Open`, `Closing`. `Open` doubles gains. The demo opens it at
   the Glare Gate boss; elsewhere it opens on a timer (roughly every 6 min for 45 s).
 - **Gaze spot**: while lidded the Eye still sweeps a wandering spot (radius ~5 cells) across open
-  ground; inside it, gains ×3. The client draws it as a slow pale-crimson wash.
+  ground; inside it, gains ×2.5. The client draws it as a slow pale-crimson wash.
 - **Ender resistance**: gains × (1 − min(WIL × 0.5 %, 40 %)).
 - **Thresholds**: ≥ 40 *Weary* (regen −50 %), ≥ 70 *Gaze-sick* (no HP regen, move −10 %, damage
   dealt −15 %), 100 *Overwhelmed* (lose 2 % max HP per second, corruption +1 per second).

@@ -78,8 +78,8 @@ pub(crate) fn move_player(
     }
 
     let step = if screen_dir != Vec2::ZERO {
-        // Manual movement cancels auto-attack (Diablo-style).
-        if state.target.take().is_some() {
+        // Manual movement cancels auto-attack (the selection stays for spells).
+        if std::mem::take(&mut state.attacking) {
             net.send(ClientMsg::StopAttack);
         }
         interact.0 = None;
@@ -88,6 +88,7 @@ pub(crate) fn move_player(
         Some((iso::to_cell(screen_dir.normalize() * iso::TILE_H) - origin).normalize_or_zero())
     } else if let Some(tpos) = state
         .target
+        .filter(|_| state.attacking)
         .or(interact.0)
         .and_then(|id| net.entities.get(&id))
         .and_then(|e| others.get(*e).ok())

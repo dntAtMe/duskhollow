@@ -284,9 +284,10 @@ fn click_npc(
     let Some((e, npc)) = pick_npc(at, units.iter()) else { return };
     let friendly = data.npc_templates.get(&npc.entry).is_some_and(|t| t.faction == faction::FRIENDLY);
     if let Some(id) = net.entity_id(e).filter(|_| friendly) {
-        if state.target.take().is_some() {
+        if std::mem::take(&mut state.attacking) {
             net.send(ClientMsg::StopAttack);
         }
+        state.target = None;
         target.0 = Some(id);
     }
 }

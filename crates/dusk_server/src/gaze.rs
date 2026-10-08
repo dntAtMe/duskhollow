@@ -17,18 +17,21 @@ use dusk_protocol::{EyeState, GazeCover, ServerMsg};
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Strain per second by cover (before multipliers).
-const RATE_OPEN: f32 = 1.0;
-const RATE_SHADE: f32 = 0.25;
+/// Strain per second by cover (before multipliers). DESIGN: a few minutes of open sky to
+/// turn Weary; shade lets it ease off between fights but never below the floor.
+const RATE_OPEN: f32 = 0.35;
+const RATE_SHADE: f32 = -0.6;
+/// Shade while fighting: still creeps up, slowly.
+const RATE_SHADE_COMBAT: f32 = 0.15;
 const RATE_SHELTER: f32 = -5.0;
 const RATE_CAIRN: f32 = -15.0;
 /// Gains while in combat (dealt or took damage within [`COMBAT_SECS`]).
-const COMBAT_MULT: f32 = 2.5;
+const COMBAT_MULT: f32 = 2.0;
 const COMBAT_SECS: f32 = 5.0;
 /// Gains while the Eye is wide open (scaled by openness during Opening/Closing).
 const EYE_OPEN_MULT: f32 = 2.0;
 /// Gains inside the wandering gaze spot.
-const SPOT_MULT: f32 = 3.0;
+const SPOT_MULT: f32 = 2.5;
 /// Ender resistance: gains x (1 - min(WIL x 0.5 %, 40 %)).
 const WIL_RESIST: f32 = 0.005;
 const WIL_RESIST_MAX: f32 = 0.4;
@@ -380,7 +383,8 @@ pub fn wil_resist(willpower: i32) -> f32 {
 pub fn strain_rate(cover: GazeCover, in_combat: bool, openness: f32, in_spot: bool, willpower: i32) -> f32 {
     let base = match cover {
         GazeCover::Open => RATE_OPEN,
-        GazeCover::Shade => RATE_SHADE,
+        GazeCover::Shade if in_combat => RATE_SHADE_COMBAT,
+        GazeCover::Shade => return RATE_SHADE,
         GazeCover::Shelter => return RATE_SHELTER,
         GazeCover::Cairn => return RATE_CAIRN,
     };
@@ -586,14 +590,15 @@ mod tests {
 
     #[test]
     fn rates() {
-        assert_eq!(strain_rate(GazeCover::Open, false, 0.0, false, 0), 1.0);
-        assert_eq!(strain_rate(GazeCover::Shade, false, 0.0, false, 0), 0.25);
-        assert_eq!(strain_rate(GazeCover::Open, true, 1.0, true, 0), 15.0);
+        assert_eq!(strain_rate(GazeCover::Open, false, 0.0, false, 0), 0.35);
+        assert_eq!(strain_rate(GazeCover::Shade, false, 0.0, false, 0), -0.6);
+        assert!((strain_rate(GazeCover::Shade, true, 0.0, false, 0) - 0.3).abs() < 1e-6);
+        assert!((strain_rate(GazeCover::Open, true, 1.0, true, 0) - 3.5).abs() < 1e-5);
         assert_eq!(strain_rate(GazeCover::Shelter, true, 1.0, true, 0), -5.0);
         assert_eq!(strain_rate(GazeCover::Cairn, false, 0.0, false, 0), -15.0);
         // 40 % cap on Ender resistance.
-        assert!((strain_rate(GazeCover::Open, false, 0.0, false, 20) - 0.9).abs() < 1e-6);
-        assert!((strain_rate(GazeCover::Open, false, 0.0, false, 500) - 0.6).abs() < 1e-6);
+        assert!((strain_rate(GazeCover::Open, false, 0.0, false, 20) - 0.315).abs() < 1e-6);
+        assert!((strain_rate(GazeCover::Open, false, 0.0, false, 500) - 0.21).abs() < 1e-6);
     }
 
     #[test]

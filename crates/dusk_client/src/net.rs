@@ -73,13 +73,22 @@ pub struct PlayerState {
     pub mana: i32,
     pub max_mana: i32,
     pub dead: bool,
-    /// Auto-attack target (server id).
+    /// Selected target (server id): spells land on it, the target frame shows it.
     pub target: Option<EntityId>,
+    /// Walking up to / auto-attacking `target` (right-click, double-click).
+    pub attacking: bool,
     pub attributes: dusk_protocol::Attributes,
     /// Movement multiplier from snares (1.0 = normal).
     pub speed_mult: f32,
     pub rooted: bool,
     pub stunned: bool,
+}
+
+impl PlayerState {
+    pub fn clear_target(&mut self) {
+        self.target = None;
+        self.attacking = false;
+    }
 }
 
 /// Spell-related and chat server messages, forwarded to `spells_ui` / `spell_fx` / `chat`.
@@ -178,7 +187,7 @@ fn receive(
                     crate::feel::despawn_unit(&mut commands, e, dead.contains(e));
                 }
                 if me.target == Some(id) {
-                    me.target = None;
+                    me.clear_target();
                 }
             }
             ServerMsg::Moved { id, pos, orientation, moving } => {
@@ -243,10 +252,10 @@ fn receive(
                 }
                 if Some(id) == net.my_id {
                     me.dead = true;
-                    me.target = None;
+                    me.clear_target();
                 }
                 if me.target == Some(id) {
-                    me.target = None;
+                    me.clear_target();
                 }
             }
             ServerMsg::Revive { id, pos, hp } => {
@@ -273,7 +282,8 @@ fn receive(
                 (me.level, me.xp, me.xp_next, me.mana, me.max_mana) = (level, xp, xp_next, mana, max_mana);
                 me.attributes = attributes;
             }
-            ServerMsg::TargetLost => me.target = None,
+            // The server stopped our auto-attack; keep the selection.
+            ServerMsg::TargetLost => me.attacking = false,
             ServerMsg::ControlState { speed_pct, rooted, stunned } => {
                 (me.speed_mult, me.rooted, me.stunned) = (speed_pct as f32 / 100.0, rooted, stunned);
             }

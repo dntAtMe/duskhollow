@@ -11,14 +11,14 @@ use crate::{
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use dusk_formats::db::faction;
-use dusk_protocol::ClientMsg;
+use dusk_protocol::{ClientMsg, EntityId};
 
 pub struct CombatUiPlugin;
 
 impl Plugin for CombatUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (load_font, spawn_hud).chain())
-            .add_systems(Update, (click_target, sync_targeted, animate_floating_text, update_death_notice))
+            .add_systems(Update, (click_target, tab_target, sync_targeted, animate_floating_text, update_death_notice))
             .add_systems(Update, autoplay.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()));
     }
 }
@@ -34,11 +34,32 @@ pub fn load_font(mut commands: Commands, data: Res<GameData>, assets: Res<AssetS
 
 // ---------------------------------------------------------------- targeting
 
-/// Left click on a hostile/neutral NPC: attack it. Escape: clear target.
+/// Two left clicks on the same unit within this many seconds attack it.
+const DOUBLE_CLICK_SECS: f32 = 0.35;
+/// Tab only cycles through hostiles this close (cells).
+const TAB_RANGE: f32 = 22.0;
+
+/// Selects `id`. An auto-attack already running follows the new target.
+fn select(state: &mut PlayerState, net: &Net, id: EntityId) {
+    state.target = Some(id);
+    if state.attacking {
+        net.send(ClientMsg::Attack { target: id });
+    }
+}
+
+fn attack(state: &mut PlayerState, net: &Net, id: EntityId) {
+    state.target = Some(id);
+    state.attacking = true;
+    net.send(ClientMsg::Attack { target: id });
+}
+
+/// Left click on a hostile/neutral NPC selects it (spells land on it, no walking);
+/// right click or a double click attacks it (walk up + auto-attack). Escape clears.
 #[allow(clippy::too_many_arguments)]
 fn click_target(
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
     window: Query<&Window, With<PrimaryWindow>>,
     camera: Query<(&Camera, &GlobalTransform), With<crate::player::MainCamera>>,
     data: Res<GameData>,
@@ -46,22 +67,64 @@ fn click_target(
     mut state: ResMut<PlayerState>,
     units: Query<(Entity, &Unit, &Npc, &Transform), (Without<Dead>, Without<Player>)>,
     captured: Res<UiInputCaptured>,
+    mut last_click: Local<Option<(EntityId, f32)>>,
 ) {
-    if !captured.keyboard && keys.just_pressed(KeyCode::Escape) && state.target.take().is_some() {
-        net.send(ClientMsg::StopAttack);
+    if !captured.keyboard && keys.just_pressed(KeyCode::Escape) && state.target.is_some() {
+        if state.attacking {
+            net.send(ClientMsg::StopAttack);
+        }
+        state.clear_target();
     }
-    if !mouse.just_pressed(MouseButton::Left) || state.dead || captured.pointer {
+    let (left, right) = (mouse.just_pressed(MouseButton::Left), mouse.just_pressed(MouseButton::Right));
+    if !(left || right) || state.dead || captured.pointer {
         return;
     }
     let (Ok(window), Ok((cam, cam_tf))) = (window.single(), camera.single()) else { return };
     let Some(world) = window.cursor_position().and_then(|c| cam.viewport_to_world_2d(cam_tf, c).ok()) else { return };
     let Some((e, npc)) = pick_npc(world, units.iter().map(|(e, u, n, t)| (e, u, n, t))) else { return };
     let attackable = data.npc_templates.get(&npc.entry).is_some_and(|t| t.faction != faction::FRIENDLY);
-    let Some(id) = net.entity_id(e) else { return };
-    if attackable {
-        state.target = Some(id);
-        net.send(ClientMsg::Attack { target: id });
+    let Some(id) = net.entity_id(e).filter(|_| attackable) else { return };
+    let now = time.elapsed_secs();
+    let double = left && last_click.is_some_and(|(prev, t)| prev == id && now - t < DOUBLE_CLICK_SECS);
+    *last_click = left.then_some((id, now));
+    if right || double {
+        attack(&mut state, &net, id);
+    } else {
+        select(&mut state, &net, id);
     }
+}
+
+/// Tab / Shift+Tab: cycle through living hostiles near the player, nearest first.
+fn tab_target(
+    keys: Res<ButtonInput<KeyCode>>,
+    data: Res<GameData>,
+    net: Res<Net>,
+    mut state: ResMut<PlayerState>,
+    player: Query<&Unit, With<Player>>,
+    units: Query<(Entity, &Unit, &Npc), (Without<Dead>, Without<Player>)>,
+    captured: Res<UiInputCaptured>,
+) {
+    if captured.keyboard || state.dead || !keys.just_pressed(KeyCode::Tab) {
+        return;
+    }
+    let Ok(me) = player.single() else { return };
+    let mut near: Vec<(f32, EntityId)> = units
+        .iter()
+        .filter(|(_, _, n)| data.npc_templates.get(&n.entry).is_some_and(|t| t.faction != faction::FRIENDLY))
+        .filter_map(|(e, u, _)| Some((u.pos.distance(me.pos), net.entity_id(e)?)))
+        .filter(|(d, _)| *d <= TAB_RANGE)
+        .collect();
+    if near.is_empty() {
+        return;
+    }
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let back = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    let next = match state.target.and_then(|t| near.iter().position(|(_, id)| *id == t)) {
+        Some(i) if back => (i + near.len() - 1) % near.len(),
+        Some(i) => (i + 1) % near.len(),
+        None => 0,
+    };
+    select(&mut state, &net, near[next].1);
 }
 
 /// Front-most NPC whose rough body box contains the world-space point `at`.
@@ -96,8 +159,7 @@ fn autoplay(
         .filter(|(_, _, n)| data.npc_templates.get(&n.entry).is_some_and(|t| t.faction != faction::FRIENDLY))
         .min_by(|a, b| a.1.pos.distance(me.pos).total_cmp(&b.1.pos.distance(me.pos)));
     if let Some(id) = nearest.filter(|n| n.1.pos.distance(me.pos) < 60.0).and_then(|n| net.entity_id(n.0)) {
-        state.target = Some(id);
-        net.send(ClientMsg::Attack { target: id });
+        attack(&mut state, &net, id);
     }
 }
 
