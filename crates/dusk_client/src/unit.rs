@@ -158,9 +158,12 @@ pub fn spawn_unit(
 }
 
 /// `scripts/npc/custom/<model>.txt` (our generated monster, tools/artgen/creatures.py) when running
-/// with `--art custom` and one exists, else the original `scripts/npc/<model>.txt`.
+/// with `--art custom` and one exists, else the original `scripts/npc/<model>.txt`. Models that only
+/// exist as ours (custom NPC templates) use ours either way.
 fn npc_script_dir(data: &GameData, model: &str) -> &'static str {
-    let custom = data.custom_art && data.root.join("scripts/npc/custom").join(format!("{model}.txt")).exists();
+    let file = format!("{model}.txt");
+    let has_custom = data.root.join("scripts/npc/custom").join(&file).exists();
+    let custom = has_custom && (data.custom_art || !data.root.join("scripts/npc").join(&file).exists());
     if custom { "npc/custom" } else { "npc" }
 }
 

@@ -18,6 +18,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).parent))
 import character  # noqa: E402
 import creatures  # noqa: E402
+import valefolk  # noqa: E402
 from vox import BAYER4, COS_E, PX_PER_UNIT, rot_y  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[2] / "custom_assets" / "content" / "custom" / "portraits"
@@ -64,8 +65,18 @@ def main():
         "goblin_charger": (creatures.goblin("spear", "red"), 1.5, 2.1, creatures.hunched(character.stance)),
         "spider": (creatures.spider(), 0.32, 2.1, None),
         "antlion_small": (creatures.antling(), 0.22, 2.9, None),
+        # Duskhollow (valefolk.py)
+        "glarewolf": (valefolk.glarewolf(), 0.7, 2.1, valefolk.wolf_portrait),
+        "stooped": (valefolk.stooped(), 1.18, 2.3, valefolk.stooped_anims()[0][1]),
+        "hollowed_warden": (valefolk.hollowed_warden(), 1.68, 1.9, valefolk.warden_anims()[0][1]),
+        "cairnkeeper": (valefolk.cairnkeeper(), 1.58, 2.1, valefolk.keeper_anims()[0][1]),
+        "lightworker": (valefolk.lightworker(), 1.52, 2.0, valefolk.worker_anims()[0][1]),
+        "lowshade_guard": (valefolk.lowshade_guard(), 1.62, 2.0, valefolk.guard_anims()[0][1]),
     }
+    only = sys.argv[1:]
     for name, (model, z, scale, pose) in jobs.items():
+        if only and name not in only:
+            continue
         Image.fromarray(portrait(model, z, scale, pose)).save(OUT / f"portrait_custom_{name}.png")
         print(f"portrait {name}")
 
