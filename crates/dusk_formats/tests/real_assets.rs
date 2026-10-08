@@ -122,6 +122,11 @@ fn custom_maps_parse_and_resolve() {
     use dusk_formats::custom::{CUSTOM_MAP_PREFIX, parse_spawns};
     let dir = dusk_formats::custom_assets_root().join("maps");
     let Ok(entries) = std::fs::read_dir(&dir) else { return };
+    // Every PNG name under custom_assets/content, scanned once.
+    let pngs: std::collections::HashSet<String> = files(&dusk_formats::custom_assets_root().join("content"), "png")
+        .iter()
+        .map(|f| f.file_name().unwrap().to_string_lossy().into_owned())
+        .collect();
     let mut n = 0;
     for p in entries.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == "map")) {
         assert!(p.file_stem().unwrap().to_string_lossy().starts_with(CUSTOM_MAP_PREFIX));
@@ -129,10 +134,7 @@ fn custom_maps_parse_and_resolve() {
         assert_eq!(m.cells.len() as u32, m.size * m.size);
         // Every texture must exist in custom_assets/content (`.psi` entries are original particle systems).
         for t in m.textures.iter().filter(|t| !t.ends_with(".psi")) {
-            let found = files(&dusk_formats::custom_assets_root().join("content"), "png")
-                .iter()
-                .any(|f| f.file_name().unwrap() == t.as_str());
-            assert!(found, "{}: missing texture {t}", p.display());
+            assert!(pngs.contains(t.as_str()), "{}: missing texture {t}", p.display());
         }
         let spawns = std::fs::read_to_string(p.with_extension("spawns")).unwrap_or_default();
         assert!(!parse_spawns(&spawns, 1, 0).is_empty(), "{}: no spawns", p.display());
