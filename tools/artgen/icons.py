@@ -1,6 +1,7 @@
 """Our own item and spell icons (40x40), replacing the originals with `--art custom`.
 
 Usage (from repo root):  python -I tools/artgen/icons.py [--only <substring>] [--no-preview]
+                         python -I tools/artgen/icons.py --custom-spells   (our skills, see below)
 
 Reads the ORIGINAL data only for names and numbers: `assets/game.db` (`item_template.icon`, name,
 quality, model; `spell_template.icon`, name, description, cast_school, effects) and the file
@@ -15,6 +16,9 @@ name, so these replace the originals -- plus contact sheets in `custom_assets/pr
   gems, orbs, scrolls, food, junk ...) on a dark dithered card tinted by item quality, with a
   bevelled frame in the quality colour. `scroll_<spell>.png` items are a parchment scroll with that
   spell's icon inset in the top-left corner.
+- `--custom-spells`: icons for our own skills (`custom_assets/data/spells.txt`, `icon=` names) into
+  `custom_assets/content/custom/icons/spells/`. Custom-only names are always indexed, so they show
+  with and without `--art custom`. Recipes: `DUSK_RULES` in `icon_spells.py`.
 - Spells (`icon_spells.py`): symbolic motifs (flames, ice shards, holy light, skulls, arrows,
   swords, shields, hands, wings ...) chosen from the spell's name / icon name / description by
   keyword rules, painted in the palette of its school.
@@ -143,7 +147,53 @@ def contact_sheet(images: list[tuple[str, np.ndarray]], path: Path, cols=16, zoo
     sheet.save(path)
 
 
+CUSTOM_SPELLS = ROOT / "custom_assets" / "data" / "spells.txt"
+CUSTOM_OUT = ROOT / "custom_assets" / "content" / "custom" / "icons" / "spells"
+
+
+def custom_spells() -> list[dict]:
+    """Our own skills from `custom_assets/data/spells.txt` (name, icon, school, effects)."""
+    out, cur = [], None
+    for line in CUSTOM_SPELLS.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            cur = {"entry": int(line[1:-1]), "effects": [], "school": 1}
+            out.append(cur)
+            continue
+        if cur is None or "=" not in line:
+            continue
+        k, v = (s.strip() for s in line.split("=", 1))
+        if k in ("name", "icon", "description"):
+            cur[k] = v
+        elif k == "school":
+            cur["school"] = int(v)
+        elif k == "effect1_positive":
+            cur["positive"] = v == "1"
+    return out
+
+
+def make_custom_spell_icons(argv):
+    """Icons for our own skills (custom-only file names, shown with and without `--art custom`)."""
+    done = []
+    for s in custom_spells():
+        if not s.get("icon"):
+            continue
+        img = spell_image(s["icon"][:-4], s, 40)
+        out = CUSTOM_OUT / s["icon"]
+        out.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(img).save(out, optimize=True)
+        fn, pat = icon_spells.pick_recipe(s["icon"][:-4], s)
+        print(f"{s['entry']} {s['name']}: {s['icon']} ({pat})")
+        done.append((s["icon"], img))
+    if "--no-preview" not in argv:
+        contact_sheet(done, PREVIEW / "icons_custom_spells.png", cols=10, zoom=4)
+
+
 def main(argv):
+    if "--custom-spells" in argv:
+        return make_custom_spell_icons(argv)
     only = argv[argv.index("--only") + 1].lower() if "--only" in argv else None
     assets = find_assets()
     items, spells, files = load(assets)

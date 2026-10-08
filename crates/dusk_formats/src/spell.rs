@@ -20,6 +20,8 @@ pub mod effect {
     pub const RESTORE_MANA_PCT: i64 = 28;
     pub const MELEE_ATK: i64 = 30;
     pub const RANGED_ATK: i64 = 31;
+    /// Rush to the target (Charge). Implemented as a dash that stops just short of it.
+    pub const CHARGE: i64 = 37;
 }
 
 pub mod aura {
@@ -31,6 +33,8 @@ pub mod aura {
     pub const MODIFY_MOVE_SPEED_PCT: i64 = 11;
     pub const MODIFY_DMG_DEALT_PCT: i64 = 14;
     pub const MODIFY_DMG_RECEIVED_PCT: i64 = 15;
+    /// Ours (not a legacy aura type): percent change to gaze strain gain (data3, e.g. -50).
+    pub const MODIFY_STRAIN_GAIN_PCT: i64 = 100;
 }
 
 pub mod mechanic {
@@ -218,7 +222,8 @@ pub struct SpellVisual {
 }
 
 impl GameDb {
-    pub fn spell_visuals(&self) -> rusqlite::Result<HashMap<i64, SpellVisual>> {
+    /// `spell_visual_kit` by id.
+    pub fn spell_visual_kits(&self) -> rusqlite::Result<HashMap<i64, VisualKit>> {
         let mut kits: HashMap<i64, VisualKit> = HashMap::new();
         {
             let mut stmt = self.conn().prepare("SELECT * FROM spell_visual_kit")?;
@@ -255,6 +260,12 @@ impl GameDb {
                 kits.insert(k.id, k);
             }
         }
+        Ok(kits)
+    }
+
+    /// `spell_visual` by spell entry, with its kits resolved.
+    pub fn spell_visuals(&self) -> rusqlite::Result<HashMap<i64, SpellVisual>> {
+        let kits = self.spell_visual_kits()?;
         let mut stmt = self.conn().prepare("SELECT * FROM spell_visual")?;
         let rows = stmt.query_map([], |r| {
             let kit = |c: &str| kits.get(&int(r, c)).cloned();

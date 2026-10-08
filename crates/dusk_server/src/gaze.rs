@@ -442,6 +442,7 @@ type PlayerGaze<'a> = (
     Option<&'a Bound>,
     Option<&'a CombatClock>,
     Has<Dead>,
+    Option<&'a crate::spells::Auras>,
 );
 
 /// Strain, corruption, cairn binding and the per-player `Gaze` message.
@@ -453,7 +454,7 @@ pub fn update_strain(
     mut players: Query<PlayerGaze, (With<Player>, Without<Hidden>)>,
 ) {
     let dt = time.delta_secs();
-    for (e, map, mut m, mut stats, id, strain, mods, bound, clock, dead) in &mut players {
+    for (e, map, mut m, mut stats, id, strain, mods, bound, clock, dead, auras) in &mut players {
         let Some(g) = gaze.maps.get(&map.0) else {
             if mods.is_some_and(|m| *m != GazeMods::default()) {
                 commands.entity(e).insert(GazeMods::default());
@@ -490,7 +491,11 @@ pub fn update_strain(
             st.strain = st.strain.min(DEAD_STRAIN_CAP);
             st.hp_debt = 0.0;
         } else {
-            let rate = strain_rate(st.cover, st.in_combat, g.openness(), st.in_spot, stats.attrs.willpower);
+            let mut rate = strain_rate(st.cover, st.in_combat, g.openness(), st.in_spot, stats.attrs.willpower);
+            if rate > 0.0 {
+                // Draw the Veil (custom aura MODIFY_STRAIN_GAIN_PCT) slows gains only.
+                rate *= auras.map_or(1.0, |a| a.strain_gain_mult());
+            }
             let floor = if matches!(st.cover, GazeCover::Shelter | GazeCover::Cairn) { 0.0 } else { STRAIN_FLOOR };
             let next = (st.strain + rate * dt).min(STRAIN_MAX);
             // Gains can't push below the floor; shelter drains to zero.

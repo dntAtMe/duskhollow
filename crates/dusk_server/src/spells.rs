@@ -99,6 +99,51 @@ impl Auras {
     fn damage_taken_pct(&self) -> i32 {
         self.0.iter().filter(|a| a.kind == aura::MODIFY_DMG_RECEIVED_PCT).map(|a| a.value).sum()
     }
+
+    /// Multiplier on gaze strain gains (Draw the Veil), never below 0.
+    pub fn strain_gain_mult(&self) -> f32 {
+        let pct: i32 = self.0.iter().filter(|a| a.kind == aura::MODIFY_STRAIN_GAIN_PCT).map(|a| a.value).sum();
+        (1.0 + pct as f32 / 100.0).max(0.0)
+    }
+}
+
+/// A charge stops this far (cells) short of its target: inside melee range.
+const CHARGE_STOP: f32 = 1.1;
+
+/// Charge: dash in a straight line towards the target, as far as the floor allows, stopping at
+/// melee range. The caster's client is snapped there (`Correct`); everyone else sees a `Moved`.
+fn charge(
+    world: &GameWorld,
+    units: &mut Query<Victim, Without<Hidden>>,
+    outbox: &mut Outbox,
+    caster: Entity,
+    target: Entity,
+) {
+    let Ok(to) = units.get(target).map(|u| u.3.pos) else { return };
+    let Ok((.., map, mut m, _, _, _, _, _, _, _)) = units.get_mut(caster) else { return };
+    let from = m.pos;
+    let reach = from.distance(to) - CHARGE_STOP;
+    if reach <= 0.1 {
+        return;
+    }
+    let dir = (to - from).normalize();
+    let mut dest = from;
+    let steps = (reach / 0.25).ceil() as i32;
+    for i in 1..=steps {
+        let p = from + dir * (i as f32 * 0.25).min(reach);
+        if !world.is_walkable(map.0, p) {
+            break;
+        }
+        dest = p;
+    }
+    if dest == from {
+        return;
+    }
+    m.pos = dest;
+    m.orientation = crate::ai::orientation(dir);
+    m.moving = false;
+    m.dirty = true;
+    outbox.push(Scope::To(caster), ServerMsg::Correct { pos: crate::world::to_pos(dest) });
 }
 
 pub fn control_of(auras: Option<&Auras>) -> Control {
@@ -448,7 +493,7 @@ type Victim<'a> = (
     Entity,
     &'a NetId,
     &'a OnMap,
-    &'a Motion,
+    &'a mut Motion,
     &'a mut Stats,
     Option<&'a mut Auras>,
     Option<&'a Faction>,
@@ -477,6 +522,9 @@ pub fn apply_effects(
         pending.0 = rest;
         due
     };
+    // Auras for units that had none yet, inserted after all effects ran: several auras of one
+    // spell (Ignite, Draw the Veil) would otherwise overwrite each other.
+    let mut fresh: HashMap<Entity, Vec<Aura>> = HashMap::new();
     for p in due {
         let Some(spell) = world.spells.get(&(p.spell as i64)) else { continue };
         let Ok((_, caster_id, caster_map, caster_motion, caster_stats, .., caster_is_player, _, _)) =
@@ -517,6 +565,12 @@ pub fn apply_effects(
                 _ => p.targets.clone(),
             };
             for t in targets {
+                if eff.kind == effect::CHARGE {
+                    if t != p.caster {
+                        charge(&world, &mut units, &mut outbox, p.caster, t);
+                    }
+                    continue;
+                }
                 apply_one(
                     &mut commands,
                     &mut *rng,
@@ -531,9 +585,13 @@ pub fn apply_effects(
                     eff,
                     t,
                     gaze.get(p.caster).ok(),
+                    &mut fresh,
                 );
             }
         }
+    }
+    for (e, list) in fresh {
+        commands.entity(e).insert(Auras(list));
     }
 }
 
@@ -552,6 +610,7 @@ fn apply_one(
     eff: &SpellEffect,
     t: Entity,
     gaze: Option<&crate::gaze::GazeMods>,
+    fresh: &mut HashMap<Entity, Vec<Aura>>,
 ) {
     let spell_id = spell.entry as SpellId;
     let Ok((_, tid, _, tm, mut ts, auras, _, is_npc, _, evading, dead)) = units.get_mut(t) else { return };
@@ -655,7 +714,11 @@ fn apply_one(
                     list.0.push(new);
                 }
                 None => {
-                    commands.entity(t).insert(Auras(vec![new]));
+                    let list = fresh.entry(t).or_default();
+                    list.retain(|a| {
+                        !(a.spell == spell_id && a.caster == caster && a.kind == kind && a.misc == new.misc)
+                    });
+                    list.push(new);
                 }
             }
             outbox.push(
@@ -738,7 +801,8 @@ pub fn tick_auras(
                 continue;
             }
             a.tick_timer -= dt;
-            while a.tick_timer <= 0.0 && a.remaining > -0.05 {
+            // Small epsilon: the last tick lands on the same frame the aura expires.
+            while a.tick_timer <= 1e-3 && a.remaining > -0.05 {
                 a.tick_timer += a.interval;
                 let heal = a.kind == aura::PERIODIC_HEAL;
                 let amount = a.value.max(1);
@@ -853,5 +917,259 @@ pub fn combat_mana(
             s.mana = (s.mana + (s.max_mana / 50).max(1)).min(s.max_mana);
             outbox.push(Scope::To(e), player_stats_msg(&world, p, &s));
         }
+    }
+}
+
+/// The Duskhollow skills (`custom_assets/data/spells.txt`) end to end through the cast pipeline,
+/// on the real data (skipped without extracted assets).
+#[cfg(test)]
+mod skill_tests {
+    use super::*;
+    use crate::stats::{npc_stats, player_stats};
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
+
+    const TICK: f32 = 0.05;
+
+    struct Sim {
+        app: App,
+        player: Entity,
+        start: Vec2,
+        /// A direction with at least 7 walkable cells in a straight line from `start`.
+        dir: Vec2,
+    }
+
+    impl Sim {
+        fn new() -> Option<Self> {
+            let root = dusk_formats::assets_root();
+            if !root.join("game.db").exists() {
+                return None;
+            }
+            let world = GameWorld::load(&root, Some("custom_duskhollow")).unwrap();
+            let (map, start) = world.start;
+            let dir = (0..16)
+                .map(|i| Vec2::from_angle(i as f32 * std::f32::consts::TAU / 16.0))
+                .find(|d| (0..=28).all(|k| world.is_walkable(map, start + *d * (k as f32 * 0.25))))
+                .expect("open ground around the arrival point");
+            let known: Vec<SpellId> = world.spells.keys().filter(|e| **e >= 50000).map(|e| *e as SpellId).collect();
+            assert!(known.len() >= 10, "custom skills loaded: {known:?}");
+            let cs = *world.class_stats(1, 1).unwrap();
+            let gaze = crate::gaze::Gaze::load(&root, &world);
+            let mut app = App::new();
+            app.add_plugins(MinimalPlugins)
+                .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f32(TICK)))
+                .insert_resource(world)
+                .insert_resource(gaze)
+                .init_resource::<Outbox>()
+                .init_resource::<CastRequests>()
+                .init_resource::<PendingEffects>()
+                .add_systems(
+                    Update,
+                    (start_casts, update_casts, apply_effects, tick_auras, tick_cooldowns, crate::gaze::update_strain)
+                        .chain(),
+                );
+            let player = app
+                .world_mut()
+                .spawn((
+                    NetId(1),
+                    OnMap(map),
+                    Motion { pos: start, orientation: 0.0, moving: false, dirty: false },
+                    player_stats(&cs, &Default::default()),
+                    Spellbook::new(known),
+                    Player { name: "Test".into(), class: 1, xp: 0 },
+                    Faction(faction::PLAYER_DEFAULT),
+                ))
+                .id();
+            app.update();
+            Some(Self { app, player, start, dir })
+        }
+
+        /// A level 1 glarewolf `dist` cells from the start, unable to dodge, parry or block.
+        fn wolf(&mut self, id: EntityId, dist: f32) -> Entity {
+            let w = self.app.world_mut();
+            let t = w.resource::<GameWorld>().npc_templates[&50001].clone();
+            let mut s = npc_stats(&t, 1);
+            s.max_hp = 500;
+            s.hp = 500;
+            (s.dodge, s.parry, s.block) = (0, 0, 0);
+            let pos = self.start + self.dir * dist;
+            let map = w.resource::<GameWorld>().start.0;
+            w.spawn((
+                NetId(id),
+                OnMap(map),
+                Npc { entry: 50001 },
+                Faction(faction::HOSTILE),
+                s,
+                Motion { pos, orientation: 0.0, moving: false, dirty: false },
+            ))
+            .id()
+        }
+
+        fn run(&mut self, secs: f32) {
+            for _ in 0..(secs / TICK).ceil() as i32 {
+                self.app.update();
+            }
+        }
+
+        /// Casts with a fresh spellbook and full mana, then runs `secs`; returns what was sent.
+        fn cast(&mut self, spell: SpellId, target: Option<Entity>, secs: f32) -> Vec<ServerMsg> {
+            let w = self.app.world_mut();
+            let known = w.get::<Spellbook>(self.player).unwrap().known.clone();
+            w.entity_mut(self.player).insert(Spellbook::new(known));
+            let mut s = w.get_mut::<Stats>(self.player).unwrap();
+            s.mana = s.max_mana;
+            w.resource_mut::<Outbox>().0.clear();
+            w.resource_mut::<CastRequests>().0.push(CastRequest {
+                caster: self.player,
+                spell,
+                target,
+                from_item: false,
+            });
+            self.run(secs);
+            self.app.world_mut().resource_mut::<Outbox>().0.drain(..).map(|(_, m)| m).collect()
+        }
+
+        fn hp(&self, e: Entity) -> i32 {
+            self.app.world().get::<Stats>(e).unwrap().hp
+        }
+
+        fn control(&self, e: Entity) -> Control {
+            control_of(self.app.world().get::<Auras>(e))
+        }
+
+        fn despawn(&mut self, e: Entity) {
+            self.app.world_mut().despawn(e);
+        }
+    }
+
+    fn hits(msgs: &[ServerMsg], spell: SpellId, target: EntityId) -> Vec<(i32, bool)> {
+        msgs.iter()
+            .filter_map(|m| match m {
+                ServerMsg::SpellHit { spell: s, target: t, amount, heal, .. } if *s == spell && *t == target => {
+                    Some((*amount, *heal))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn errors(msgs: &[ServerMsg]) -> Vec<String> {
+        msgs.iter()
+            .filter_map(|m| match m {
+                ServerMsg::CastError { reason } => Some(reason.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn aura_applied(msgs: &[ServerMsg], spell: SpellId, target: EntityId) -> bool {
+        msgs.iter()
+            .any(|m| matches!(m, ServerMsg::AuraApply { spell: s, target: t, .. } if *s == spell && *t == target))
+    }
+
+    #[test]
+    fn every_skill_casts_and_lands() {
+        let Some(mut sim) = Sim::new() else { return };
+
+        // Cairnbreaker: 0.7 s wind-up, then a heavy weapon hit.
+        let wolf = sim.wolf(10, 1.0);
+        let m = sim.cast(50001, Some(wolf), 1.0);
+        assert!(errors(&m).is_empty(), "{:?}", errors(&m));
+        assert!(m.iter().any(|m| matches!(m, ServerMsg::CastStart { spell: 50001, cast_ms: 700, .. })));
+        let h = hits(&m, 50001, 10);
+        println!("Cairnbreaker: {h:?}");
+        assert!(h.len() == 1 && h[0].0 > 0);
+
+        // Open Vein: a cut, then three bleed ticks over 9 s.
+        let m = sim.cast(50002, Some(wolf), 9.5);
+        let h = hits(&m, 50002, 10);
+        println!("Open Vein: {h:?}");
+        assert!(aura_applied(&m, 50002, 10));
+        assert_eq!(h.len(), 4, "hit + 3 ticks");
+        assert!(h[1..].iter().all(|(a, heal)| *a > 0 && !heal));
+
+        // Skullcrack: stunned for 2 s, then free again.
+        let m = sim.cast(50003, Some(wolf), 0.2);
+        println!("Skullcrack: {:?}", hits(&m, 50003, 10));
+        assert!(aura_applied(&m, 50003, 10) && sim.control(wolf).stunned);
+        sim.run(2.0);
+        assert!(!sim.control(wolf).stunned);
+        sim.despawn(wolf);
+
+        // Run Down: from 5 cells away, ends in melee range with the target slowed.
+        let far = sim.wolf(11, 5.0);
+        let before = sim.app.world().get::<Motion>(sim.player).unwrap().pos;
+        let m = sim.cast(50004, Some(far), 0.2);
+        assert!(errors(&m).is_empty(), "{:?}", errors(&m));
+        let after = sim.app.world().get::<Motion>(sim.player).unwrap().pos;
+        let wolf_pos = sim.app.world().get::<Motion>(far).unwrap().pos;
+        println!("Run Down: {:.2} -> {:.2} cells from the target", before.distance(wolf_pos), after.distance(wolf_pos));
+        assert!(after.distance(wolf_pos) < 1.6, "ends in melee range");
+        assert!(m.iter().any(|m| matches!(m, ServerMsg::Correct { .. })));
+        assert_eq!(hits(&m, 50004, 11).len(), 1);
+        assert!((sim.control(far).speed_mult - 0.5).abs() < 1e-3);
+        sim.despawn(far);
+        sim.app.world_mut().get_mut::<Motion>(sim.player).unwrap().pos = sim.start;
+
+        // Clear the Row: everything within 2 cells, nothing beyond.
+        let (a, b, c) = (sim.wolf(12, 1.0), sim.wolf(13, -1.5), sim.wolf(14, 4.0));
+        let m = sim.cast(50005, None, 0.2);
+        println!("Clear the Row: {:?} {:?}", hits(&m, 50005, 12), hits(&m, 50005, 13));
+        assert_eq!((hits(&m, 50005, 12).len(), hits(&m, 50005, 13).len(), hits(&m, 50005, 14).len()), (1, 1, 0));
+        for e in [a, b] {
+            sim.despawn(e);
+        }
+
+        // Flung Blade: a projectile across 4 cells.
+        let m = sim.cast(50006, Some(c), 1.0);
+        let travel = m.iter().find_map(|m| match m {
+            ServerMsg::SpellGo { spell: 50006, travel_ms, .. } => Some(*travel_ms),
+            _ => None,
+        });
+        let h = hits(&m, 50006, 14);
+        println!("Flung Blade: {h:?}, travel {travel:?} ms");
+        assert!(travel.is_some_and(|t| t > 0) && h.len() == 1 && h[0].0 > 0);
+
+        // Ember Bolt: 1.2 s cast, fire hit, then the coal smoulders for 3 ticks.
+        let m = sim.cast(50007, Some(c), 5.0);
+        let h = hits(&m, 50007, 14);
+        println!("Ember Bolt: {h:?}");
+        assert!(aura_applied(&m, 50007, 14) && h.len() == 4);
+
+        // Drag-Hook: hit and slowed by half.
+        let m = sim.cast(50008, Some(c), 1.0);
+        println!("Drag-Hook: {:?}", hits(&m, 50008, 14));
+        assert_eq!(hits(&m, 50008, 14).len(), 1);
+        assert!((sim.control(c).speed_mult - 0.5).abs() < 1e-3);
+
+        // Kept Ember: four heal ticks on the caster.
+        sim.app.world_mut().get_mut::<Stats>(sim.player).unwrap().hp = 10;
+        let m = sim.cast(50009, None, 13.5);
+        let h = hits(&m, 50009, 1);
+        println!("Kept Ember: {h:?}, hp 10 -> {}", sim.hp(sim.player));
+        assert!(h.len() == 4 && h.iter().all(|(a, heal)| *heal && *a > 0));
+        assert_eq!(sim.hp(sim.player), 10 + h.iter().map(|h| h.0).sum::<i32>());
+    }
+
+    #[test]
+    fn draw_the_veil_halves_strain_gain() {
+        let Some(mut sim) = Sim::new() else { return };
+        // Out of combat, under open sky at the arrival point: compare 6 s of strain gain.
+        sim.run(1.0);
+        let strain = |sim: &Sim| sim.app.world().get::<crate::gaze::Strain>(sim.player).unwrap().strain;
+        let s0 = strain(&sim);
+        sim.run(6.0);
+        let bare = strain(&sim) - s0;
+        let m = sim.cast(50010, None, 0.05);
+        assert!(aura_applied(&m, 50010, 1));
+        let auras = sim.app.world().get::<Auras>(sim.player).unwrap();
+        assert!((auras.strain_gain_mult() - 0.5).abs() < 1e-6);
+        assert!((sim.control(sim.player).speed_mult - 0.85).abs() < 1e-3);
+        let s1 = strain(&sim);
+        sim.run(6.0);
+        let veiled = strain(&sim) - s1;
+        println!("strain over 6 s: bare {bare:.2}, veiled {veiled:.2}");
+        assert!(bare > 1.0, "the arrival point is under open sky");
+        assert!((veiled / bare - 0.5).abs() < 0.05, "bare {bare}, veiled {veiled}");
     }
 }

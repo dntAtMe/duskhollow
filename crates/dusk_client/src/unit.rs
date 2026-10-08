@@ -56,6 +56,10 @@ impl Unit {
         }
     }
 
+    pub fn has_anim(&self, anim: &str) -> bool {
+        self.body.as_ref().is_some_and(|b| b.animations.contains_key(anim))
+    }
+
     pub fn is_acting(&self) -> bool {
         self.action.is_some()
     }

@@ -1,0 +1,224 @@
+# Duskhollow player skills (entries >= 50000), merged into the game.db spell templates by server
+# and client. Format: dusk_formats::custom::parse_spells (keys mirror spell_template columns).
+#
+# Quick reference (docs/combat.md):
+#   effectN        school_damage | weapon_damage | apply_aura | heal | heal_pct | charge (or a number)
+#   effectN_data   d1,d2,d3. Damage/heal: d2 = base `value`. Weapon damage: d2 = weapon %.
+#                  Auras: d1 = aura type (1 periodic damage, 2 periodic heal, 3 mechanic,
+#                  11 move speed %, 100 strain gain %), d2 = mechanic (7 snare, 8 stun), d3 = value.
+#   effectN_target caster | hostile | area_src_hostile | friendly ...; effectN_radius in cells.
+#   Periodic auras: the formula is the total over `duration`, ticking every `interval` ms.
+#   range: 64 per cell (130 = melee). speed: projectile (16 ~ 12 cells/s), 0 = instant.
+#   Tooltip tokens: $E1min $E1max (effect values), $E2D3 (raw data3), $DUR, $INVL.
+#   Visuals: visual=<legacy spell entry> plus *_kit=<spell_visual_kit id> overrides (0 = none);
+#   go_anim / cast_anim: swing | cast | shoot | cast_alt.
+#   Icons: tools/artgen/icons.py --custom-spells -> content/custom/icons/spells/.
+#
+# Balance (level 1, starter gear): legacy Fireball ~28 fire on a 1.5 s cast / 6 s cooldown,
+# Mighty Blow 135% weapon / 7 s. Glarewolves have 42 hp, the Alpha 150, Corvin 180 x boss.
+# Skills here stay at or under that line: they add choices (reach, control, sustain), not burst.
+
+# --- melee ---
+
+[50001]
+name=Cairnbreaker
+icon=skill_cairnbreaker.png
+description=Wind up and bring the whole weight down for $E1min% weapon damage.
+mana=2+((clvl*10)/10)
+cast_time=700
+cooldown=9000
+range=130
+school=1
+effect1=weapon_damage
+effect1_data=1,180,0
+effect1_target=hostile
+effect1_formula=value+(splvl*5)
+visual=14
+go_anim=swing
+
+[50002]
+name=Open Vein
+icon=skill_open_vein.png
+description=A short hooked cut for $E1min% weapon damage. The wound bleeds $E2max more over $DUR.
+aura_description=Bleeding.
+mana=1+((clvl*10)/10)
+cooldown=8000
+range=130
+duration=9000
+interval=3000
+school=1
+effect1=weapon_damage
+effect1_data=1,60,0
+effect1_target=hostile
+effect2=apply_aura
+effect2_data=1,1,0
+effect2_target=hostile
+effect2_formula=3+(clvl*3)+(STR/3)
+visual=229
+go_anim=swing
+
+[50003]
+name=Skullcrack
+icon=skill_skullcrack.png
+description=Crack the brow with the flat of your weapon: $E1min% weapon damage and a $DUR stun.
+aura_description=Stunned.
+mana=2+((clvl*10)/10)
+cooldown=16000
+range=130
+duration=2000
+school=1
+effect1=weapon_damage
+effect1_data=1,80,0
+effect1_target=hostile
+effect2=apply_aura
+effect2_data=3,8,0
+effect2_target=hostile
+impact_kit=15
+aura_kit=61
+go_anim=swing
+
+[50004]
+name=Run Down
+icon=skill_run_down.png
+description=Close the distance in a few strides and strike for $E2min% weapon damage. The target is slowed by $E3D3% for $DUR.
+aura_description=Slowed.
+mana=1+((clvl*10)/10)
+cooldown=15000
+range=384
+duration=3000
+school=1
+effect1=charge
+effect1_target=hostile
+effect2=weapon_damage
+effect2_data=1,70,0
+effect2_target=hostile
+effect3=apply_aura
+effect3_data=3,7,-50
+effect3_target=hostile
+go_kit=6
+impact_kit=129
+go_anim=swing
+
+[50005]
+name=Clear the Row
+icon=skill_clear_the_row.png
+description=Swing in a full circle, like a sickle through grain: $E1min% weapon damage to every enemy within 2 paces.
+mana=3+((clvl*10)/10)
+cooldown=12000
+school=1
+effect1=weapon_damage
+effect1_data=1,70,0
+effect1_target=area_src_hostile
+effect1_radius=2
+go_kit=199
+go_anim=swing
+
+# --- ranged ---
+
+[50006]
+name=Flung Blade
+icon=skill_flung_blade.png
+description=Throw a skinning knife for $E1min-$E1max physical damage.
+mana=1
+cooldown=5000
+range=448
+speed=18
+school=1
+effect1=school_damage
+effect1_data=1,0,0
+effect1_target=hostile
+effect1_formula=2+(clvl*2)+(AGI/2)
+traveling_kit=78
+impact_kit=132
+go_anim=swing
+
+[50007]
+name=Ember Bolt
+icon=skill_ember_bolt.png
+description=Flick a coal of cairn fire at an enemy: $E1min-$E1max Fire damage, and $E2max more as it smoulders over $DUR.
+aura_description=Smouldering.
+mana=2+clvl
+cast_time=1200
+cooldown=2000
+range=576
+speed=16
+duration=3000
+interval=1000
+school=3
+effect1=school_damage
+effect1_data=3,0,0
+effect1_target=hostile
+effect1_formula=2+(((INT+CUR)*45)/100)
+effect2=apply_aura
+effect2_data=1,3,0
+effect2_target=hostile
+effect2_formula=1+(INT/5)
+visual=243
+go_anim=swing
+cast_anim=cast
+
+[50008]
+name=Drag-Hook
+icon=skill_drag_hook.png
+description=Hurl a barbed hook on a chain for $E1min-$E1max physical damage. The target is slowed by $E2D3% for $DUR.
+aura_description=Hooked. Slowed.
+mana=1+clvl
+cast_time=300
+cooldown=10000
+range=448
+speed=16
+duration=4000
+school=1
+effect1=school_damage
+effect1_data=1,0,0
+effect1_target=hostile
+effect1_formula=3+clvl+(AGI/3)
+effect2=apply_aura
+effect2_data=3,7,-50
+effect2_target=hostile
+visual=46
+go_anim=shoot
+cast_anim=shoot
+
+# --- utility ---
+
+[50009]
+name=Kept Ember
+icon=skill_kept_ember.png
+description=Breathe on a coal carried from the cairn. Heals $E1max over $DUR.
+aura_description=Warmed by a kept ember.
+mana=3
+cast_time=1000
+cooldown=20000
+duration=12000
+interval=3000
+school=3
+effect1=apply_aura
+effect1_data=2,0,0
+effect1_target=caster
+effect1_positive=1
+effect1_formula=6+(clvl*4)+(WIL/2)
+casting_kit=119
+impact_kit=98
+go_anim=cast
+cast_anim=cast
+
+[50010]
+name=Draw the Veil
+icon=skill_draw_the_veil.png
+description=Pull the veil low over your eyes. Strain builds $E1D3% slower for $DUR, but you move $E2D3% slower.
+aura_description=Veiled. Strain builds slower.
+mana=2
+cooldown=40000
+duration=15000
+school=1
+effect1=apply_aura
+effect1_data=100,0,-50
+effect1_target=caster
+effect1_positive=1
+effect2=apply_aura
+effect2_data=11,0,-15
+effect2_target=caster
+effect2_positive=1
+impact_kit=158
+go_anim=cast

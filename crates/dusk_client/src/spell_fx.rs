@@ -27,8 +27,10 @@ impl Plugin for SpellFxPlugin {
 }
 
 /// Unit animation enum (client DB editor): 6 Cast, 7 Swing, 8 Hit, 9 Block, 10 CastAlt.
+/// 2 is what every bow skill (Auto Shot, Aimed/Stunning/Entangling Shot) uses: the shoot pose.
 fn unit_anim(id: i64) -> Option<&'static str> {
     match id {
+        2 => Some("shoot"),
         6 => Some("cast"),
         7 => Some("swing"),
         8 => Some("hit"),
@@ -36,6 +38,11 @@ fn unit_anim(id: i64) -> Option<&'static str> {
         10 => Some("cast_alt"),
         _ => None,
     }
+}
+
+/// Plays a unit action; sheets without a shoot pose (most NPCs) fall back to casting.
+fn play_unit_anim(u: &mut Unit, anim: &'static str) {
+    u.play_action(if u.has_anim(anim) { anim } else { "cast" });
 }
 
 /// Packed RGBA (`0xRRGGBBAA`); -1/0 = untinted.
@@ -194,7 +201,7 @@ fn on_spell_events(
                 let visual = data.spell_visuals.get(&(*spell as i64));
                 let anim = visual.and_then(|v| unit_anim(v.unit_cast_animation)).unwrap_or("cast");
                 if let Some(Ok(mut u)) = net.entities.get(caster).map(|e| units.get_mut(*e)) {
-                    u.play_action(anim);
+                    play_unit_anim(&mut u, anim);
                 }
             }
             ServerMsg::SpellGo { caster, spell, targets, travel_ms } => {
@@ -207,8 +214,12 @@ fn on_spell_events(
                         u.dir = iso::direction_from_orientation(iso::orientation_of(tp - u.pos));
                     }
                     if let Some(anim) = unit_anim(visual.unit_go_animation) {
-                        u.play_action(anim);
+                        play_unit_anim(&mut u, anim);
                     }
+                }
+                // Go kit: plays on the caster as the spell is released (War Stomp's ground ring).
+                if let (Some(kit), Some(Ok(u))) = (&visual.go, caster_e.map(|e| units.get(e))) {
+                    spawn_kit(&mut commands, &data, &assets, &mut queue, kit, u);
                 }
                 let travel = *travel_ms as f32 / 1000.0;
                 for t in target_es {
