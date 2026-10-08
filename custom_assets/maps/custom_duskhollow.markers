@@ -1,0 +1,7 @@
+# name x y radius (cells) -- demo landmarks, see docs/demo-plan.md
+arrival 54.5 54.5 3
+lowshade 14.5 34.5 9
+red_fields 45.0 20.0 12
+glare_gate 16.5 15.5 5
+fallen_blade 9.5 9.5 3
+still_pool 25.5 51.0 4
