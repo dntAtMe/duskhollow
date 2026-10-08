@@ -20,7 +20,7 @@ impl Plugin for EnvLightPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EnvLight>().add_systems(
             Update,
-            (load_cover, collect_lights, tint_uprights, tint_units).chain().after(crate::feel::tick_tints),
+            (load_cover, collect_lights, tint_uprights, tint_units, fade_roofs).chain().after(crate::feel::tick_tints),
         );
     }
 }
@@ -30,6 +30,18 @@ impl Plugin for EnvLightPlugin {
 pub struct Upright {
     pub cell: Vec2,
 }
+
+/// A roof sprite over the cells `cell ..= cell + extent`; faded while the player is beneath.
+#[derive(Component)]
+pub struct Roof {
+    pub cell: IVec2,
+    pub extent: IVec2,
+}
+
+/// DESIGN: roof opacity while the player stands under it.
+const ROOF_UNDER_ALPHA: f32 = 0.45;
+/// Roof pieces within this many cells of a player standing under a roof fade with it.
+const ROOF_FADE_REACH: f32 = 6.0;
 
 /// Colour the game-feel effects want on a unit (hit flash, fades); multiplied with the light.
 #[derive(Component, Clone, Copy)]
@@ -127,5 +139,27 @@ fn tint_units(
                 s.color = color.into();
             }
         }
+    }
+}
+
+fn fade_roofs(
+    time: Res<Time>,
+    player: Query<&Unit, With<crate::player::Player>>,
+    mut roofs: Query<(&Roof, &mut Sprite)>,
+) {
+    let covers = |r: &Roof, c: IVec2| {
+        let d = c - r.cell;
+        d.x >= 0 && d.y >= 0 && d.x <= r.extent.x && d.y <= r.extent.y
+    };
+    // Under any roof: fade every roof piece nearby (a lane is many overlapping segments).
+    let pos = player.single().ok().map(|u| u.pos);
+    let under = pos.filter(|p| roofs.iter().any(|(r, _)| covers(r, p.floor().as_ivec2())));
+    let k = 1.0 - (-time.delta_secs() * 8.0).exp();
+    for (r, mut s) in &mut roofs {
+        let centre = r.cell.as_vec2() + (r.extent.as_vec2() + 1.0) * 0.5;
+        let near = under.is_some_and(|p| p.distance(centre) < ROOF_FADE_REACH);
+        let target = if near { ROOF_UNDER_ALPHA } else { 1.0 };
+        let a = s.color.alpha();
+        s.color.set_alpha(a + (target - a) * k);
     }
 }

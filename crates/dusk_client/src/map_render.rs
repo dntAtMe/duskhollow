@@ -156,6 +156,12 @@ fn load_map(
             );
             let Some((image, pivot)) = resolved else { continue };
             // TOP_LEFT anchor: shift so the sprite's pivot sits on the cell centre.
+            // Roofs draw above everything standing under them (front-most roofed cell).
+            let lower = texture.to_lowercase();
+            let roof = (layer_idx >= 2)
+                .then(|| data.roofs.iter().find(|(p, _)| lower.starts_with(p.as_str())).map(|(_, d)| *d))
+                .flatten();
+            let z = roof.map_or(z, |d| iso::depth(centre + d.as_vec2()) + 0.05);
             let mut tile = commands.spawn((
                 MapTile,
                 Sprite { image: image.clone(), ..default() },
@@ -164,6 +170,9 @@ fn load_map(
             ));
             if layer_idx >= 2 {
                 tile.insert(crate::env_light::Upright { cell: centre });
+            }
+            if let Some(extent) = roof {
+                tile.insert(crate::env_light::Roof { cell: IVec2::new(cell.x as i32, cell.y as i32), extent });
             }
             sprites += 1;
         }

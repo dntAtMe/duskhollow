@@ -1,0 +1,4 @@
+# roof <sprite prefix> <dx> <dy>: the sprite (placed on its back cell) roofs the cells up to +dx,+dy.
+# Drawn above anything under it, faded while the player stands beneath.
+roof cv_laneroof 0 3
+roof cv_canopy_ 3 3

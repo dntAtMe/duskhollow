@@ -736,6 +736,18 @@ def main():
         + "\n",
         newline="\n",
     )
+    (vale.OUT / "roofs.txt").write_text(
+        "# roof <sprite prefix> <dx> <dy>: the sprite (placed on its back cell) roofs the cells up to +dx,+dy.
+"
+        "# Drawn above anything under it, faded while the player stands beneath.
+"
+        f"roof cv_laneroof 0 {3}
+"
+        "roof cv_canopy_ 3 3
+",
+        newline="
+",
+    )
     preview(ground, placed, cover)
     total = sum(p.stat().st_size for p in vale.OUT.glob("*.png"))
     print(f"vale art: {len(list(vale.OUT.glob('*.png')))} PNGs, {total / 1e6:.1f} MB; total {time.time() - t0:.0f}s")

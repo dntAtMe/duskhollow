@@ -25,6 +25,8 @@ pub struct GameData {
     /// `--art custom`: render players (and NPC models that have one) with our own `tools/artgen`
     /// sprites instead of the original art.
     pub custom_art: bool,
+    /// Roof sprites from `roofs.txt`: (lowercase name prefix, cells roofed beyond the back cell).
+    pub roofs: Vec<(String, IVec2)>,
     pub spell_visuals: HashMap<i64, SpellVisual>,
     /// `sprite_psi` / `sprite_light` by lowercase sprite filename.
     pub sprite_psi: HashMap<String, Vec<SpritePsi>>,
@@ -66,6 +68,16 @@ fn install_custom_assets(root: &Path, index: &mut FileIndex, overrides: bool) ->
 }
 
 /// Contents of every file called `file_name` under `content/custom` (metadata written by tools/artgen).
+/// `roof <sprite prefix> <dx> <dy>` lines; `#` comments.
+fn parse_roofs(text: &str) -> Vec<(String, IVec2)> {
+    text.lines()
+        .filter_map(|l| match l.split_whitespace().collect::<Vec<_>>()[..] {
+            ["roof", name, dx, dy] => Some((name.to_lowercase(), IVec2::new(dx.parse().ok()?, dy.parse().ok()?))),
+            _ => None,
+        })
+        .collect()
+}
+
 fn custom_metadata(root: &Path, file_name: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut stack = vec![root.join("content/custom")];
@@ -129,6 +141,10 @@ impl GameData {
             hotspots: db.sprite_hotspots()?.into_iter().chain(custom_hotspots(root)).collect(),
             spells: db.spells()?,
             custom_art: custom && art_requested,
+            roofs: parse_roofs(&custom_metadata(root, "roofs.txt").join(
+                "
+",
+            )),
             spell_visuals: db.spell_visuals()?,
             sprite_psi: with_custom(db.sprite_psi()?, custom_fx.0),
             sprite_lights: with_custom(db.sprite_lights()?, custom_fx.1),
