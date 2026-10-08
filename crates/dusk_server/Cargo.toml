@@ -1,0 +1,13 @@
+[package]
+name = "dusk_server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Headless: no rendering/windowing features.
+bevy = { workspace = true, default-features = false, features = ["std", "bevy_log"] }
+dusk_formats.workspace = true
+dusk_protocol.workspace = true
+anyhow.workspace = true
+crossbeam-channel.workspace = true

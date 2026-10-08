@@ -1,0 +1,11 @@
+ratio=1
+size=128
+filename=sfx_gowaypoint
+loopstart=1
+loopend=4
+delay=100
+
+1,83,109
+2,82,109
+3,83,109
+4,84,109

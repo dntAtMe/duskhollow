@@ -1,0 +1,13 @@
+ratio=4
+size=192
+filename=sfx_wind_003a
+loopstart=6
+loopend=6
+delay=50
+
+1,20,116
+2,24,112
+3,16,104
+4,12,96
+5,24,88
+6,28,84

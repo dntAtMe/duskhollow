@@ -1,0 +1,13 @@
+[package]
+name = "dusk_client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bevy.workspace = true
+dusk_formats.workspace = true
+dusk_protocol.workspace = true
+dusk_server = { path = "../dusk_server" }
+crossbeam-channel.workspace = true
+anyhow.workspace = true

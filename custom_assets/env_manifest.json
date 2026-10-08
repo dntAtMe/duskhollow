@@ -1,0 +1,120 @@
+{
+ "ground": {
+  "grass": [
+   "cg_grass_00.png",
+   "cg_grass_01.png",
+   "cg_grass_02.png",
+   "cg_grass_03.png",
+   "cg_grass_10.png",
+   "cg_grass_11.png",
+   "cg_grass_12.png",
+   "cg_grass_13.png",
+   "cg_grass_20.png",
+   "cg_grass_21.png",
+   "cg_grass_22.png",
+   "cg_grass_23.png",
+   "cg_grass_30.png",
+   "cg_grass_31.png",
+   "cg_grass_32.png",
+   "cg_grass_33.png"
+  ],
+  "dirt": [
+   "cg_dirt_00.png",
+   "cg_dirt_01.png",
+   "cg_dirt_02.png",
+   "cg_dirt_03.png",
+   "cg_dirt_10.png",
+   "cg_dirt_11.png",
+   "cg_dirt_12.png",
+   "cg_dirt_13.png",
+   "cg_dirt_20.png",
+   "cg_dirt_21.png",
+   "cg_dirt_22.png",
+   "cg_dirt_23.png",
+   "cg_dirt_30.png",
+   "cg_dirt_31.png",
+   "cg_dirt_32.png",
+   "cg_dirt_33.png"
+  ],
+  "cobble": [
+   "cg_cobble_00.png",
+   "cg_cobble_01.png",
+   "cg_cobble_02.png",
+   "cg_cobble_03.png",
+   "cg_cobble_10.png",
+   "cg_cobble_11.png",
+   "cg_cobble_12.png",
+   "cg_cobble_13.png",
+   "cg_cobble_20.png",
+   "cg_cobble_21.png",
+   "cg_cobble_22.png",
+   "cg_cobble_23.png",
+   "cg_cobble_30.png",
+   "cg_cobble_31.png",
+   "cg_cobble_32.png",
+   "cg_cobble_33.png"
+  ],
+  "water": [
+   "cg_water_00.png",
+   "cg_water_01.png",
+   "cg_water_02.png",
+   "cg_water_03.png",
+   "cg_water_10.png",
+   "cg_water_11.png",
+   "cg_water_12.png",
+   "cg_water_13.png",
+   "cg_water_20.png",
+   "cg_water_21.png",
+   "cg_water_22.png",
+   "cg_water_23.png",
+   "cg_water_30.png",
+   "cg_water_31.png",
+   "cg_water_32.png",
+   "cg_water_33.png"
+  ]
+ },
+ "upright": {
+  "tree": [
+   "cg_tree_0.png",
+   "cg_tree_1.png",
+   "cg_tree_2.png",
+   "cg_tree_3.png"
+  ],
+  "pine": [
+   "cg_pine_0.png",
+   "cg_pine_1.png",
+   "cg_pine_2.png"
+  ],
+  "rock": [
+   "cg_rock_0.png",
+   "cg_rock_1.png",
+   "cg_rock_2.png",
+   "cg_rock_3.png"
+  ],
+  "bush": [
+   "cg_bush_0.png",
+   "cg_bush_1.png",
+   "cg_bush_2.png"
+  ],
+  "wall": [
+   "cg_wall_0.png"
+  ],
+  "crate": [
+   "cg_crate_0.png",
+   "cg_crate_1.png"
+  ],
+  "barrel": [
+   "cg_barrel_0.png",
+   "cg_barrel_1.png"
+  ],
+  "hut": [
+   "cg_hut_0.png"
+  ],
+  "campfire": [
+   "cg_campfire_0.png"
+  ],
+  "lamp": [
+   "cg_lamp_0.png"
+  ]
+ }
+}

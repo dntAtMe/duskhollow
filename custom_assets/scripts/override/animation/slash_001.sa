@@ -1,0 +1,14 @@
+ratio=1
+size=96
+filename=sfx_slash_001
+loopstart=0
+loopend=0
+delay=50
+
+1,30,30
+2,23,21
+3,16,13
+4,13,10
+5,11,9
+6,11,9
+7,11,9

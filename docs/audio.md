@@ -1,0 +1,98 @@
+# Audio
+
+Implementation: `crates/dusk_client/src/audio.rs` (Bevy systems), `crates/dusk_formats/src/sound.rs`
+(db tables, playlist/zone lookup, the client's hard-coded sound names). Same tags as
+[combat.md](combat.md): **DB** = data in `game.db`, **EXE** = recovered from the legacy client
+(Ghidra), **DESIGN** = our choice.
+
+Sound files live in `content/sound/{AMBIENCE,EFFECT,MUSIC,MUSIC_2..4,UI}` and are resolved by
+bare filename through `file_index.txt`, like textures. 280 OGG/Vorbis + 79 PCM WAV; the
+workspace enables Bevy's `wav` feature for the latter. The db names a few `.mp3` tracks
+(`zorkfouralchs.mp3`) that only exist as `zorkfouralchs_01.ogg`; `resolve_sound` falls back to
+`<stem>.ogg` / `<stem>_01.ogg` (DESIGN).
+
+## Music and ambience
+
+| Source | Tag |
+|---|---|
+| Playlists: `map.music/ambience`, `zone_template.music/ambience`, `area_template.music/ambience` (comma separated) | DB |
+| Region of the player: map chunk -> zone table and area -> chunk table, 13x13-cell chunks (`RegionGrid`) | DB / formats.md |
+| Precedence area > zone > map (`FUN_00555d50` checks `area_template` first, then the zone) | EXE |
+| A list counts only if it has a track present in the install; otherwise fall through | DESIGN |
+| Zone-less chunks (id 0) keep the current music; a new region must hold for two 0.5 s checks | DESIGN |
+| 2 s crossfade on change; music plays once, then a random *other* track of the playlist starts | DESIGN |
+| Ambience loops (one random entry of its list) | DESIGN |
+| Ambience follows the music volume / toggle | DESIGN |
+| `zone_template.night_pct` is not audio (probably day/night lighting); ignored | — |
+
+If the current track is also in the new region's playlist it keeps playing (no restart).
+
+## Sound effects
+
+All one-shots go through the `PlaySfx` message (`SfxAt::Ui` or `SfxAt::Unit(entity)`, optional
+delay). Positional ones are attenuated linearly from full volume at 4 cells to silence at 18
+cells and dropped beyond (DESIGN; no stereo panning). At most 24 run at once and the same file
+starts at most once per frame.
+
+| Event | Sound | Tag |
+|---|---|---|
+| Melee hit/crit by an NPC | random `attack_hit_var01..05.wav` (`FUN_0054ce40`) | EXE |
+| Melee hit/crit by a player | random `attack_sword_normal_{s,m,m2,h}.ogg`; with weapon_type 1/4/6 the original uses `attack_metal_hit_var01..05.wav` (`FUN_0054fe50`). We always use the blade set (weapon types are not on the client yet) | EXE / DESIGN |
+| Miss, Evade | `dodge_default.wav` | EXE (`FUN_00554030`) |
+| Dodge | `swishverb4.ogg` | EXE |
+| Block | random `e3_attack_hardhit01..03.ogg` | EXE |
+| Parry | `attack_metal_case.ogg` | EXE |
+| Local player hurt | `vdamage3_mlb_4.ogg` (male; female is `vdamage3_flc_1.ogg`, `FUN_0054f9e0`) — paper doll is always male for now | EXE / DESIGN |
+| NPC swings | `npc_sounds` event `attack` | DB |
+| NPC swings after ≥15 s without swinging | `npc_sounds` event `aggro` (falls back to `attack`) — no aggro message exists in our protocol | DB / DESIGN |
+| NPC takes a melee hit | `npc_sounds` event `damage` | DB |
+| NPC dies | `npc_sounds` event `die` | DB |
+| Voice throttle: one line per unit per 1.5 s (deaths exempt) | | DESIGN |
+| `CastStart` | casting kit `spell_visual_kit.sound` at the caster | DB |
+| `SpellGo` | go kit + traveling kit (if `travel_ms > 0`) sound at the caster; impact kit sound at up to 3 targets after `travel_ms` | DB |
+| Level up | `alert_levelup_a.ogg` | EXE (string) |
+| Any UI `Button` pressed | `button_click_a.ogg` | EXE (string) / DESIGN (when) |
+| New target selected | `window_target_open_a.ogg` | EXE (string) / DESIGN (when) |
+
+`npc_sounds` events present in the data: `aggro` (20 rows), `attack` (59), `damage` (92),
+`die` (62); `model` is `npc_models.name`. One sound is picked at random per event. Some rows
+look mislabelled in the original data (e.g. `antlion_small` `damage` lists a `_die` file); kept
+as-is.
+
+## Proximity loops
+
+`sprite_proximity_sound` (filename, sound, radius): on map load every cell whose layers use one
+of those sprites (`campfire_01.png`, `street_light.png`, `tileset_dungeon_167.png`,
+`water_shallow.png`, `water_cell_tile.png`) becomes an emitter, grouped per sound (fanadin:
+2167 water cells, 77 fires). Each group plays one loop whose volume is
+`1 - d / radius` for the nearest emitter `d` cells away (radius DB, linear falloff DESIGN),
+eased over 0.5 s and stopped when silent. Uses the effects volume.
+
+## Settings
+
+Defaults are the original `config.ini`: `VolumeMusic=15`, `VolumeSfx=20` (SFML 0..100,
+applied as linear gain 0.15 / 0.20), `EnableMusic`/`EnableSfx` on. A `config.ini` in the assets
+root is read if present; `DUSK_MUSIC_VOLUME` / `DUSK_SFX_VOLUME` (0..100) override. Keys: `M`
+toggles music + ambience, `N` toggles effects (+ proximity loops); a short notice is shown.
+`DUSK_AUDIO_LOG=1` logs every started sound, track and region change at `info` level.
+
+## Tests
+
+- `dusk_formats/tests/sounds.rs`: every sound named by the db (13 table columns) and every
+  hard-coded name resolves to a valid OGG-Vorbis / PCM-WAV file; missing db references are
+  printed. Currently missing from the install: `ancient_city_ru-ambience.ogg`,
+  `moslan_forest-02.ogg`, `voice_from_the_ruins-02.ogg` (fanadin `map.music`),
+  `ambient_wind_public_01st.ogg` (fanadin `map.ambience`), `bursthonin_field-03.ogg`
+  (zone music), `skill_empowerwater.wav` (spell kit). Also: every map has some playable music.
+- `dusk_client` `audio::tests::referenced_sounds_decode`: all of them decode with Bevy's decoders.
+
+## Known gaps
+
+- No stereo panning / true spatial audio; listener is the player, not the camera.
+- Weapon-type hit sounds, female voice, footsteps (`step_{dirt,grass,sand,stone,water}N.ogg`,
+  terrain-dependent in the original) are not done.
+- Item sounds (`item_template.icon_sound`, `item_dictionary.sound`), game-object sounds
+  (`gameobject_models.sound_use/sound_unlocked`) and the remaining UI alerts wait for those
+  features. `login_creation.ogg` is the original login/character-creation music.
+- Casting sounds are not cut when a cast is interrupted.
+- Spell misses (`SpellHit` result) and player deaths have no special sound.

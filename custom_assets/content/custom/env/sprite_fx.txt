@@ -1,0 +1,6 @@
+# psi <sprite> <file.psi> <x> <y>          (offset from the sprite's top-left)
+# light <sprite> <rrggbbaa> <x> <y> <ground 0/1> <top 0/1> <scale>  (offset from the cell)
+psi cg_campfire_0.png campfire.psi 20 8
+light cg_campfire_0.png e25822c8 0 16 1 0 1.0
+psi cg_lamp_0.png small_light_embers.psi 27 3
+light cg_lamp_0.png e25822c8 11 -60 1 0 0.8
