@@ -124,6 +124,16 @@ impl GameData {
         let db = GameDb::open(root.join("game.db"))?;
         let custom_npcs = dusk_formats::custom::load_npc_templates(&dusk_formats::custom_assets_root());
         let custom_fx = dusk_formats::sprite_fx::parse_custom_fx(&custom_metadata(root, "sprite_fx.txt").join("\n"));
+        // Our own skills (`custom_assets/data/spells.txt`); visuals reuse legacy kits by id.
+        let mut spells = db.spells()?;
+        let mut spell_visuals = db.spell_visuals()?;
+        let custom_spells =
+            dusk_formats::custom::merge_spells(&dusk_formats::custom_assets_root(), &mut spells, &mut HashMap::new());
+        let kits = db.spell_visual_kits()?;
+        for s in &custom_spells {
+            let v = s.visual.resolve(&spell_visuals, &kits);
+            spell_visuals.insert(s.template.entry, v);
+        }
         Ok(Self {
             root: root.to_path_buf(),
             index,
@@ -139,13 +149,13 @@ impl GameData {
                 .chain(custom_npcs.into_iter().map(|(t, _)| (t.entry, t)))
                 .collect(),
             hotspots: db.sprite_hotspots()?.into_iter().chain(custom_hotspots(root)).collect(),
-            spells: db.spells()?,
+            spells,
             custom_art: custom && art_requested,
             roofs: parse_roofs(&custom_metadata(root, "roofs.txt").join(
                 "
 ",
             )),
-            spell_visuals: db.spell_visuals()?,
+            spell_visuals,
             sprite_psi: with_custom(db.sprite_psi()?, custom_fx.0),
             sprite_lights: with_custom(db.sprite_lights()?, custom_fx.1),
             zone_night: db.zone_night_pct()?,

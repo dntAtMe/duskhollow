@@ -118,13 +118,40 @@ shared formulas `dusk_formats::spell`.
 | Casting | moving, stuns, or the target dying interrupt | DESIGN |
 | Snare/Root/Stun/Sleep/Incapacitate | mechanics 7/4/8/6/9; incapacitate & sleep break on damage | DB / TEXT (Holy Bolt) |
 | NPC spells | `spell_N_id/chance/interval/cooldown/targetType` while in combat | DB |
+| Charge (effect 37) | dash straight at the target up to 1.1 cells short of it, stopping at the first unwalkable step; the caster is snapped there (`Correct`) | DESIGN |
 | Not yet | threat, teleports, items/gameobject targets, summons, dispel, procs, spell ranks (`splvl` = 1) | |
+
+### Duskhollow skills
+
+Our own player skills live in `custom_assets/data/spells.txt` (entries ≥ 50000, `[entry]` sections
+of `key=value` mirroring `spell_template`; format in `dusk_formats::custom::parse_spells`) and are
+merged into the spell tables of server and client. `custom_assets/data/class_spells.txt`
+(`class spell` lines) appends them to each class's legacy starting spells. Visuals reuse legacy
+`spell_visual` rows (`visual=<spell entry>`) and kits by id (`impact_kit=`, `traveling_kit=`,
+`go_kit=` ...); icons come from `python -I tools/artgen/icons.py --custom-spells`
+(`content/custom/icons/spells/`, custom-only names, so they show with and without `--art custom`).
+
+Aura type **100 ModifyStrainGainPct** is ours: data3 percent applied to positive gaze strain gains
+(Draw the Veil: −50 %). Tested end to end in `dusk_server::spells::skill_tests`.
+
+| Skill | Classes | Role |
+|---|---|---|
+| Cairnbreaker | 1 | 0.7 s wind-up, 185 % weapon damage, 9 s |
+| Open Vein | 1, 3 | 60 % weapon + bleed (3 + 3·lvl + Str/3 over 9 s), 8 s |
+| Skullcrack | 1, 4 | 80 % weapon + 2 s stun, 16 s |
+| Run Down | 1, 3 | charge (6 cells) + 70 % weapon + 50 % snare 3 s, 15 s |
+| Clear the Row | 1 | 70 % weapon to every enemy within 2 cells, 12 s |
+| Flung Blade | 1, 3 | thrown knife, 2 + 2·lvl + Agi/2 physical, 7 cells, 5 s, 1 mana |
+| Ember Bolt | 2, 4 | 1.2 s cast fire bolt, 2 + 0.45·(Int + Cou) + burn, 9 cells, 2 s |
+| Drag-Hook | 3 | hook on a chain, 3 + lvl + Agi/3 physical + 50 % snare 4 s, 10 s |
+| Kept Ember | all | self heal over 12 s: 6 + 4·lvl + Wil/2, 20 s |
+| Draw the Veil | all | strain gain −50 %, move −15 % for 15 s, 40 s |
 
 Tooltip numbers: the original client only substitutes `$E1min`-style tokens with values
 the server sent (`int16` pairs at `+0xf8` in the tooltip builder `FUN_0047d310`); we compute them
 client-side from the same formulas and the attributes in `PlayerStats`.
 
-Visuals: `spell_visual` → kits (`traveling` / `impact` / `casting`) → `.sa` flipbooks.
+Visuals: `spell_visual` → kits (`traveling` / `impact` / `casting` / `go`, the last on the caster at release) → `.sa` flipbooks.
 `.sa` frames are drawn at scale `1/ratio`; the canvas left edge is `feet.x - spranim_x`, its bottom
 is `feet + spranim_y` (y-down; may use `height`). Opaque frames are luma-keyed to emulate the
 original's screen/additive blending. Particles (`.psi`) and sounds are not implemented.

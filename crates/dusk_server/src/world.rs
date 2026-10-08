@@ -115,6 +115,9 @@ impl GameWorld {
         };
         let custom_npcs = dusk_formats::custom::load_npc_templates(&dusk_formats::custom_assets_root());
         let class_stats = db.class_stats()?.into_iter().map(|c| ((c.class, c.level), c)).collect();
+        // Our own skills (`custom_assets/data/spells.txt`, `class_spells.txt`).
+        let (mut spells, mut class_spells) = (db.spells()?, db.class_spells()?);
+        dusk_formats::custom::merge_spells(&dusk_formats::custom_assets_root(), &mut spells, &mut class_spells);
         Ok(Self {
             npc_templates: db
                 .npc_templates()?
@@ -123,9 +126,9 @@ impl GameWorld {
                 .collect(),
             class_stats,
             exp_levels: db.exp_levels()?,
-            spells: db.spells()?,
+            spells,
             custom_spawns,
-            class_spells: db.class_spells()?,
+            class_spells,
             db: std::sync::Mutex::new(db),
             maps,
             start,

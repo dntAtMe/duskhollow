@@ -55,7 +55,7 @@ STRONG = [
     (r"frost|\bice\b|icebolt|freeze|frozen", "frost"),
 ]
 WEAK = [
-    (r"shadow|dark|curse|fear|madness|satan|grave|harrow|bind spirit|disintegrate|nether|forcecage|mind blast|penance|cursed|brainstorm", "shadow"),
+    (r"\bveil\b|shadow|dark|curse|fear|madness|satan|grave|harrow|bind spirit|disintegrate|nether|forcecage|mind blast|penance|cursed|brainstorm", "shadow"),
     (r"mana|magic|arcane|teleport|illusion|clairvoy|wisdom|intellect", "arcane"),
     (r"holy|divine|light|bless|heal|radian|prayer|smite|salvation|resurrect|reincarn|redemption|renew|rejuven|devotion|aegis|cleanse", "holy"),
 ]
@@ -988,7 +988,105 @@ def r_poison_bolt(cv, P):
     bolt(cv, P, "poison", "leaf")
 
 
-RULES = [
+# --- Duskhollow skills (custom_assets/data/spells.txt) ---------------------------------------------------
+
+
+def r_cairnbreaker(cv, P):
+    """Battle axe driven down into cracked ground."""
+    cv.paint(ellipse(0, -0.62, 0.85, 0.2), "stone", "lit", bevel=0.1, base=0.1)
+    cracks = union(*[taper(0, -0.62, x, y, 0.05, 0.01) for x, y in ((-0.75, -0.7), (0.7, -0.55), (-0.35, -0.85), (0.4, -0.85))])
+    cv.paint(cracks, "fire", "glow", bevel=0.03, lo=0.6, hi=1.0, outline=False)
+    burst(cv, P, "topaz", "flame", 0, -0.55, 0.5, 0.18, 9, core_r=0.0, halo=0.25)
+    prop(cv, it.axe(4, "battle_axe"), 0.8, rot=view(diag=200, tilt=10, yaw=-15), off=(0.05, 0.12))
+
+
+def r_open_vein(cv, P):
+    """Hooked cut with a run of blood."""
+    slashes(cv, "blood", 2, -0.75, 0.3, 0.95)
+    prop(cv, it.dagger(3, red=True), 0.6, rot=view(diag=135, tilt=10, yaw=-20), off=(-0.25, 0.25), shadow=False)
+    drop(cv, "blood", 0.35, -0.55, 0.13)
+    drop(cv, "blood", 0.6, -0.15, 0.09, halo=0.0)
+
+
+def r_skullcrack(cv, P):
+    """A mace head meeting a brow, stars knocked loose."""
+    skull(cv, -0.12, -0.22, 0.85, "bone")
+    burst(cv, P, "topaz", "light", 0.2, 0.2, 0.45, 0.14, 8, core_r=0.0, halo=0.25)
+    prop(cv, it.mace(3, "maul"), 0.6, rot=view(diag=-30, tilt=10, yaw=-20), off=(0.3, 0.3), shadow=False)
+    stars(cv, [(-0.6, 0.45), (-0.25, 0.68)], "topaz", 0.11)
+
+
+def r_run_down(cv, P):
+    """A sword thrust forward, trailing dust."""
+    speedlines(cv, "linen", -0.55, 0.35, -0.95, 6, 0.9, seed=3)
+    cv.paint(ellipse(-0.35, -0.7, 0.55, 0.12), "phys", "flat", lo=0.6, outline=False)
+    prop(cv, it.sword(4, 1.5, 0.13, 0.36), 0.86, rot=view(diag=45, tilt=12, yaw=-20), off=(0.12, 0.05))
+
+
+def r_clear_the_row(cv, P):
+    """A full circle of steel around a reaping blade."""
+    ring = arc(0, -0.05, 0.68, 0.3, 2 * math.pi - 0.3, 0.07)
+    glowy(cv, ring, "linen", lo=0.5, hi=1.0, bevel=0.05, halo=0.25)
+    cv.paint(poly([(0.66, 0.35), (0.9, 0.05), (0.55, 0.1)]), "linen", "lit", bevel=0.04, base=0.2)
+    cv.paint(ellipse(0, -0.68, 0.7, 0.13), "redmark", "flat", lo=0.5, outline=False)
+    prop(cv, it.axe(3, "infantry_axe"), 0.78, rot=view(diag=30, tilt=10, yaw=-15), shadow=False)
+
+
+def r_flung_blade(cv, P):
+    """A spinning knife in flight."""
+    speedlines(cv, "linen", -0.65, 0.05, -0.95, 5, 0.75, seed=5)
+    cv.paint(arc(0.25, 0.25, 0.45, 2.4, 4.3, 0.04), "linen", "flat", lo=0.8, outline=False)
+    prop(cv, it.dagger(3), 0.7, rot=view(diag=60, tilt=10, yaw=-20), off=(0.18, 0.12))
+
+
+def r_ember_bolt(cv, P):
+    """A coal of cairn fire, tumbling with sparks."""
+    fireball(cv, P, "fire", "flame", cx=-0.2, cy=-0.2, r=0.28)
+    cv.paint(circle(-0.27, -0.27, 0.11), "fire", "lit", bevel=0.08, base=0.1)
+    stars(cv, [(0.5, -0.45), (-0.55, 0.4), (0.15, -0.65)], "flame", 0.08)
+
+
+def r_drag_hook(cv, P):
+    """Barbed iron hook on a run of chain."""
+    cv.obj(chain_links(5, "metal"), view(diag=-50, tilt=10, yaw=20), fit=0.62, off=(0.3, 0.32), shadow=False)
+    hook = it.curved_spike("plate", length=1.2, r=0.12, bend=0.9)
+    cv.obj(hook, view(diag=200, tilt=10, yaw=0), fit=0.66, off=(-0.25, -0.22))
+    cv.paint(poly([(-0.62, -0.2), (-0.42, -0.02), (-0.5, -0.28)]), "plate", "lit", bevel=0.03, base=0.2)
+
+
+def r_kept_ember(cv, P):
+    """Cupped hands around a small fire."""
+    cv.glow(circle(0, 0.1, 0.55), 0.5, 0.5)
+    flames(cv, P, 0, -0.15, 0.85, 0.2, 3, "fire", "flame", halo=0.3)
+    cv.paint(hand_shape(-0.32, -0.42, 0.72, -0.9), "skin", "lit", bevel=0.08)
+    cv.paint(hand_shape(0.32, -0.42, 0.72, 0.9, mirror=True), "skin", "lit", bevel=0.08)
+
+
+def r_draw_the_veil(cv, P):
+    """A hooded head bowed under the Eye."""
+    eye(cv, P, 0, 0.58, 0.8, iris="ruby", rays=False)
+    sh = (circle(0, 0.0, 0.42) | rect(0, -0.5, 0.56, 0.36, rr=0.18) | poly([(-0.2, 0.3), (0.0, 0.52), (0.2, 0.3)])).move(0, -0.18)
+    cv.paint(sh, "phys", "lit", bevel=0.16, base=0.1)
+    cv.paint(ellipse(0, -0.22, 0.24, 0.3), "void", "flat", lo=0.25, outline=False)
+    # The veil, pulled low over the eyes.
+    veil = poly([(-0.34, -0.02), (0.34, -0.02), (0.3, -0.36), (0.12, -0.3), (0.0, -0.4), (-0.12, -0.3), (-0.3, -0.36)])
+    cv.paint(veil, "redmark", "lit", bevel=0.06, base=0.15)
+
+
+DUSK_RULES = [
+    (r"^cairnbreaker$", r_cairnbreaker),
+    (r"^open vein$", r_open_vein),
+    (r"^skullcrack$", r_skullcrack),
+    (r"^run down$", r_run_down),
+    (r"^clear the row$", r_clear_the_row),
+    (r"^flung blade$", r_flung_blade),
+    (r"^ember bolt$", r_ember_bolt),
+    (r"^drag-hook$", r_drag_hook),
+    (r"^kept ember$", r_kept_ember),
+    (r"^draw the veil$", r_draw_the_veil),
+]
+
+RULES = DUSK_RULES + [
     (r"pick lock|pincer", r_lockpick),
     (r"\binteract\b|^loot$|get_item", r_grab),
     (r"sleep arrow", r_sleep_arrow),
