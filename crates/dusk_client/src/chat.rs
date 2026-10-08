@@ -56,6 +56,9 @@ const NAME: Color = Color::srgb(0.95, 0.78, 0.4);
 const SYSTEM: Color = Color::srgb(1.0, 0.85, 0.2);
 const ERROR: Color = Color::srgb(1.0, 0.35, 0.3);
 const HINT: Color = Color::srgba(0.8, 0.75, 0.65, 0.45);
+/// NPC speech (barks, quest givers).
+const NPC_NAME: Color = Color::srgb(0.85, 0.62, 0.45);
+const NPC_SAY: Color = Color::srgb(0.88, 0.82, 0.72);
 
 /// One coloured run of a log line.
 type Segment = (String, Color);
@@ -189,7 +192,7 @@ fn spawn_chat(
 }
 
 /// Text entry. Runs in `PreUpdate` so every `Update` system sees the final capture state.
-fn type_chat(
+pub(crate) fn type_chat(
     mut keys: MessageReader<KeyboardInput>,
     mut log: ResMut<ChatLog>,
     mut captured: ResMut<UiInputCaptured>,
@@ -271,11 +274,18 @@ fn collect_lines(
     state: Res<PlayerState>,
     mut last: Local<(u32, bool)>,
     mut log: ResMut<ChatLog>,
+    net: Res<Net>,
+    names: Query<&Name>,
 ) {
     for SpellNet(msg) in net_msgs.read() {
         match msg {
             ServerMsg::Chat { from, text } => {
                 log.push(vec![(format!("[{from}]: "), NAME), (text.clone(), SAY)]);
+            }
+            ServerMsg::NpcSay { id, text } => {
+                let name = net.entities.get(id).and_then(|e| names.get(*e).ok());
+                let name = name.map(|n| n.as_str()).unwrap_or("Someone");
+                log.push(vec![(format!("{name} says: "), NPC_NAME), (text.clone(), NPC_SAY)]);
             }
             _ => {}
         }
@@ -426,6 +436,7 @@ fn spawn_bubbles(
     font: Res<UiFont>,
     speakers: Query<(Entity, &Name), (With<Unit>, Without<Npc>)>,
     old: Query<(Entity, &Bubble)>,
+    net: Res<Net>,
 ) {
     let now = time.elapsed_secs();
     for (e, b) in &old {
@@ -434,8 +445,12 @@ fn spawn_bubbles(
         }
     }
     for SpellNet(msg) in net_msgs.read() {
-        let ServerMsg::Chat { from, text } = msg else { continue };
-        let Some((unit, _)) = speakers.iter().find(|(_, n)| n.as_str() == from) else { continue };
+        let (unit, text) = match msg {
+            ServerMsg::Chat { from, text } => (speakers.iter().find(|(_, n)| n.as_str() == from).map(|s| s.0), text),
+            ServerMsg::NpcSay { id, text } => (net.entities.get(id).copied(), text),
+            _ => continue,
+        };
+        let Some(unit) = unit else { continue };
         for (e, b) in &old {
             if b.unit == unit {
                 commands.entity(e).despawn();

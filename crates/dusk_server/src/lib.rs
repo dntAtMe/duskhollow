@@ -3,6 +3,8 @@
 
 pub mod ai;
 pub mod combat;
+pub mod director;
+pub mod eye;
 pub mod items;
 pub mod net;
 pub mod spells;
@@ -68,6 +70,7 @@ pub fn build_app(config: &ServerConfig, acceptor: net::Acceptor) -> anyhow::Resu
             )
                 .chain(),
         );
+    director::plugin(&mut app, &config.assets);
     Ok(app)
 }
 

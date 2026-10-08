@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Same port the original client used.
 pub const DEFAULT_PORT: u16 = 16383;
 /// Bump on any incompatible message change.
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 /// Frames above this are rejected (protects against garbage length prefixes).
 pub const MAX_FRAME: usize = 1 << 20;
 
@@ -78,6 +78,16 @@ pub enum ClientMsg {
     TakeLoot {
         corpse: EntityId,
         index: Option<u8>,
+    },
+
+    /// Talk to a friendly NPC (the server checks range; answers with `ServerMsg::Dialogue`).
+    Interact {
+        target: EntityId,
+    },
+    /// Pick `choices[index]` of the last `ServerMsg::Dialogue` shown by `speaker`.
+    DialogueChoice {
+        speaker: EntityId,
+        index: u8,
     },
 }
 
@@ -301,6 +311,63 @@ pub enum ServerMsg {
         item: Option<Item>,
         gold: u32,
     },
+
+    /// An NPC talks to the receiver. Empty `choices`: the client offers a plain "Goodbye".
+    Dialogue {
+        speaker: EntityId,
+        text: String,
+        choices: Vec<String>,
+    },
+    /// An NPC says something out loud (speech bubble + chat log).
+    NpcSay {
+        id: EntityId,
+        text: String,
+    },
+    /// State of one of the receiver's quests (sent on accept, progress, ready and turn-in).
+    Quest(QuestInfo),
+    /// What the receiver should see over a quest giver's head.
+    QuestMarker {
+        npc: EntityId,
+        marker: QuestMarker,
+    },
+    /// Show (`Some`) or drop the boss health bar for a scripted encounter.
+    BossBar {
+        boss: Option<EntityId>,
+    },
+    /// The demo run is over: time since joining and deaths, for the end card.
+    DemoEnd {
+        secs: u32,
+        deaths: u32,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QuestStatus {
+    Active,
+    /// Objective done; turn it in.
+    Ready,
+    Done,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QuestInfo {
+    pub id: u32,
+    pub title: String,
+    /// Tracker line, e.g. "Glarewolves" (shown as "Glarewolves 2/4" when `need > 0`).
+    pub objective: String,
+    pub count: u32,
+    pub need: u32,
+    pub status: QuestStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum QuestMarker {
+    #[default]
+    None,
+    /// Has a quest for the receiver.
+    Available,
+    /// The receiver can turn a quest in here.
+    TurnIn,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]

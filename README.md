@@ -26,11 +26,13 @@ cargo run -p dusk_client -- --connect 127.0.0.1:16383 --name Alice
 # Headless bot: joins, pathfinds to the nearest attackable NPC and fights
 # (DUSK_AUTOPLAY=1 makes the GUI client do the same)
 cargo run -p dusk_protocol --example bot
+# Headless run of the demo quests (server on a map with Ysolde, glarewolves and a glare_gate marker)
+cargo run -p dusk_protocol --example quest_bot
 ```
 
-Controls: `WASD` move, left-click an enemy to walk up and auto-attack, `1`-`0` `-` `=` cast from the action bar, `P` Abilities window (click a spell, then a slot to place it; right-click a slot to clear), `Esc` cancel cast / clear target, `Enter` chat (`Enter` send, `Esc` cancel, `/help`), mouse wheel over chat / minimap scrolls / zooms, numpad `+`/`-` minimap zoom, `M` toggle music, `N` toggle sound effects, `I` Inventory (click gear to equip, potions to drink; shift + right-click destroys), `C` Character window (click a slot to unequip), left-click a corpse with a pouch over it to loot.
+Controls: `WASD` move, left-click an enemy to walk up and auto-attack, `1`-`0` `-` `=` cast from the action bar, `P` Abilities window (click a spell, then a slot to place it; right-click a slot to clear), `Esc` cancel cast / clear target, `Enter` chat (`Enter` send, `Esc` cancel, `/help`), mouse wheel over chat / minimap scrolls / zooms, numpad `+`/`-` minimap zoom, `M` toggle music, `N` toggle sound effects, `I` Inventory (click gear to equip, potions to drink; shift + right-click destroys), `C` Character window (click a slot to unequip), left-click a corpse with a pouch over it to loot. Click (left or right) a friendly NPC to walk up and talk: `1`-`4` or click picks a reply, `Esc` closes.
 
-Debug aids (env vars): `DUSK_SCREENSHOT=out.png` (+ `DUSK_SCREENSHOT_AT=secs`), `DUSK_AUTOPLAY=1`, `DUSK_OPEN_BOOK=1`, `DUSK_TOOLTIP_SLOT=n`, `DUSK_CHAT=text` (say `text`, then leave it typed in the input).
+Debug aids (env vars): `DUSK_SCREENSHOT=out.png` (+ `DUSK_SCREENSHOT_AT=secs`), `DUSK_AUTOPLAY=1`, `DUSK_OPEN_BOOK=1`, `DUSK_TOOLTIP_SLOT=n`, `DUSK_CHAT=text` (say `text`, then leave it typed in the input). Demo director: `DUSK_DIALOGUE_TEST=<npc entry>` (walk up and talk), `DUSK_QUEST_TEST=<stage>` (start the run at `wolves[:N]`, `wolves_ready`, `warden_offered`, `warden`, `warden_ready` or `end`), `DUSK_BOSS_TEST=1`, `DUSK_TITLE_TEST=1`, `DUSK_END_TEST=1`.
 
 ## Workspace
 

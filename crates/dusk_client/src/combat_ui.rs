@@ -55,23 +55,28 @@ fn click_target(
     }
     let (Ok(window), Ok((cam, cam_tf))) = (window.single(), camera.single()) else { return };
     let Some(world) = window.cursor_position().and_then(|c| cam.viewport_to_world_2d(cam_tf, c).ok()) else { return };
-
-    // Front-most unit whose rough body box contains the cursor.
-    let hit = units
-        .iter()
-        .filter(|(_, u, ..)| {
-            let feet = iso::to_screen(u.pos);
-            let half_w = 22.0 * u.scale;
-            (world.x - feet.x).abs() <= half_w && world.y >= feet.y - 10.0 && world.y <= feet.y + u.height * u.scale
-        })
-        .max_by(|a, b| a.3.translation.z.total_cmp(&b.3.translation.z));
-    let Some((e, _, npc, _)) = hit else { return };
+    let Some((e, npc)) = pick_npc(world, units.iter().map(|(e, u, n, t)| (e, u, n, t))) else { return };
     let attackable = data.npc_templates.get(&npc.entry).is_some_and(|t| t.faction != faction::FRIENDLY);
     let Some(id) = net.entity_id(e) else { return };
     if attackable {
         state.target = Some(id);
         net.send(ClientMsg::Attack { target: id });
     }
+}
+
+/// Front-most NPC whose rough body box contains the world-space point `at`.
+pub fn pick_npc<'a>(
+    at: Vec2,
+    units: impl Iterator<Item = (Entity, &'a Unit, &'a Npc, &'a Transform)>,
+) -> Option<(Entity, &'a Npc)> {
+    units
+        .filter(|(_, u, ..)| {
+            let feet = iso::to_screen(u.pos);
+            let half_w = 22.0 * u.scale;
+            (at.x - feet.x).abs() <= half_w && at.y >= feet.y - 10.0 && at.y <= feet.y + u.height * u.scale
+        })
+        .max_by(|a, b| a.3.translation.z.total_cmp(&b.3.translation.z))
+        .map(|(e, _, n, _)| (e, n))
 }
 
 /// Debug aid (`DUSK_AUTOPLAY=1`): keep attacking the nearest attackable NPC.

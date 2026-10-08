@@ -1,5 +1,5 @@
 //! Local player: WASD movement in screen space (client-predicted), walking up to the
-//! attack target, follow camera. The player entity is spawned by `net` on `Welcome`.
+//! attack (or talk) target. The follow camera lives in `feel`. The player entity is spawned by `net` on `Welcome`.
 
 use crate::{
     iso,
@@ -18,7 +18,7 @@ impl Plugin for PlayerPlugin {
         app.add_systems(Startup, |mut commands: Commands| {
             commands.spawn((Camera2d, MainCamera));
         })
-        .add_systems(Update, (move_player, follow_camera).chain());
+        .add_systems(Update, move_player);
     }
 }
 
@@ -44,13 +44,13 @@ pub struct PlayerMotion {
 
 /// Cached route to the attack target.
 #[derive(Default)]
-struct Approach {
+pub(crate) struct Approach {
     route: Vec<Vec2>,
     goal: Vec2,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn move_player(
+pub(crate) fn move_player(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
     map: Res<CurrentMap>,
@@ -60,6 +60,7 @@ fn move_player(
     mut player: Query<(&mut Unit, &mut PlayerMotion), (With<Player>, Without<Dead>)>,
     others: Query<&Unit, Without<Player>>,
     captured: Res<UiInputCaptured>,
+    mut interact: ResMut<crate::dialogue::InteractTarget>,
 ) {
     let Ok((mut unit, mut motion)) = player.single_mut() else { return };
     if state.stunned || state.rooted {
@@ -81,11 +82,16 @@ fn move_player(
         if state.target.take().is_some() {
             net.send(ClientMsg::StopAttack);
         }
+        interact.0 = None;
         approach.route.clear();
         let origin = iso::to_cell(Vec2::ZERO);
         Some((iso::to_cell(screen_dir.normalize() * iso::TILE_H) - origin).normalize_or_zero())
-    } else if let Some(tpos) =
-        state.target.and_then(|id| net.entities.get(&id)).and_then(|e| others.get(*e).ok()).map(|u| u.pos)
+    } else if let Some(tpos) = state
+        .target
+        .or(interact.0)
+        .and_then(|id| net.entities.get(&id))
+        .and_then(|e| others.get(*e).ok())
+        .map(|u| u.pos)
     {
         let to = tpos - unit.pos;
         if to.length() <= APPROACH_RANGE {
@@ -129,13 +135,4 @@ fn move_player(
         pos.y += delta.y;
     }
     unit.pos = pos;
-}
-
-fn follow_camera(
-    player: Query<&Transform, With<Player>>,
-    mut camera: Query<&mut Transform, (With<MainCamera>, Without<Player>)>,
-) {
-    let (Ok(p), Ok(mut c)) = (player.single(), camera.single_mut()) else { return };
-    c.translation.x = p.translation.x;
-    c.translation.y = p.translation.y + 40.0;
 }

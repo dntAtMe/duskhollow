@@ -10,6 +10,9 @@ mod audio;
 mod chat;
 mod combat_ui;
 mod data;
+mod dialogue;
+mod director_ui;
+mod feel;
 mod gaze;
 mod hud;
 mod iso;
@@ -107,6 +110,7 @@ fn main() -> AppExit {
     .add_plugins((nameplates::NameplatePlugin, minimap::MinimapPlugin))
     .add_plugins((particles::ParticlesPlugin, lights::LightsPlugin, spell_particles::SpellParticlesPlugin))
     .add_plugins((items_ui::ItemsUiPlugin, paper_doll::PaperDollPlugin, gaze::GazePlugin))
+    .add_plugins((dialogue::DialoguePlugin, director_ui::DirectorUiPlugin, feel::FeelPlugin))
     .add_systems(Update, auto_screenshot.run_if(|| std::env::var_os("DUSK_SCREENSHOT").is_some()));
 
     let args = parse_args();
