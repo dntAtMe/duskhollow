@@ -6,3 +6,4 @@
 /_run_*.exe
 /.claude/
 __pycache__/
+/target-*/

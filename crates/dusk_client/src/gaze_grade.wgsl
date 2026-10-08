@@ -61,9 +61,10 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
         let dist = distance(cell, m.spot.xy);
         let shimmer = 0.85 + 0.15 * sin(t * 0.7 + dist * 0.8);
         var wash = (1.0 - smoothstep(r * 0.3, r, dist)) * shimmer;
-        wash = dq(wash, 5.0, d) * (1.0 - shelter) * (1.0 - 0.6 * shade);
+        // Any cover (eaves, canopies, roofs) hides the ground from the gaze entirely.
+        wash = dq(wash, 5.0, d) * (1.0 - shade);
         g = mix(g, vec4(0.78, 0.34, 0.32, 0.2), wash * 0.85);
-        let ring = exp(-pow((dist - r) / 0.28, 2.0)) * (1.0 - shelter);
+        let ring = exp(-pow((dist - r) / 0.28, 2.0)) * (1.0 - shade);
         g = mix(g, vec4(0.70, 0.22, 0.22, 0.26), dq(ring, 3.0, d) * 0.45);
     }
 

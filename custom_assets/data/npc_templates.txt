@@ -14,9 +14,9 @@ portrait=custom_glarewolf
 level=1-2
 faction=3
 health=42
-weapon_value=4
+weapon_value=3
 armor=15
-melee_speed_ms=1800
+melee_speed_ms=2100
 agility=10
 
 [50002]
@@ -29,7 +29,7 @@ level=3
 faction=3
 elite=1
 health=150
-weapon_value=7
+weapon_value=6
 armor=30
 melee_speed_ms=1800
 agility=14

@@ -18,7 +18,9 @@ pub struct CombatUiPlugin;
 impl Plugin for CombatUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (load_font, spawn_hud).chain())
+            .add_systems(Startup, spawn_target_ring)
             .add_systems(Update, (click_target, tab_target, sync_targeted, animate_floating_text, update_death_notice))
+            .add_systems(PostUpdate, follow_target_ring)
             .add_systems(Update, autoplay.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()));
     }
 }
@@ -36,8 +38,8 @@ pub fn load_font(mut commands: Commands, data: Res<GameData>, assets: Res<AssetS
 
 /// Two left clicks on the same unit within this many seconds attack it.
 const DOUBLE_CLICK_SECS: f32 = 0.35;
-/// Tab only cycles through hostiles this close (cells).
-const TAB_RANGE: f32 = 22.0;
+/// Tab only cycles through hostiles this close (cells) that are also on screen.
+const TAB_RANGE: f32 = 12.0;
 
 /// Selects `id`. An auto-attack already running follows the new target.
 fn select(state: &mut PlayerState, net: &Net, id: EntityId) {
@@ -95,6 +97,7 @@ fn click_target(
 }
 
 /// Tab / Shift+Tab: cycle through living hostiles near the player, nearest first.
+#[allow(clippy::too_many_arguments)]
 fn tab_target(
     keys: Res<ButtonInput<KeyCode>>,
     data: Res<GameData>,
@@ -102,17 +105,23 @@ fn tab_target(
     mut state: ResMut<PlayerState>,
     player: Query<&Unit, With<Player>>,
     units: Query<(Entity, &Unit, &Npc), (Without<Dead>, Without<Player>)>,
+    camera: Query<(&Camera, &GlobalTransform), With<crate::player::MainCamera>>,
     captured: Res<UiInputCaptured>,
 ) {
     if captured.keyboard || state.dead || !keys.just_pressed(KeyCode::Tab) {
         return;
     }
-    let Ok(me) = player.single() else { return };
+    let (Ok(me), Ok((cam, cam_tf))) = (player.single(), camera.single()) else { return };
+    let viewport = cam.logical_viewport_size().unwrap_or(Vec2::new(1280.0, 720.0));
+    let on_screen = |u: &Unit| {
+        cam.world_to_viewport(cam_tf, iso::to_screen(u.pos).extend(0.0))
+            .is_ok_and(|p| p.x >= 0.0 && p.y >= 0.0 && p.x <= viewport.x && p.y <= viewport.y)
+    };
     let mut near: Vec<(f32, EntityId)> = units
         .iter()
         .filter(|(_, _, n)| data.npc_templates.get(&n.entry).is_some_and(|t| t.faction != faction::FRIENDLY))
+        .filter(|(_, u, _)| u.pos.distance(me.pos) <= TAB_RANGE && on_screen(u))
         .filter_map(|(e, u, _)| Some((u.pos.distance(me.pos), net.entity_id(e)?)))
-        .filter(|(d, _)| *d <= TAB_RANGE)
         .collect();
     if near.is_empty() {
         return;
@@ -161,6 +170,125 @@ fn autoplay(
     if let Some(id) = nearest.filter(|n| n.1.pos.distance(me.pos) < 60.0).and_then(|n| net.entity_id(n.0)) {
         attack(&mut state, &net, id);
     }
+}
+
+/// Ring under the selected unit, drawn just behind it (over grain and clutter behind it).
+const RING_Z: f32 = 0.6;
+/// Bouncing chevron over the selected unit's head.
+const CHEVRON_Z: f32 = 600.0;
+
+#[derive(Component)]
+struct TargetRing;
+
+#[derive(Component)]
+struct TargetChevron;
+
+/// A flat iso ellipse ring, dithered rim, white (tinted per use).
+fn spawn_target_ring(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    use bevy::asset::RenderAssetUsages;
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    // Ring: flat iso ellipse, dithered inner rim.
+    let (w, h) = (56u32, 28u32);
+    let mut data = Vec::with_capacity((w * h * 4) as usize);
+    for y in 0..h {
+        for x in 0..w {
+            let d = Vec2::new(
+                (x as f32 + 0.5 - w as f32 / 2.0) / (w as f32 / 2.0),
+                (y as f32 + 0.5 - h as f32 / 2.0) / (h as f32 / 2.0),
+            )
+            .length();
+            let a = if (0.8..0.97).contains(&d) {
+                255
+            } else if (0.7..0.8).contains(&d) && (x + y) % 2 == 0 {
+                140
+            } else {
+                0
+            };
+            data.extend([255, 255, 255, a]);
+        }
+    }
+    let img = Image::new(
+        Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    commands.spawn((
+        TargetRing,
+        Sprite { image: images.add(img), ..default() },
+        Transform::from_xyz(0.0, 0.0, RING_Z),
+        Visibility::Hidden,
+        crate::minimap::overlay_layer(),
+    ));
+    // Downward chevron, 2 px outline in darker tint for contrast.
+    let (w, h) = (13u32, 9u32);
+    let mut data = Vec::with_capacity((w * h * 4) as usize);
+    for y in 0..h as i32 {
+        for x in 0..w as i32 {
+            let dx = (x - 6).abs();
+            let inner = y >= 1 && y <= 6 && dx <= 6 - y && dx >= 4 - y.min(4);
+            let edge = dx <= 7 - y && !inner && y <= 7;
+            let a = if inner {
+                [255, 255, 255, 255]
+            } else if edge {
+                [70, 20, 20, 230]
+            } else {
+                [0, 0, 0, 0]
+            };
+            data.extend(a);
+        }
+    }
+    let img = Image::new(
+        Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    commands.spawn((
+        TargetChevron,
+        Sprite { image: images.add(img), ..default() },
+        Transform::from_xyz(0.0, 0.0, CHEVRON_Z).with_scale(Vec3::splat(2.0)),
+        Visibility::Hidden,
+        crate::minimap::overlay_layer(),
+    ));
+}
+
+fn follow_target_ring(
+    time: Res<Time>,
+    data: Res<GameData>,
+    targeted: Query<(&Unit, Option<&Npc>), (With<Targeted>, Without<Dead>)>,
+    state: Res<PlayerState>,
+    mut ring: Query<(&mut Transform, &mut Visibility, &mut Sprite), (With<TargetRing>, Without<TargetChevron>)>,
+    mut chevron: Query<(&mut Transform, &mut Visibility, &mut Sprite), (With<TargetChevron>, Without<TargetRing>)>,
+) {
+    let Ok((mut t, mut vis, mut sprite)) = ring.single_mut() else { return };
+    let Ok((mut ct, mut cvis, mut csprite)) = chevron.single_mut() else { return };
+    let Ok((u, npc)) = targeted.single() else {
+        *vis = Visibility::Hidden;
+        *cvis = Visibility::Hidden;
+        return;
+    };
+    *vis = Visibility::Visible;
+    *cvis = Visibility::Visible;
+    let feet = iso::to_screen(u.pos);
+    t.translation = feet.extend(iso::depth(u.pos) - 0.02).max(Vec3::new(f32::MIN, f32::MIN, RING_Z));
+    t.scale = Vec3::splat(1.35 * u.scale.max(0.6));
+    let bob = 3.0 * (time.elapsed_secs() * 5.0).sin().abs();
+    ct.translation = (feet + Vec2::new(0.0, u.height * u.scale + 50.0 + bob)).extend(CHEVRON_Z);
+    let friendly = npc.and_then(|n| data.npc_templates.get(&n.entry)).is_some_and(|t| t.faction == faction::FRIENDLY);
+    // Hostile: oxblood-crimson, brighter while attacking; pulses slowly.
+    let pulse = 0.75 + 0.25 * (time.elapsed_secs() * 4.0).sin();
+    let (r, g, b) = if friendly {
+        (0.55, 0.8, 0.45)
+    } else if state.attacking {
+        (0.95, 0.3, 0.18)
+    } else {
+        (0.85, 0.22, 0.2)
+    };
+    sprite.color = Color::srgba(r, g, b, pulse);
+    csprite.color = Color::srgb(r, g, b);
 }
 
 /// Keeps the `Targeted` marker on the entity matching `PlayerState::target`.

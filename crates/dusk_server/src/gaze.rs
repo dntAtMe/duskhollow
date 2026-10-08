@@ -484,7 +484,7 @@ pub fn update_strain(
             outbox.push(Scope::To(e), ServerMsg::Correct { pos: to_pos(at) });
         }
         st.cover = g.cover_at(m.pos);
-        st.in_spot = matches!(st.cover, GazeCover::Open | GazeCover::Shade) && g.in_spot(m.pos);
+        st.in_spot = st.cover == GazeCover::Open && g.in_spot(m.pos);
         st.in_combat = clock.is_some_and(|c| c.0 < COMBAT_SECS);
         if dead {
             st.strain = st.strain.min(DEAD_STRAIN_CAP);
