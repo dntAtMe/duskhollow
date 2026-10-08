@@ -123,6 +123,7 @@ fn receive(
     mut combat_out: MessageWriter<CombatNet>,
     mut director_out: MessageWriter<DirectorNet>,
     dead: Query<(), With<Dead>>,
+    mut gaze_out: MessageWriter<crate::gaze::GazeNet>,
 ) {
     loop {
         let msg = match net.conn.incoming.try_recv() {
@@ -304,6 +305,9 @@ fn receive(
             | ServerMsg::BossBar { .. }
             | ServerMsg::DemoEnd { .. }) => {
                 director_out.write(DirectorNet(msg));
+            }
+            msg @ (ServerMsg::Eye { .. } | ServerMsg::Gaze { .. } | ServerMsg::CairnBound { .. }) => {
+                gaze_out.write(crate::gaze::GazeNet(msg));
             }
         }
     }

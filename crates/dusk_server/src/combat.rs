@@ -1,6 +1,7 @@
 //! Melee combat, death, experience, corpses/respawn and regeneration.
 
 use crate::ai::Rng;
+use crate::gaze::{Bound, GazeMods};
 use crate::items::{GearStats, Kills};
 use crate::spells::{Auras, Casting, control_of};
 use crate::stats::{Stats, player_stats, resolve_melee};
@@ -52,7 +53,7 @@ pub fn melee(
     mut rng: Local<Rng>,
     mut outbox: ResMut<Outbox>,
     mut attackers: Query<
-        (Entity, &NetId, &OnMap, &Motion, &mut Attacking, Has<Player>, Has<Casting>),
+        (Entity, &NetId, &OnMap, &Motion, &mut Attacking, Has<Player>, Has<Casting>, Option<&GazeMods>),
         (Without<Dead>, Without<Hidden>),
     >,
     mut units: Query<(&NetId, &OnMap, &Motion, &mut Stats, Has<Npc>, Has<Evading>, Has<Dead>, Has<Hidden>)>,
@@ -60,7 +61,7 @@ pub fn melee(
 ) {
     let dt = time.delta_secs();
     let mut swings = Vec::new();
-    for (e, id, map, m, mut atk, is_player, casting) in &mut attackers {
+    for (e, id, map, m, mut atk, is_player, casting, gaze) in &mut attackers {
         atk.cooldown -= dt;
         let target = units.get(atk.target).ok().filter(|t| t.1 == map && !t.6 && !t.7 && t.3.hp > 0);
         let Some((_, _, tm, ts, _, evading, ..)) = target else {
@@ -80,6 +81,7 @@ pub fn melee(
         let Ok((.., att_stats, _, _, _, _)) = units.get(e) else { continue };
         atk.cooldown = att_stats.melee_speed_ms as f32 / 1000.0;
         let (result, amount) = if evading { (HitResult::Evade, 0) } else { resolve_melee(att_stats, ts, &mut *rng) };
+        let amount = crate::gaze::scale_damage(amount, gaze);
         swings.push((e, id.0, atk.target, result, amount, map.0, m.pos));
     }
 
@@ -167,11 +169,21 @@ pub fn corpses(
     time: Res<Time>,
     world: Res<GameWorld>,
     mut outbox: ResMut<Outbox>,
-    mut dead: Query<(Entity, &NetId, &OnMap, &mut Dead, &mut Motion, &mut Stats, Has<Npc>, Option<&Home>)>,
+    mut dead: Query<(
+        Entity,
+        &NetId,
+        &OnMap,
+        &mut Dead,
+        &mut Motion,
+        &mut Stats,
+        Has<Npc>,
+        Option<&Home>,
+        Option<&Bound>,
+    )>,
     mut hidden: Query<(Entity, &NetId, &OnMap, &mut Hidden, &Home, &mut Motion, &mut Stats, &Npc), Without<Dead>>,
 ) {
     let dt = time.delta_secs();
-    for (e, id, map, mut d, mut m, mut s, is_npc, home) in &mut dead {
+    for (e, id, map, mut d, mut m, mut s, is_npc, home, bound) in &mut dead {
         d.timer -= dt;
         if d.timer > 0.0 {
             continue;
@@ -182,7 +194,9 @@ pub fn corpses(
             let secs = home.map(|h| h.respawn_secs).unwrap_or(60.0);
             commands.entity(e).insert(Hidden { timer: secs });
         } else {
-            if map.0 == world.start.0 {
+            if let Some(b) = bound.filter(|b| b.map == map.0) {
+                m.pos = b.pos; // the cairn the player last rested at
+            } else if map.0 == world.start.0 {
                 m.pos = world.start.1;
             }
             m.moving = false;
@@ -219,7 +233,7 @@ pub fn regen(
     mut acc: Local<f32>,
     mut outbox: ResMut<Outbox>,
     mut units: Query<
-        (Entity, &NetId, &OnMap, &Motion, &mut Stats, Option<&CombatClock>, Option<&Player>),
+        (Entity, &NetId, &OnMap, &Motion, &mut Stats, Option<&CombatClock>, Option<&Player>, Option<&GazeMods>),
         (Without<Dead>, Without<Hidden>, Without<Attacking>, Without<Evading>),
     >,
 ) {
@@ -228,17 +242,18 @@ pub fn regen(
         return;
     }
     *acc = 0.0;
-    for (e, id, map, m, mut s, clock, player) in &mut units {
+    for (e, id, map, m, mut s, clock, player, gaze) in &mut units {
         if clock.is_some_and(|c| c.0 < OUT_OF_COMBAT_SECS) || (s.hp >= s.max_hp && s.mana >= s.max_mana) {
             continue;
         }
         let pct = if player.is_some() { 0.05 } else { 0.10 };
-        if s.hp < s.max_hp {
-            s.hp = (s.hp + ((s.max_hp as f32 * pct).ceil() as i32).max(1)).min(s.max_hp);
+        let g = gaze.copied().unwrap_or_default();
+        if s.hp < s.max_hp && g.hp_regen > 0.0 {
+            s.hp = (s.hp + ((s.max_hp as f32 * pct * g.hp_regen).ceil() as i32).max(1)).min(s.max_hp);
             outbox.push(Scope::Near(map.0, m.pos), ServerMsg::Health { id: id.0, hp: s.hp, max_hp: s.max_hp });
         }
         if s.mana < s.max_mana {
-            s.mana = (s.mana + ((s.max_mana as f32 * pct).ceil() as i32).max(1)).min(s.max_mana);
+            s.mana = (s.mana + ((s.max_mana as f32 * pct * g.mana_regen).ceil() as i32).max(1)).min(s.max_mana);
         }
         if let Some(p) = player {
             outbox.push(Scope::To(e), player_stats_msg(&world, p, &s));

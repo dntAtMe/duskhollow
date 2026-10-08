@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Same port the original client used.
 pub const DEFAULT_PORT: u16 = 16383;
 /// Bump on any incompatible message change.
-pub const PROTOCOL_VERSION: u32 = 5;
+pub const PROTOCOL_VERSION: u32 = 6;
 /// Frames above this are rejected (protects against garbage length prefixes).
 pub const MAX_FRAME: usize = 1 << 20;
 
@@ -339,6 +339,27 @@ pub enum ServerMsg {
         secs: u32,
         deaths: u32,
     },
+    /// The Eye over the receiver's map (docs/demo-plan.md), ~4 Hz and on change. Only sent on maps
+    /// with a `.cover` sidecar; no message = no gaze. `openness`: 0 half-lidded .. 1 wide open.
+    /// `spot`: centre of the wandering gaze spot (cells), radius `spot_radius` cells.
+    Eye {
+        state: EyeState,
+        openness: f32,
+        spot: Option<Pos>,
+        spot_radius: f32,
+    },
+    /// The receiver's own gaze state, ~4 Hz. `strain` and `corruption` are 0..=100.
+    Gaze {
+        strain: f32,
+        corruption: f32,
+        cover: GazeCover,
+        in_combat: bool,
+        in_spot: bool,
+    },
+    /// The receiver rested at a cairn: deaths now respawn at `pos`.
+    CairnBound {
+        pos: Pos,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -368,6 +389,26 @@ pub enum QuestMarker {
     Available,
     /// The receiver can turn a quest in here.
     TurnIn,
+}
+
+/// The Eye's lid (`ServerMsg::Eye`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EyeState {
+    #[default]
+    Lidded,
+    Opening,
+    Open,
+    Closing,
+}
+
+/// Cover under a unit (`maps/<name>.cover`); `Cairn` = within range of a rest cairn.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GazeCover {
+    #[default]
+    Open,
+    Shade,
+    Shelter,
+    Cairn,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
