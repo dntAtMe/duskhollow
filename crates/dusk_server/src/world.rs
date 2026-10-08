@@ -85,7 +85,20 @@ impl GameWorld {
                 let info =
                     infos.iter().find(|i| i.name == name).ok_or_else(|| anyhow::anyhow!("unknown map {name}"))?;
                 let grid = &maps.get(&info.id).ok_or_else(|| anyhow::anyhow!("map {name} failed to load"))?.grid;
-                let want = if info.start != (0.0, 0.0) {
+                // Custom maps: the `arrival` marker of `maps/<name>.markers` (`name x y [radius]`).
+                let arrival =
+                    std::fs::read_to_string(root.join("maps").join(format!("{name}.markers"))).ok().and_then(|t| {
+                        t.lines().find_map(|l| {
+                            let v: Vec<&str> = l.split_whitespace().collect();
+                            match v[..] {
+                                ["arrival", x, y, ..] => Some((x.parse().ok()?, y.parse().ok()?)),
+                                _ => None,
+                            }
+                        })
+                    });
+                let want = if let Some(a) = arrival {
+                    a
+                } else if info.start != (0.0, 0.0) {
                     info.start
                 } else {
                     (grid.size as f32 / 2.0, grid.size as f32 / 2.0)
