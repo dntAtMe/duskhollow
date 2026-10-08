@@ -110,13 +110,22 @@ impl GameData {
             || std::env::args().collect::<Vec<_>>().windows(2).any(|w| w[0] == "--art" && w[1] == "custom");
         let custom = install_custom_assets(root, &mut index, art_requested);
         let db = GameDb::open(root.join("game.db"))?;
+        let custom_npcs = dusk_formats::custom::load_npc_templates(&dusk_formats::custom_assets_root());
         let custom_fx = dusk_formats::sprite_fx::parse_custom_fx(&custom_metadata(root, "sprite_fx.txt").join("\n"));
         Ok(Self {
             root: root.to_path_buf(),
             index,
             maps: db.maps()?,
-            npc_models: db.npc_models()?,
-            npc_templates: db.npc_templates()?,
+            npc_models: db
+                .npc_models()?
+                .into_iter()
+                .chain(custom_npcs.iter().map(|(_, m)| (m.id, m.clone())))
+                .collect(),
+            npc_templates: db
+                .npc_templates()?
+                .into_iter()
+                .chain(custom_npcs.into_iter().map(|(t, _)| (t.entry, t)))
+                .collect(),
             hotspots: db.sprite_hotspots()?.into_iter().chain(custom_hotspots(root)).collect(),
             spells: db.spells()?,
             custom_art: custom && art_requested,

@@ -50,8 +50,14 @@ back".
 
 ## Contracts between work streams
 
-- **Map files**: `custom_assets/maps/custom_duskhollow.{map,spawns,cover}`. `.cover` is plain text:
-  first line `W H`, then H rows of W chars (row = cell y, column = cell x).
+- **Map files**: `custom_assets/maps/custom_duskhollow.{map,spawns,cover,markers}`. `.cover` is
+  plain text: first line `W H`, then H rows of W chars (row = cell y, column = cell x); parsed by
+  `dusk_formats::custom::CoverGrid`. `.markers` is `name x y [radius]` per line
+  (`dusk_formats::custom::parse_markers`); demo names: `arrival`, `lowshade`, `red_fields`,
+  `glare_gate`, `fallen_blade`, `still_pool`.
+- **NPC template format**: `[entry]` sections of `key=value` (see
+  `dusk_formats::custom::parse_npc_templates`); already merged into the server's and client's
+  template maps, with `model=` naming the sprite script in `scripts/npc/custom/`.
 - **Custom NPC templates**: `custom_assets/data/npc_templates.txt`, entries ≥ 50000, loaded by both
   server and client next to `game.db` templates. Reserved entries:
 

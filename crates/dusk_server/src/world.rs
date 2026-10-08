@@ -100,9 +100,14 @@ impl GameWorld {
                 .map(|t| (t.map, Vec2::new(t.x + 0.5, t.y + 0.5)))
                 .unwrap_or((1, Vec2::new(17.5, 106.5))),
         };
+        let custom_npcs = dusk_formats::custom::load_npc_templates(&dusk_formats::custom_assets_root());
         let class_stats = db.class_stats()?.into_iter().map(|c| ((c.class, c.level), c)).collect();
         Ok(Self {
-            npc_templates: db.npc_templates()?,
+            npc_templates: db
+                .npc_templates()?
+                .into_iter()
+                .chain(custom_npcs.into_iter().map(|(t, _)| (t.entry, t)))
+                .collect(),
             class_stats,
             exp_levels: db.exp_levels()?,
             spells: db.spells()?,
