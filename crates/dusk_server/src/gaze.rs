@@ -23,7 +23,7 @@ const RATE_SHADE: f32 = 0.25;
 const RATE_SHELTER: f32 = -5.0;
 const RATE_CAIRN: f32 = -15.0;
 /// Gains while in combat (dealt or took damage within [`COMBAT_SECS`]).
-const COMBAT_MULT: f32 = 4.0;
+const COMBAT_MULT: f32 = 2.5;
 const COMBAT_SECS: f32 = 5.0;
 /// Gains while the Eye is wide open (scaled by openness during Opening/Closing).
 const EYE_OPEN_MULT: f32 = 2.0;
@@ -588,7 +588,7 @@ mod tests {
     fn rates() {
         assert_eq!(strain_rate(GazeCover::Open, false, 0.0, false, 0), 1.0);
         assert_eq!(strain_rate(GazeCover::Shade, false, 0.0, false, 0), 0.25);
-        assert_eq!(strain_rate(GazeCover::Open, true, 1.0, true, 0), 24.0);
+        assert_eq!(strain_rate(GazeCover::Open, true, 1.0, true, 0), 15.0);
         assert_eq!(strain_rate(GazeCover::Shelter, true, 1.0, true, 0), -5.0);
         assert_eq!(strain_rate(GazeCover::Cairn, false, 0.0, false, 0), -15.0);
         // 40 % cap on Ender resistance.

@@ -36,7 +36,7 @@ back".
 | `S` | deep shelter (overhang, roofed lane) | −5 |
 | `C` | rest cairn (cell centre of a cairn) | — (cells within 3 of a `C` count as cairn range: −15/s, bind) |
 
-- Combat (dealt or took damage within the last 5 s) multiplies gains ×4.
+- Combat (dealt or took damage within the last 5 s) multiplies gains ×2.5.
 - Eye states: `Lidded`, `Opening`, `Open`, `Closing`. `Open` doubles gains. The demo opens it at
   the Glare Gate boss; elsewhere it opens on a timer (roughly every 6 min for 45 s).
 - **Gaze spot**: while lidded the Eye still sweeps a wandering spot (radius ~5 cells) across open

@@ -5,12 +5,13 @@
 use crate::{
     audio::PlaySfx,
     dialogue::Modal,
+    env_light::FeelColor,
     iso,
     map_render::MapLoaded,
     minimap::overlay_layer,
     net::{CombatNet, Net, SpellNet},
     player::{MainCamera, Player},
-    unit::{Dead, Health, Npc, Unit, UnitLayer},
+    unit::{Dead, Health, Npc, Unit},
 };
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
@@ -87,11 +88,11 @@ struct DustTexture(Handle<Image>);
 
 /// Brief warm tint after being struck.
 #[derive(Component)]
-struct Flash(f32);
+pub struct Flash(f32);
 
 /// Alpha fade: in (rising) or out (corpse removal, despawns at the end).
 #[derive(Component)]
-struct Fade {
+pub struct Fade {
     t: f32,
     secs: f32,
     out: bool,
@@ -363,16 +364,18 @@ fn footsteps(
     }
 }
 
-/// Applies flash tint and fades to the unit's sprite layers.
-fn tick_tints(
+/// Flash tint and fades of units (as [`FeelColor`]).
+pub fn tick_tints(
     mut commands: Commands,
     time: Res<Time>,
-    mut units: Query<(Entity, Option<&mut Flash>, Option<&mut Fade>, &Children)>,
-    mut layers: Query<&mut Sprite, With<UnitLayer>>,
+    mut units: Query<(Entity, Option<&mut Flash>, Option<&mut Fade>, Has<FeelColor>)>,
 ) {
     let dt = time.delta_secs();
-    for (e, flash, fade, children) in &mut units {
+    for (e, flash, fade, has_color) in &mut units {
         if flash.is_none() && fade.is_none() {
+            if has_color {
+                commands.entity(e).remove::<FeelColor>();
+            }
             continue;
         }
         let mut color = LinearRgba::WHITE;
@@ -398,11 +401,8 @@ fn tick_tints(
                 commands.entity(e).remove::<Fade>();
             }
         }
-        for c in children.iter() {
-            if let Ok(mut s) = layers.get_mut(c) {
-                s.color = color.into();
-            }
-        }
+        // Applied to the sprite layers together with the light by `env_light`.
+        commands.entity(e).insert(FeelColor(color));
     }
 }
 

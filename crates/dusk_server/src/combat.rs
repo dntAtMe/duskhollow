@@ -119,23 +119,38 @@ pub fn npc_deaths(
         // DESIGN: kill_exp of the victim's level, +/-10% per level of difference, nothing 5+ levels below.
         let diff = s.level as f32 - ps.level as f32;
         let factor = if diff <= -5.0 { 0.0 } else { (1.0 + 0.1 * diff).clamp(0.1, 2.0) };
-        p.xp += (world.kill_xp(s.level) as f32 * factor).round() as u32;
-        let mut leveled = false;
-        while ps.level < world.max_level() && p.xp >= world.xp_to_next(ps.level) {
-            p.xp -= world.xp_to_next(ps.level);
-            if let Some(c) = world.class_stats(p.class, ps.level + 1) {
-                *ps = player_stats(c, &gear.map(|g| g.0.clone()).unwrap_or_default());
-                leveled = true;
-            } else {
-                break;
-            }
-        }
-        if leveled {
-            info!("{} reached level {}", p.name, ps.level);
-            outbox.push(Scope::Near(pmap.0, pm.pos), ServerMsg::Health { id: pid.0, hp: ps.hp, max_hp: ps.max_hp });
-        }
-        outbox.push(Scope::To(last.unwrap().0), player_stats_msg(&world, &p, &ps));
+        let amount = (world.kill_xp(s.level) as f32 * factor).round() as u32;
+        grant_xp(&world, &mut outbox, last.unwrap().0, (pid, pmap, pm), &mut p, &mut ps, gear, amount);
     }
+}
+
+/// Adds experience (levelling up as far as it goes) and tells the player.
+pub fn grant_xp(
+    world: &GameWorld,
+    outbox: &mut Outbox,
+    player: Entity,
+    (pid, pmap, pm): (&NetId, &OnMap, &Motion),
+    p: &mut Player,
+    ps: &mut Stats,
+    gear: Option<&GearStats>,
+    amount: u32,
+) {
+    p.xp += amount;
+    let mut leveled = false;
+    while ps.level < world.max_level() && p.xp >= world.xp_to_next(ps.level) {
+        p.xp -= world.xp_to_next(ps.level);
+        if let Some(c) = world.class_stats(p.class, ps.level + 1) {
+            *ps = player_stats(c, &gear.map(|g| g.0.clone()).unwrap_or_default());
+            leveled = true;
+        } else {
+            break;
+        }
+    }
+    if leveled {
+        info!("{} reached level {}", p.name, ps.level);
+        outbox.push(Scope::Near(pmap.0, pm.pos), ServerMsg::Health { id: pid.0, hp: ps.hp, max_hp: ps.max_hp });
+    }
+    outbox.push(Scope::To(player), player_stats_msg(world, p, ps));
 }
 
 pub fn player_stats_msg(world: &GameWorld, p: &Player, s: &Stats) -> ServerMsg {

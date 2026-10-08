@@ -200,8 +200,9 @@ fn apply_net(
 
 // ---------------------------------------------------------------- crimson grade
 
-/// Above upright sprites (depth <= ~1 + map size), below nameplates (~500) and ground glows.
-const GRADE_Z: f32 = 450.0;
+/// Just above the floor (layers at 0 / 0.1), under upright sprites (depth >= 1) and ground
+/// glows: walls and units are lit per cell by `env_light` instead of being washed over.
+const GRADE_Z: f32 = 0.5;
 /// Lights cut warm holes into the grade (nearest first).
 pub const MAX_GRADE_LIGHTS: usize = 32;
 

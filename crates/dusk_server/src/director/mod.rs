@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 /// Max distance (cells) between a player and the NPC they talk to.
 pub const INTERACT_RANGE: f32 = 3.5;
 /// Stooped that rise around the gate with Corvin.
-const STOOPED_RISEN: usize = 4;
+const STOOPED_RISEN: usize = 2;
 /// How long the Eye is forced open at most (it settles earlier when Corvin falls).
 const EYE_OPEN_SECS: f32 = 300.0;
 /// The fight resets after this long without anyone on the quest near the gate.
@@ -168,13 +168,20 @@ fn handle_requests(
     mut outbox: ResMut<Outbox>,
     mut rng: Local<Rng>,
     mut players: Query<
-        (&OnMap, &Motion, &mut Quester, Option<&mut Inventory>, Has<Dead>),
-        (With<Player>, Without<Npc>),
+        (
+            (&OnMap, &Motion, &mut Quester, Option<&mut Inventory>, Has<Dead>),
+            (&NetId, &mut Player, &mut Stats, Option<&crate::items::GearStats>),
+        ),
+        Without<Npc>,
     >,
     mut npcs: Query<NpcView, (Without<Player>, Without<Hidden>)>,
+    world: Res<GameWorld>,
 ) {
     for (pe, msg) in requests.0.drain(..) {
-        let Ok((pmap, pm, mut quester, mut inv, dead)) = players.get_mut(pe) else { continue };
+        let Ok(((pmap, pm, mut quester, mut inv, dead), (pid, mut player, mut stats, gear))) = players.get_mut(pe)
+        else {
+            continue;
+        };
         let (target, choice) = match msg {
             ClientMsg::Interact { target } => (target, None),
             ClientMsg::DialogueChoice { speaker, index } => (speaker, Some(index)),
@@ -227,6 +234,12 @@ fn handle_requests(
                 } else {
                     let now = time.elapsed_secs();
                     for o in outcomes {
+                        if let Outcome::Reward(_) = o {
+                            // DESIGN: each demo quest is worth one level at the player's current level.
+                            let xp = world.xp_to_next(stats.level);
+                            let who = (pid, pmap, pm);
+                            crate::combat::grant_xp(&world, &mut outbox, pe, who, &mut player, &mut stats, gear, xp);
+                        }
                         handle_outcome(&mut outbox, &data, pe, &mut quester, inv.as_deref_mut(), o, now);
                     }
                     Some(if matches!(action, Action::Accept(_)) {

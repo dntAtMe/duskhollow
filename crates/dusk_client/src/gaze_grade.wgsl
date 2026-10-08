@@ -45,14 +45,15 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     if (m.map.w > 0.5) {
         c = textureSampleLevel(cover_texture, cover_sampler, cell / m.map.xy, 0.0);
     }
-    let shade = dq(smoothstep(0.1, 0.9, c.r), 4.0, d);
-    let shelter = dq(smoothstep(0.1, 0.9, c.g), 4.0, d);
+    let shade = dq(smoothstep(0.35, 0.65, c.r), 4.0, d);
+    let shelter = dq(smoothstep(0.35, 0.65, c.g), 4.0, d);
 
     // rgb = tint, a = amount. Crimson from above; the open Eye burns hotter.
-    var g = vec4(mix(vec3(0.34, 0.008, 0.02), vec3(0.46, 0.01, 0.015), open), 0.42 + 0.1 * open);
+    // The vale art is already lit crimson: the open-sky grade only deepens it a little.
+    var g = vec4(mix(vec3(0.22, 0.01, 0.03), vec3(0.42, 0.02, 0.02), open), 0.08 + 0.16 * open);
     // Shade: bruised violet-black. Deep shelter: darkest.
-    g = mix(g, vec4(0.04, 0.012, 0.06, 0.58 + 0.06 * open), shade);
-    g = mix(g, vec4(0.012, 0.008, 0.025, 0.74), shelter);
+    g = mix(g, vec4(0.05, 0.015, 0.06, 0.26 + 0.06 * open), shade);
+    g = mix(g, vec4(0.012, 0.006, 0.02, 0.4), shelter);
 
     // The wandering gaze spot: pale crimson wash, soft edge, faint ring. Slow shimmer.
     if (m.spot.w > 0.5) {
@@ -61,9 +62,9 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
         let shimmer = 0.85 + 0.15 * sin(t * 0.7 + dist * 0.8);
         var wash = (1.0 - smoothstep(r * 0.3, r, dist)) * shimmer;
         wash = dq(wash, 5.0, d) * (1.0 - shelter) * (1.0 - 0.6 * shade);
-        g = mix(g, vec4(0.78, 0.34, 0.32, 0.36), wash * 0.85);
+        g = mix(g, vec4(0.78, 0.34, 0.32, 0.2), wash * 0.85);
         let ring = exp(-pow((dist - r) / 0.28, 2.0)) * (1.0 - shelter);
-        g = mix(g, vec4(0.70, 0.22, 0.22, 0.42), dq(ring, 3.0, d) * 0.6);
+        g = mix(g, vec4(0.70, 0.22, 0.22, 0.26), dq(ring, 3.0, d) * 0.45);
     }
 
     // Fires blind the Watcher: warm holes around lights and cairns.
@@ -74,11 +75,15 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
         let q = (p - l.xy) / (vec2(300.0, 150.0) * max(l.z, 0.05));
         warm = max(warm, 1.0 - smoothstep(0.2, 1.0, length(q)));
     }
-    g = mix(g, vec4(0.45, 0.22, 0.06, g.a * 0.3), dq(warm, 4.0, d));
+    g = mix(g, vec4(0.3, 0.12, 0.04, g.a * 0.15), dq(warm, 4.0, d));
 
     // Sky flare when the Eye opens (dimmer under cover).
     let flare = m.params.z * m.params.z * (1.0 - 0.7 * shelter) * (1.0 - 0.4 * shade);
     g = mix(g, vec4(0.92, 0.48, 0.42, 0.55), flare);
 
+    // Nothing outside the map: the void stays black.
+    if (m.map.w > 0.5 && (cell.x < 0.0 || cell.y < 0.0 || cell.x > m.map.x || cell.y > m.map.y)) {
+        return vec4(0.0);
+    }
     return vec4(g.rgb, g.a * m.params.x);
 }

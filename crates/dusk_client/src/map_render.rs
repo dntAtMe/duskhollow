@@ -156,12 +156,15 @@ fn load_map(
             );
             let Some((image, pivot)) = resolved else { continue };
             // TOP_LEFT anchor: shift so the sprite's pivot sits on the cell centre.
-            commands.spawn((
+            let mut tile = commands.spawn((
                 MapTile,
                 Sprite { image: image.clone(), ..default() },
                 Anchor::TOP_LEFT,
                 Transform::from_xyz(screen.x - pivot.x, screen.y + pivot.y, z),
             ));
+            if layer_idx >= 2 {
+                tile.insert(crate::env_light::Upright { cell: centre });
+            }
             sprites += 1;
         }
     }

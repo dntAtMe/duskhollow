@@ -999,13 +999,13 @@ def make_props():
     ox, oy = screen_offset(coal)
     fx, fy = (int(v) for v in HOTSPOTS[-1].split()[1:])
     SPRITE_FX.append(f"psi {name} campfire.psi {fx + ox} {fy + oy + 2}")
-    SPRITE_FX.append(f"light {name} e25822c8 {ox} {oy + 30} 1 0 1.6")
+    SPRITE_FX.append(f"light {name} e0642a70 {ox} {oy + 30} 1 0 0.9")
     pts, lan = lantern_post(61)
     name = add("lantern", "lantern_0", pts)
     ox, oy = screen_offset(lan)
     fx, fy = (int(v) for v in HOTSPOTS[-1].split()[1:])
     SPRITE_FX.append(f"psi {name} small_light_embers.psi {fx + ox} {fy + oy}")
-    SPRITE_FX.append(f"light {name} e25822c8 {ox} {oy} 1 0 0.8")
+    SPRITE_FX.append(f"light {name} e0642a58 {ox} {oy} 1 0 0.45")
     for i in range(4):
         add("dead_tree", f"deadtree_{i}", dead_tree(71 + i))
     for i in range(5):

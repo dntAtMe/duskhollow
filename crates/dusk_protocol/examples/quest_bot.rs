@@ -112,6 +112,19 @@ fn main() {
                     route.clear();
                 }
                 ServerMsg::TargetLost => target = None,
+                ServerMsg::Swing { attacker, target: t, amount, .. }
+                    if Some(t) == me && std::env::var_os("QB_DMG").is_some() =>
+                {
+                    say(format!("swing from #{attacker}: {amount}"))
+                }
+                ServerMsg::SpellHit { caster, target: t, spell, amount, heal: false, .. }
+                    if Some(t) == me && std::env::var_os("QB_DMG").is_some() =>
+                {
+                    say(format!("spell {spell:?} from #{caster}: {amount}"))
+                }
+                ServerMsg::Health { id, hp, .. } if Some(id) == me && std::env::var_os("QB_DMG").is_some() => {
+                    say(format!("hp {hp}"))
+                }
                 ServerMsg::Dialogue { speaker, text, choices } => {
                     say(format!("dialogue: {:?} {choices:?}", text.lines().next().unwrap_or("")));
                     if let Some(i) = choices.iter().position(|c| PICK.contains(&c.as_str())) {

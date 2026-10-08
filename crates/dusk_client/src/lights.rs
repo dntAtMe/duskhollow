@@ -42,7 +42,7 @@ impl Plugin for LightsPlugin {
 /// Lights cut into the darkness per frame (nearest to the camera first).
 pub const MAX_LIGHTS: usize = 64;
 /// Draw depth of `bool_applyground` glows: above all upright sprites, below the darkness.
-const GROUND_GLOW_Z: f32 = 980.0;
+const GROUND_GLOW_Z: f32 = 0.55;
 const DARKNESS_Z: f32 = 990.0;
 
 /// Map brightness (`ClientMap` +0xb8) and its target (+0xbc).
