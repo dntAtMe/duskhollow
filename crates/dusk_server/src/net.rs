@@ -127,6 +127,7 @@ pub fn handle_players(
     mut outbox: ResMut<Outbox>,
     mut casts: ResMut<CastRequests>,
     mut item_requests: ResMut<ItemRequests>,
+    mut director_requests: ResMut<crate::director::DirectorRequests>,
     mut players: Query<(Entity, &NetId, &OnMap, &Player, &mut Client, &mut Motion, Has<Dead>, Option<&Casting>)>,
     targets: Query<(&OnMap, Option<&Faction>, Has<Npc>), (Without<Dead>, Without<Hidden>)>,
 ) {
@@ -205,6 +206,9 @@ pub fn handle_players(
                     | ClientMsg::OpenLoot { .. }
                     | ClientMsg::TakeLoot { .. }),
                 ) => item_requests.0.push((entity, msg)),
+                Ok(msg @ (ClientMsg::Interact { .. } | ClientMsg::DialogueChoice { .. })) => {
+                    director_requests.0.push((entity, msg));
+                }
             }
         }
     }

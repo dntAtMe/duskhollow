@@ -38,6 +38,7 @@ impl Plugin for NetPlugin {
             .insert_resource(PlayerState { name: self.name.clone(), speed_mult: 1.0, ..default() })
             .add_message::<SpellNet>()
             .add_message::<CombatNet>()
+            .add_message::<DirectorNet>()
             .add_systems(Update, (receive, send_movement, interpolate_remote).chain());
     }
 }
@@ -89,6 +90,10 @@ pub struct SpellNet(pub ServerMsg);
 #[derive(Message, Clone)]
 pub struct CombatNet(pub ServerMsg);
 
+/// Dialogue, quest, boss-bar and end-of-run messages, for `dialogue` / `director_ui`.
+#[derive(Message, Clone)]
+pub struct DirectorNet(pub ServerMsg);
+
 /// Latest authoritative state of a remote unit; [`interpolate_remote`] eases toward it.
 #[derive(Component)]
 pub struct NetTarget {
@@ -116,6 +121,8 @@ fn receive(
     mut spell_out: MessageWriter<SpellNet>,
     mut item_out: MessageWriter<ItemNet>,
     mut combat_out: MessageWriter<CombatNet>,
+    mut director_out: MessageWriter<DirectorNet>,
+    dead: Query<(), With<Dead>>,
 ) {
     loop {
         let msg = match net.conn.incoming.try_recv() {
@@ -166,7 +173,8 @@ fn receive(
             }
             ServerMsg::Despawn { id } => {
                 if let Some(e) = net.entities.remove(&id) {
-                    commands.entity(e).despawn();
+                    // Corpses fade out instead of popping.
+                    crate::feel::despawn_unit(&mut commands, e, dead.contains(e));
                 }
                 if me.target == Some(id) {
                     me.target = None;
@@ -277,7 +285,8 @@ fn receive(
             | ServerMsg::AuraApply { .. }
             | ServerMsg::AuraRemove { .. }
             | ServerMsg::CastError { .. }
-            | ServerMsg::Chat { .. }) => {
+            | ServerMsg::Chat { .. }
+            | ServerMsg::NpcSay { .. }) => {
                 spell_out.write(SpellNet(msg));
             }
             msg @ (ServerMsg::Inventory { .. }
@@ -288,6 +297,13 @@ fn receive(
             | ServerMsg::ItemError { .. }
             | ServerMsg::Received { .. }) => {
                 item_out.write(ItemNet(msg));
+            }
+            msg @ (ServerMsg::Dialogue { .. }
+            | ServerMsg::Quest(_)
+            | ServerMsg::QuestMarker { .. }
+            | ServerMsg::BossBar { .. }
+            | ServerMsg::DemoEnd { .. }) => {
+                director_out.write(DirectorNet(msg));
             }
         }
     }

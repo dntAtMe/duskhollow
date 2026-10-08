@@ -31,12 +31,14 @@ pub struct Unit {
     pub scale: f32,
     /// Visual height in unscaled pixels (from `npc_models.height`).
     pub height: f32,
+    /// Seconds the animation stays frozen (hit-stop, see `feel`).
+    pub hitstop: f32,
     body: Option<Arc<SpriteScript>>,
 }
 
 impl Unit {
     pub fn new(pos: Vec2, dir: u8, scale: f32, height: f32) -> Self {
-        Self { pos, dir, anim: "stance", elapsed_ms: 0.0, action: None, scale, height, body: None }
+        Self { pos, dir, anim: "stance", elapsed_ms: 0.0, action: None, scale, height, hitstop: 0.0, body: None }
     }
 
     pub fn set_anim(&mut self, anim: &'static str) {
@@ -209,6 +211,10 @@ pub fn spawn_paper_doll(
 fn tick_units(time: Res<Time>, mut units: Query<&mut Unit>) {
     let dt = time.delta_secs() * 1000.0;
     for mut u in &mut units {
+        if u.hitstop > 0.0 {
+            u.hitstop -= dt / 1000.0;
+            continue;
+        }
         u.elapsed_ms += dt;
         if let Some((_, t, len)) = &mut u.action {
             *t += dt;
