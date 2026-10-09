@@ -2,9 +2,8 @@
 
 Usage (from repo root):  python -I tools/artgen/creatures.py
 
-Each creature replaces an original NPC model when the client runs with `--art custom`:
-it is written to `custom_assets/scripts/npc/<model>.txt` (+ sheet `custom_npc_<model>.png`),
-and the client prefers that over `scripts/npc/<model>.txt`.
+Each creature is written to `assets/scripts/npc/<model>.txt` (+ sheet `custom_npc_<model>.png` in
+`content/sprites/`); NPC templates name it with `model=` (`data/npc_templates.txt`).
 """
 
 from __future__ import annotations
@@ -269,7 +268,7 @@ def main():
         print(f"{name}: {sum(len(p[0]) for p in model.parts.values())} voxels")
         renders = sheet.render_all(model, anims, FRAME, FOOT, scale)
         hits = character.HITS if anims is GOBLIN_ANIMS else CRITTER_HITS
-        script_dir = sheet.OUT / "scripts" / "npc" / "custom"
+        script_dir = sheet.OUT / "scripts" / "npc"
         sheet.export(renders, anims, FOOT, f"custom_npc_{name}.png", script_dir / f"{name}.txt", hits=hits)
         sheet.preview(renders, anims, FRAME, f"npc_{name}")
         if anims is GOBLIN_ANIMS:

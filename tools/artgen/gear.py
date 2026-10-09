@@ -3,8 +3,8 @@
 Usage (from repo root):  python -I tools/artgen/gear.py [model ...]
 
 Every layer is rendered with the adventurer's skeleton and animations (character.py) and written
-under the original item model name (`item_template.model`), e.g. `scripts/player/leather_chest.txt`,
-so equipping any item with that model shows our art (client: `--art custom`).
+under the item model name (`model=` in `data/items.txt` / `item_bases.txt`), e.g.
+`scripts/player/leather_chest.txt`, so equipping any item with that model shows it.
 
 Layers are depth-tested against the body: a gear pixel is kept only where the gear is in front of
 the body, so an arm in front of a cuirass stays visible and a sword held behind the back is hidden.
@@ -276,7 +276,7 @@ MAGE_PIECES = {
     "mage_hood": lambda m: head("hood", m),
 }
 
-# model name (item_template.model) -> builder
+# item model name (`model=`) -> builder
 GEAR = {
     # starter cloth
     "cloth_shirt": lambda: chest("linen", "linen"),
@@ -382,7 +382,7 @@ def job(name: str, only_anims: list[str] | None) -> str:
     """Renders and exports one layer (+ its smear); runs in a worker process."""
     base_body = body()
     layer = None if name == "custom_body" else GEAR[name]()
-    script_dir = sheet.OUT / "scripts" / "player" / "custom"
+    script_dir = sheet.OUT / "scripts" / "player"
     script = script_dir / f"{name}.txt"
     anims = [a for a in character.ANIMS if not only_anims or a[0] in only_anims]
     renders = render_layer(base_body, layer, anims)

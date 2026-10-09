@@ -17,10 +17,10 @@ border widths below are repeated there (`SLICE_*`):
   (the Ashpriest). `menu_class_ring_sel.png`: the selection ring drawn over a medallion.
 - `menu_rule.png` (360x14): bronze rule with a central lozenge, under the title.
 
-Output: `custom_assets/content/ui/` (our own names, always available).
+Output: `assets/content/ui/` (our own names, always available).
 
     python -I tools/artgen/menu_ui.py              # write the set
-    python -I tools/artgen/menu_ui.py --preview    # also custom_assets/preview/menu_sheet.png
+    python -I tools/artgen/menu_ui.py --preview    # also assets/preview/menu_sheet.png
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import ui  # noqa: E402
 from ui import OUTLINE, Canvas, _tri, band, grow, leather, metal, rivet, vnoise, well, wood  # noqa: E402
 
-ui.OUT = ui.ROOT / "custom_assets" / "content" / "custom" / "ui"
+ui.OUT = ui.ROOT / "assets" / "content" / "ui"
 ui.RAMPS["crimson"] = ["#1e0306", "#43070d", "#6e0f16", "#9c1f22", "#c94a3a"]
 ui.RAMPS["bronze"] = ["#1f1308", "#3d2610", "#5e3d1a", "#83582a", "#a8773e"]
 for k in ("crimson", "bronze"):

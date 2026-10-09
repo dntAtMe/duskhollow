@@ -6,7 +6,7 @@
   (4, 4) size 188x8, see `GAZE_FILL` in `crates/dusk_client/src/gaze.rs`).
 - `gaze_strain_fill.png` (188x8), `gaze_corruption_fill.png` (188x3): bar fills.
 
-Output: `custom_assets/content/ui/` (our own names, always available).
+Output: `assets/content/ui/` (our own names, always available).
 
     python -I tools/artgen/gaze_ui.py
 """
@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import ui  # noqa: E402
 from ui import OUTLINE, Canvas, grow, vnoise, well  # noqa: E402
 
-ui.OUT = ui.ROOT / "custom_assets" / "content" / "custom" / "ui"
+ui.OUT = ui.ROOT / "assets" / "content" / "ui"
 ui.RAMPS["crimson"] = ["#1e0306", "#43070d", "#6e0f16", "#9c1f22", "#c94a3a"]
 ui.RAMPS["bruise"] = ["#140a1a", "#2a1236", "#462052", "#653070", "#8a4a8e"]
 ui.RAMPS["lid"] = ["#1a120e", "#33241a", "#4d3828", "#6b5038", "#8c6c4c"]

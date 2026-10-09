@@ -1,20 +1,21 @@
-"""Rendering animations to sprite sheets + sprite scripts in the original format.
+"""Rendering animations to sprite sheets + sprite scripts (docs/content.md).
 
 Shared by character.py and creatures.py. A sprite script looks like `scripts/npc/*.txt`:
 `image=`, then per animation `[name] frames= duration= type=` and
-`frame=F,D,x,y,w,h,pivot_x,pivot_y` for 8 directions (docs/formats.md).
+`frame=F,D,x,y,w,h,pivot_x,pivot_y` for 8 directions (docs/content.md).
 """
 
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "custom_assets"
+sys.path.insert(0, str(Path(__file__).parent))
+from paths import ASSETS as OUT, PREVIEW, ROOT, SPRITES  # noqa: E402,F401
 
 # Sheet direction order (engine): 0=W 1=NW 2=N 3=NE 4=E 5=SE 6=S 7=SW (screen).
 # `ClientUnit::computeDirection` maps cell-space orientation k*pi/4 to sheet dir [5,6,7,0,1,2,3,4][k].
@@ -45,7 +46,7 @@ def trim(img: np.ndarray):
 
 
 def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width: int = 1024, hits=None):
-    """Shelf-pack trimmed frames into one sheet (custom_assets/content/custom/<image_name>)
+    """Shelf-pack trimmed frames into one sheet (assets/content/sprites/<image_name>)
     and write the sprite script to `script_path`. Identical frames (holds, empty smear frames)
     share one rect. `hits`: {anim: frame} where the blow lands -> `hit=<ms>` in the script."""
     entries = []
@@ -77,7 +78,7 @@ def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width
     for k, first in alias.items():
         rects[k] = rects[first]
 
-    img_dir = OUT / "content" / "custom"
+    img_dir = SPRITES
     img_dir.mkdir(parents=True, exist_ok=True)
     script_path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(sheet).save(img_dir / image_name)
@@ -97,8 +98,8 @@ def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width
 
 
 def preview(renders, anims, frame: int, name: str):
-    """custom_assets/preview/<name>_<anim>.png: rows = directions, columns = frames."""
-    pdir = OUT / "preview"
+    """assets/preview/<name>_<anim>.png: rows = directions, columns = frames."""
+    pdir = PREVIEW
     pdir.mkdir(parents=True, exist_ok=True)
     for anim, *_ in anims:
         frames = renders[anim]
@@ -116,7 +117,7 @@ def load(script_path: Path, frame: int, foot):
     cur = None
     for line in script_path.read_text().splitlines():
         if line.startswith("image="):
-            image = np.array(Image.open(OUT / "content" / "custom" / line[6:]).convert("RGBA"))
+            image = np.array(Image.open(SPRITES / line[6:]).convert("RGBA"))
         elif line.startswith("[") and line.endswith("]"):
             cur = renders.setdefault(line[1:-1], [])
         elif line.startswith("frame=") and cur is not None:

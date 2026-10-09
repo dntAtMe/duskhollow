@@ -13,8 +13,8 @@ import struct
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-MAPS = ROOT / "custom_assets" / "maps"
+sys.path.insert(0, str(Path(__file__).parent))
+from paths import MAPS, ROOT  # noqa: E402
 
 # prop name prefix -> (kind, radius in cells)
 RULES = [
@@ -29,7 +29,7 @@ RANK = {".": 0, "s": 1, "S": 2, "C": 3}
 
 
 def read_map(path: Path):
-    """(size, {(x, y): upright texture name}) from a `.map` file (docs/formats.md)."""
+    """(size, {(x, y): upright texture name}) from a `.map` file (docs/content.md)."""
     b = path.read_bytes()
     size, ntex = struct.unpack_from("<II", b, 0)
     off = 8

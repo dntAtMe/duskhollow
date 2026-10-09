@@ -4,11 +4,11 @@ art in `vale.py`.
 Usage (from repo root):  python -I tools/artgen/valemap.py [--preview-only]
 
 Writes:
-- `custom_assets/content/vale/*.png` + `hotspots.txt` + `sprite_fx.txt` (tiles, cliffs, props)
-- `custom_assets/maps/duskhollow.map` (original `.map` format, docs/formats.md)
+- `assets/content/vale/*.png` + `hotspots.txt` + `sprite_fx.txt` (tiles, cliffs, props)
+- `assets/maps/duskhollow.map` (`.map` format, docs/content.md)
 - `.spawns` (`entry x y orientation wander`), `.cover` (`W H` + rows of `.`/`s`/`S`/`C`),
   `.markers` (`name x y radius`)
-- `custom_assets/preview/duskhollow.png`: whole-map overview (painter's order, like the client)
+- `assets/preview/duskhollow.png`: whole-map overview (painter's order, like the client)
 
 Layout (cell x grows screen right-down, y grows left-down; "north" = screen up = small x + y):
 - south: the gorge mouth at the bottom corner, arrival under open sky
@@ -40,8 +40,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import vale  # noqa: E402
 from enviro import PERIOD, TILE_H, TILE_W, diamond_coords, periodic_noise  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-CA = ROOT / "custom_assets"
+from paths import MAPS, PREVIEW, ROOT  # noqa: E402,F401
 NAME = "duskhollow"
 SIZE = 64
 FLAG_UNWALKABLE, FLAG_BLOCK = 0x20, 0x40
@@ -536,7 +535,7 @@ def cover_grid(walk):
 
 def write_cover(g):
     lines = [f"{SIZE} {SIZE}"] + ["".join(row) for row in g]
-    (CA / "maps" / f"{NAME}.cover").write_text("\n".join(lines) + "\n", newline="\n")
+    (MAPS / f"{NAME}.cover").write_text("\n".join(lines) + "\n", newline="\n")
 
 
 MARKERS = [
@@ -552,7 +551,7 @@ MARKERS = [
 def write_markers():
     lines = ["# name x y radius (cells) -- demo landmarks, see docs/demo-plan.md"]
     lines += [f"{n} {x:.1f} {y:.1f} {r:g}" for n, x, y, r in MARKERS]
-    (CA / "maps" / f"{NAME}.markers").write_text("\n".join(lines) + "\n", newline="\n")
+    (MAPS / f"{NAME}.markers").write_text("\n".join(lines) + "\n", newline="\n")
 
 
 SPAWNS = [
@@ -577,7 +576,7 @@ def write_spawns(placed):
         if c in placed and placed[c][1] & FLAG_UNWALKABLE:
             print(f"warning: spawn {e} at {c} is on an unwalkable cell")
         lines.append(f"{e} {x:.1f} {y:.1f} {o:.2f} {w}")
-    (CA / "maps" / f"{NAME}.spawns").write_text("\n".join(lines) + "\n", newline="\n")
+    (MAPS / f"{NAME}.spawns").write_text("\n".join(lines) + "\n", newline="\n")
 
 
 def write_map(ground, placed):
@@ -600,8 +599,8 @@ def write_map(ground, placed):
                 out += b"\0"
     out += struct.pack("<I", 0)
     out += struct.pack("<II", 0, 0)
-    (CA / "maps").mkdir(parents=True, exist_ok=True)
-    (CA / "maps" / f"{NAME}.map").write_bytes(bytes(out))
+    MAPS.mkdir(parents=True, exist_ok=True)
+    (MAPS / f"{NAME}.map").write_bytes(bytes(out))
     print(f"map {NAME}: {SIZE}x{SIZE}, {len(textures)} textures, {sum(1 for p in placed.values() if p[0])} uprights")
 
 
@@ -683,7 +682,7 @@ def preview(ground, placed, cover):
         sx, sy = ox + (x - y) * 32, oy + (x + y) * 16
         d.ellipse((sx - r * 45, sy - r * 22.6, sx + r * 45, sy + r * 22.6), outline=(120, 110, 140), width=2)
         d.text((sx + 8, sy - 8), n, fill=(200, 190, 210))
-    out = CA / "preview"
+    out = PREVIEW
     out.mkdir(parents=True, exist_ok=True)
     img.convert("RGB").save(out / f"{NAME}_full.png")
     img.resize((W // 2, H // 2), Image.LANCZOS).convert("RGB").save(out / f"{NAME}.png")

@@ -38,8 +38,8 @@ import vox  # noqa: E402
 from enviro import PERIOD, TILE_H, TILE_W, cells_noise, diamond_coords, fbm, periodic_noise  # noqa: E402
 from vox import BAYER4, Bone, Model, Prim  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "custom_assets" / "content" / "custom" / "vale"
+from paths import ROOT  # noqa: E402,F401
+from paths import VALE as OUT  # noqa: E402
 
 # --- palette -------------------------------------------------------------------------------
 # dark (violet shadow) -> light (crimson key); nothing near white, fire excepted.

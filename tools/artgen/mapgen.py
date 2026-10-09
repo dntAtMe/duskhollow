@@ -3,10 +3,10 @@
 Usage (from repo root, after enviro.py):  python -I tools/artgen/mapgen.py
 
 Writes:
-- `custom_assets/maps/glade.map` in the original `.map` format (docs/formats.md)
-- `custom_assets/maps/glade.spawns`: `entry x y orientation wander` per line, read by our server
+- `assets/maps/glade.map` in our `.map` format (docs/content.md)
+- `assets/maps/glade.spawns`: `entry x y orientation wander` per line, read by our server
 - unique blended ground tiles for cells where terrain types meet
-  (`custom_assets/content/env/map/cg_glade_*.png`); pure cells reuse the periodic tiles.
+  (`assets/content/env/map/cg_glade_*.png`); pure cells reuse the periodic tiles.
 
 Layout: a meadow ringed by forest, a winding dirt path crossing it, and a ruined cobble plaza with
 broken walls where goblins camp.
@@ -27,8 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import enviro  # noqa: E402
 from enviro import PERIOD, TILE_H, TILE_W, diamond_coords, ground_texture, periodic_noise, shade_to_rgb  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-CA = ROOT / "custom_assets"
+from paths import ASSETS as CA, ENV, MAPS, ROOT  # noqa: E402,F401
 NAME = "glade"
 SIZE = 52
 PLAZA = (32.0, 18.0)
@@ -59,7 +58,7 @@ def ground_tiles():
     """Per cell: texture filename (periodic tile or a baked blend)."""
     du, dv, inside = diamond_coords()
     py, px = np.indices((TILE_H, TILE_W))
-    out_dir = CA / "content" / "custom" / "env" / "map"
+    out_dir = ENV / "map"
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("cg_glade_*.png"):
         old.unlink()
@@ -136,7 +135,7 @@ def props(rng, terrain):
         placed[(x, y)] = (pick(kind), FLAG_UNWALKABLE)
     lx = 22
     placed[(lx, int(path_y(lx + 0.5)) - 2)] = (man["lamp"][0], FLAG_UNWALKABLE)
-    # Fireflies over the pond banks (invisible .psi sprites carrying the original particle system).
+    # Fireflies over the pond banks (invisible .psi sprites that only carry a particle system).
     for _ in range(7):
         a = rng.uniform(0, 2 * math.pi)
         x, y = int(POND[0] + (POND_R[0] + 1.2) * math.cos(a)), int(POND[1] + (POND_R[1] + 1.2) * math.sin(a))
@@ -181,8 +180,8 @@ def write_map(ground, placed):
                 out += b"\0"
     out += struct.pack("<I", 0)  # no terrain textures (so no terrain pairs)
     out += struct.pack("<II", 0, 0)  # zones, areas
-    (CA / "maps").mkdir(parents=True, exist_ok=True)
-    (CA / "maps" / f"{NAME}.map").write_bytes(bytes(out))
+    MAPS.mkdir(parents=True, exist_ok=True)
+    (MAPS / f"{NAME}.map").write_bytes(bytes(out))
     print(f"map {NAME}: {SIZE}x{SIZE}, {len(textures)} textures, {len(placed)} props")
 
 
@@ -208,7 +207,7 @@ def write_spawns(rng, terrain, placed):
         x, y = PLAZA[0] + 3 * math.cos(a), PLAZA[1] + 3 * math.sin(a)
         if free(x, y):
             lines.append(f"{50021 if i % 2 else 50020} {x:.1f} {y:.1f} {a + math.pi:.2f} 2")
-    (CA / "maps" / f"{NAME}.spawns").write_text("\n".join(lines) + "\n", newline="\n")
+    (MAPS / f"{NAME}.spawns").write_text("\n".join(lines) + "\n", newline="\n")
 
 
 def main():

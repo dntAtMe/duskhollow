@@ -4,19 +4,18 @@ Every interface image the client loads is regenerated from scratch here, in the 
 oldschool look as the sprites (5-shade ramps + 4x4 ordered dithering, dark outlines):
 dark stained oak panels, blackened iron bands with brass rivets and corner plates,
 oxblood leather title bars with stitching, recessed iron-rimmed wells, and hand-made
-5x7 pixel lettering for the few labels the original art has baked in.
+5x7 pixel lettering for the few baked-in labels.
 
-The client positions everything with the ORIGINAL images' measured geometry
+The client positions everything with fixed geometry
 (`hud.rs`, `spells_ui.rs`, `items_ui.rs`, `chat.rs`, `minimap.rs`, `nameplates.rs`),
-so each image keeps the original pixel size and puts its wells / bar tracks / buttons /
+so each image has a fixed pixel size and puts its wells / bar tracks / buttons /
 holes exactly where the client expects them; the numbers are repeated next to each
 generator below.
 
-Output: `custom_assets/content/ui/<original name>.png`; with `--art custom`
-the client resolves these instead of the originals (same bare file name).
+Output: `assets/content/ui/<name>.png` (the client loads them by bare file name).
 
-    python -I tools/artgen/ui.py              # write the override set
-    python -I tools/artgen/ui.py --preview    # also a contact sheet in custom_assets/preview
+    python -I tools/artgen/ui.py              # write the set
+    python -I tools/artgen/ui.py --preview    # also a contact sheet in assets/preview
 """
 
 from __future__ import annotations
@@ -28,9 +27,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "custom_assets" / "content" / "override" / "ui"
-PREVIEW = ROOT / "custom_assets" / "preview"
+sys.path.insert(0, str(Path(__file__).parent))
+from paths import PREVIEW, ROOT  # noqa: E402,F401
+from paths import UI as OUT  # noqa: E402
 
 # --- palette -----------------------------------------------------------------------------
 
@@ -613,7 +612,7 @@ def level_badge():
 
 def rank_ring(name: str, boss: bool):
     """136x140 ring around the target portrait, centre (65.5, 75.5); open on the left
-    (where the frame meets the portrait) and at the bottom, like the original."""
+    (where the frame meets the portrait) and at the bottom."""
     c = Canvas(136, 140)
     cx, cy = 65.5, 75.5
     d = c.dist(cx, cy)

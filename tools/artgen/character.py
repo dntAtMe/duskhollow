@@ -1,12 +1,12 @@
 """Base adventurer: model, animations and sprite-sheet export in the game's sprite-script format.
 
 Usage (from repo root):
-    python -I tools/artgen/character.py            # writes custom_assets/...
-    python -I tools/artgen/character.py --preview  # preview strips into custom_assets/preview/
+    python -I tools/artgen/character.py            # writes assets/...
+    python -I tools/artgen/character.py --preview  # preview strips into assets/preview/
 
-Output: `custom_assets/content/custom/custom_adventurer.png` + `custom_assets/scripts/player/adventurer.txt`
+Output: `assets/content/sprites/custom_adventurer.png` + `assets/scripts/player/adventurer.txt`
 using the same `[anim] frames= duration= type= frame=F,D,x,y,w,h,px,py` format as
-`scripts/player/male/*.txt` (see docs/formats.md), so the engine renders it like original sprites.
+every other sprite script (see docs/content.md).
 """
 
 from __future__ import annotations
@@ -22,13 +22,12 @@ import smear  # noqa: E402
 from keyframes import keyed  # noqa: E402
 from vox import Bone, Model, Prim, rot_x, rot_y, rot_z  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "custom_assets"
+from paths import PLAYER_SCRIPTS, ROOT  # noqa: E402,F401
 NAME = "adventurer"
 
 FRAME = 160
 FOOT = (80, 112)  # room below the feet for bodies falling toward the camera
-# Original player sprites stand ~60 px tall; the 1.8-unit model would be ~70 px.
+# Player sprites stand ~60 px tall; the 1.8-unit model would be ~70 px.
 SCALE = 0.85
 
 
@@ -309,7 +308,7 @@ def die(t):
     return rot, (-0.05 * k, 0, 0.12 * math.sin(k * math.pi) * 0.3), rot_y(-fall)
 
 
-# name, function, frames, duration ms, play type (same vocabulary as the original scripts)
+# name, function, frames, duration ms, play type (the sprite-script vocabulary)
 ANIMS = [
     ("stance", stance, 4, 800, "back_forth"),
     ("run", run, RUN_FRAMES, RUN_MS, "looped"),
@@ -335,9 +334,9 @@ def main(preview_only: bool = False):
     trail = smear.render_layer(model, ANIMS, FRAME, FOOT, SCALE, base, tip, HITS)
     trail_anims = smear.anims_for(ANIMS, trail)
     if not preview_only:
-        script = OUT / "scripts" / "player" / "custom" / f"{NAME}.txt"
+        script = PLAYER_SCRIPTS / f"{NAME}.txt"
         sheet.export(renders, ANIMS, FOOT, f"custom_{NAME}.png", script, hits=HITS)
-        script = OUT / "scripts" / "player" / "custom" / f"{NAME}_smear.txt"
+        script = PLAYER_SCRIPTS / f"{NAME}_smear.txt"
         sheet.export(trail, trail_anims, FOOT, f"custom_{NAME}_smear.png", script, sheet_width=512)
     sheet.preview(renders, ANIMS, FRAME, NAME)
     sheet.preview(trail, trail_anims, FRAME, f"{NAME}_smear")

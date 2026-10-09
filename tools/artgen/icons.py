@@ -2,12 +2,12 @@
 
 Usage (from repo root):  python -I tools/artgen/icons.py [--force] [--only <substring>] [--no-preview]
 
-Reads `custom_assets/data/spells.txt`, `items.txt` and `item_bases.txt` (whichever exist; the
+Reads `assets/data/spells.txt`, `items.txt` and `item_bases.txt` (whichever exist; the
 `[id]` / `[kind id]` + `key=value` text format) and collects every `icon=` name. An icon that
-already exists anywhere under `custom_assets/content/` (bare-name lookup, as in the client) is kept;
-a missing one is generated into `custom_assets/content/icons/{items,spells}/`. `--force`
+already exists anywhere under `assets/content/` (bare-name lookup, as in the client) is kept;
+a missing one is generated into `assets/content/icons/{items,spells}/`. `--force`
 regenerates every referenced icon that lives in those two folders (plus missing ones), `--only`
-limits the run to icon names containing the substring. Contact sheets go to `custom_assets/preview/`.
+limits the run to icon names containing the substring. Contact sheets go to `assets/preview/`.
 
 - Items (`icon_items.py`): voxel models (weapons, armour by family and slot, flasks, rings, gems,
   scrolls, food, junk ...) on a dark dithered card tinted by item quality, with a bevelled frame in
@@ -31,11 +31,8 @@ import icon_items  # noqa: E402
 import icon_spells  # noqa: E402
 from iconlib import Canvas  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-DATA = ROOT / "custom_assets" / "data"
-CONTENT = ROOT / "custom_assets" / "content"
-OUT = CONTENT / "custom" / "icons"
-PREVIEW = ROOT / "custom_assets" / "preview"
+from paths import CONTENT, DATA, PREVIEW, ROOT  # noqa: E402,F401
+from paths import ICONS as OUT  # noqa: E402
 SIZE = 40
 
 # quality -> (background ramp, frame light, frame dark)
@@ -104,16 +101,19 @@ def item_jobs() -> list[dict]:
     jobs = []
     for path, base in ((DATA / "items.txt", False), (DATA / "item_bases.txt", True)):
         for _, sid, d in sections(path):
-            icon = first(d, "icon")
-            if not icon:
-                continue
-            jobs.append({
-                "kind": "items", "icon": icon, "id": sid,
-                "info": {"name": first(d, "name"), "model": first(d, "model"),
-                         "quality": as_int(first(d, "quality", "2"), 2),
-                         "equip_type": first(d, "equip_type"), "weapon_type": first(d, "weapon_type"),
-                         "armor_type": first(d, "armor_type"), "base": base},
-            })
+            # Item bases list one icon (and name) per quality, 2 (plain) .. 6 (purple).
+            icons = [i.strip() for i in first(d, "icon").split(",")] if base else [first(d, "icon")]
+            names = [n.strip() for n in first(d, "name").split(",")] if base else [first(d, "name")]
+            for k, icon in enumerate(icons):
+                if not icon:
+                    continue
+                jobs.append({
+                    "kind": "items", "icon": icon, "id": sid,
+                    "info": {"name": names[min(k, len(names) - 1)], "model": first(d, "model"),
+                             "quality": 2 + k if base else as_int(first(d, "quality", "2"), 2),
+                             "equip_type": first(d, "equip_type"), "weapon_type": first(d, "weapon_type"),
+                             "armor_type": first(d, "armor_type"), "base": base},
+                })
     return jobs
 
 

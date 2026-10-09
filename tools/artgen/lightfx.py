@@ -2,13 +2,13 @@
 
 Usage (from repo root):  python -I tools/artgen/lightfx.py
 
-Writes to `custom_assets/content/fx/`:
+Writes to `assets/content/fx/`:
 - `fx_light_glow.png` (422x193): the additive glow drawn on (and around) a light, tinted with the
   light's colour and scaled by its scale. White with an elliptical falloff (2.2 : 1, flattened like
   ground light in the isometric view), peak alpha ~0.38, Bayer-dithered alpha steps.
 - `fx_light_mask.png` (1024x512): the light's cut-out in the map darkness. Black; alpha ~0.04 in
   the centre rising to 1 at the ellipse's edge (the darkness is multiplied by it), dithered.
-- `custom_assets/preview/lightfx.png`: both over a dark ground (gitignored).
+- `assets/preview/lightfx.png`: both over a dark ground (gitignored).
 """
 
 from __future__ import annotations
@@ -22,9 +22,8 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).parent))
 from vox import BAYER4  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "custom_assets" / "content" / "custom" / "fx"
-PREVIEW = ROOT / "custom_assets" / "preview"
+from paths import PREVIEW, ROOT  # noqa: E402,F401
+from paths import FX as OUT  # noqa: E402
 
 GLOW_SIZE = (422, 193)
 MASK_SIZE = (1024, 512)

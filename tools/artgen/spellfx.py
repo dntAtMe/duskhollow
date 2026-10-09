@@ -5,7 +5,7 @@ Usage (from repo root):
     python -I tools/artgen/spellfx.py cast_001.sa  # only some flipbooks (+ previews)
     python -I tools/artgen/spellfx.py --atlas      # only the particle atlas
 
-Everything is drawn procedurally from scratch (no original pixels): glowing sigils, noise flames,
+Everything is drawn procedurally from scratch: glowing sigils, noise flames,
 particle bursts, rings, light columns, beams, lightning, slashes, whirlwinds... Each effect is a
 float intensity field mapped through a short per-school palette ramp (black -> dark -> mid ->
 bright -> white-hot) with 4x4 Bayer ordered dithering, i.e. the oldschool "limited palette" look.
@@ -18,13 +18,13 @@ resolution (canvas / ratio) and blown up by `ratio` with nearest neighbour, so t
 the client's 1/sqrt(ratio) draw scale.
 
 Output:
-- `custom_assets/scripts/animation/<name>.sa`, `filename=sfx_<name>`:
-- `custom_assets/content/spellfx/sfx_*_<n>.png`: trimmed, palettized frames on opaque
+- `assets/scripts/animation/<name>.sa`, `filename=sfx_<name>`:
+- `assets/content/spellfx/sfx_*_<n>.png`: trimmed, palettized frames on opaque
   black (the client luma-keys those = additive look). Quest markers / arrows / the obelisk are
   drawn with real alpha instead.
-- `custom_assets/content/fx/fx_particles.png`: 128x128 atlas of 16 white 32x32 particle
+- `assets/content/fx/fx_particles.png`: 128x128 atlas of 16 white 32x32 particle
   sprites (`sprite=<cell>` in `data/particles.txt`), alpha in 5 dithered steps.
-- `custom_assets/preview/spellfx_*.png`: contact sheets (gitignored).
+- `assets/preview/spellfx_*.png`: contact sheets (gitignored).
 """
 
 from __future__ import annotations
@@ -41,13 +41,14 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, str(Path(__file__).parent))
 from vox import BAYER4  # noqa: E402
 from enviro import periodic_noise  # noqa: E402
+import paths  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = paths.ROOT
 LAYOUT = Path(__file__).with_name("spellfx_layout.json")
-OUT_FRAMES = ROOT / "custom_assets" / "content" / "custom" / "spellfx"
-OUT_SA = ROOT / "custom_assets" / "scripts" / "override" / "animation"
-OUT_ATLAS = ROOT / "custom_assets" / "content" / "custom" / "fx" / "fx_particles.png"
-PREVIEW = ROOT / "custom_assets" / "preview"
+OUT_FRAMES = paths.SPELLFX
+OUT_SA = paths.ANIMATION
+OUT_ATLAS = paths.FX / "fx_particles.png"
+PREVIEW = paths.PREVIEW
 TAU = 2 * math.pi
 
 # --- palettes -------------------------------------------------------------------------------
@@ -82,7 +83,7 @@ RAMP_RGB = {k: [_rgb(c) for c in v] for k, v in RAMPS.items()}
 
 
 def auto_ramp(hue: float, sat: float) -> str:
-    """School ramp for an original's dominant colour."""
+    """School ramp for a layout entry's dominant colour."""
     if sat < 0.25:
         return "white"
     for upto, name in ((15, "blood"), (38, "fire"), (65, "holy"), (150, "nature"), (190, "cyan"),
@@ -182,7 +183,7 @@ def smooth(t):
 
 
 class Fx:
-    """World-resolution canvas + the original's per-frame boxes (smoothed) and envelope."""
+    """World-resolution canvas + the layout's per-frame boxes (smoothed) and envelope."""
 
     def __init__(self, name: str, lay: dict):
         self.name, self.lay = name, lay
@@ -222,7 +223,7 @@ class Fx:
 
     def quant(self, F, gamma=0.8):
         # gamma < 1: luma keying makes dark ramp entries nearly transparent over the bright
-        # world, so mid tones are pushed up a little to keep effects as present as the originals
+        # world, so mid tones are pushed up a little to keep effects as present as intended
         """Float field -> ramp index 0..K-1 with ordered dithering."""
         F = np.clip(F, 0, 1.0) ** gamma
         idx = np.floor(F * (K - 1) + 0.5 + (self.B - 0.5) * self.dither).astype(np.int16)
@@ -1056,7 +1057,7 @@ def sprite_obelisk(fx):
 
 
 # --- which effect is what ---------------------------------------------------------------------
-# name -> (family, params); ramp=None picks the school ramp from the original's dominant colour.
+# name -> (family, params); ramp=None picks the school ramp from the layout's dominant colour.
 
 ARROWS = {"east": 0, "south_east": 0.45, "south": math.pi / 2, "south_west": math.pi - 0.45, "west": math.pi,
           "north_west": math.pi + 0.45, "north": -math.pi / 2, "north_east": -0.45}

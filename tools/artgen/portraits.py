@@ -2,8 +2,8 @@
 
 Usage (from repo root):  python -I tools/artgen/portraits.py
 
-Writes `custom_assets/content/portraits/portrait_custom_<model>.png` (80x80, the HUD uses
-small portraits whole and cuts the circle itself). The client prefers these with `--art custom`.
+Writes `assets/content/portraits/portrait_custom_<model>.png` (80x80, the HUD uses
+small portraits whole and cuts the circle itself).
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import creatures  # noqa: E402
 import valefolk  # noqa: E402
 from vox import BAYER4, COS_E, PX_PER_UNIT, rot_y  # noqa: E402
 
-OUT = Path(__file__).resolve().parents[2] / "custom_assets" / "content" / "custom" / "portraits"
+from paths import PORTRAITS as OUT  # noqa: E402
 SIZE = 80
 CANVAS = 512
 # A 3/4 view toward the camera: halfway between sheet directions S (pi/4) and SE (0).

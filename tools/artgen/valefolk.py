@@ -3,7 +3,7 @@
 Usage (from repo root):  python -I tools/artgen/valefolk.py [model ...]
 
 Same pipeline as creatures.py (SDF voxel models on a skeleton -> 8-direction sheets), written to
-`custom_assets/scripts/npc/<model>.txt` + `content/custom/custom_npc_<model>.png`:
+`assets/scripts/npc/<model>.txt` + `content/sprites/custom_npc_<model>.png`:
 
 | model | who |
 |---|---|
@@ -1048,7 +1048,7 @@ def job(name: str) -> str:
     anims = anims_fn()
     renders = sheet.render_all(model, anims, frame, foot, scale)
     hits = HITS.get(name)
-    script_dir = sheet.OUT / "scripts" / "npc" / "custom"
+    script_dir = sheet.OUT / "scripts" / "npc"
     sheet.export(renders, anims, foot, f"custom_npc_{name}.png", script_dir / f"{name}.txt", hits=hits)
     sheet.preview(renders, anims, frame, f"npc_{name}")
     if name in SMEARS:

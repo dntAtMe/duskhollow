@@ -1,7 +1,7 @@
 """Item icon models: small voxel objects built from `iconlib` primitives, chosen by heuristics.
 
 `item_icon(stem, info)` -> (prims, view rotation, fit). How a model is picked, in order:
-1. `item_template.model` of the items using the icon (weapons / shields: dagger, longsword, maul,
+1. `model=` of the items using the icon (weapons / shields: dagger, longsword, maul,
    rod_purple, greatbow_orange, kite shield ...) -> a weapon / shield builder;
 2. armour icons `icon_item_<rb|lt|ch|pl>_<glove|head|pants|shoes|torso>_*` -> cloth / leather /
    chain / plate builders of that slot;

@@ -3,12 +3,11 @@
 `spell_icon(stem, info, n)` -> RGBA (n x n). Two decisions per spell:
 
 School (palette): a strong element word in the name / icon name wins (poison, fire, frost ...),
-otherwise `spell_template.cast_school` (1 physical, 2 frost, 3 fire, 4 shadow, 5/6 holy), otherwise
+otherwise the spell's `school` (1 physical, 2 frost, 3 fire, 4 shadow, 5/6 holy), otherwise
 weaker words in name + description (mana -> arcane, curse -> shadow, bless -> holy ...).
 
 Motif: `RULES` is an ordered list of (regex, recipe); the in-game name is tried first, then the icon
-file name (the original English spell name), then the description, so a renamed spell ("Lesser
-Heal.png" is the NPC spell Forcecage) shows what it does now. Recipes compose 2D motifs (flames,
+file name, then the description, so a spell keeps a fitting icon after a rename. Recipes compose 2D motifs (flames,
 shards, bolts, bursts, skulls, hands, wings, runes, waves ...) and small voxel props shared with
 the item icons (swords, daggers, shields, bows, arrows, hammers, boots, chains, books, horns).
 Unmatched spells fall back on their effect types: heal -> hands with light, damage -> a bolt,
@@ -988,7 +987,7 @@ def r_poison_bolt(cv, P):
     bolt(cv, P, "poison", "leaf")
 
 
-# --- Duskhollow skills (custom_assets/data/spells.txt) ---------------------------------------------------
+# --- Duskhollow skills (assets/data/spells.txt) ---------------------------------------------------
 
 
 def r_cairnbreaker(cv, P):

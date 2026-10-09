@@ -2,7 +2,7 @@
 
 Usage (from repo root):  python -I tools/artgen/enviro.py
 
-Writes `custom_assets/content/env/*.png` plus `custom_assets/env_manifest.json` (what exists,
+Writes `assets/content/env/*.png` plus `assets/env_manifest.json` (what exists,
 used by mapgen.py). Pivots follow the engine's default for map sprites without a `sprite_hotspot`
 row: horizontally centred, 16 px above the bottom (= centre of the cell's diamond).
 
@@ -23,8 +23,8 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).parent))
 from vox import BAYER4, OUTLINE, RAMP_TABLE, RAMP_IDS, Bone, Model, Prim  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "custom_assets" / "content" / "custom" / "env"
+from paths import ASSETS, ROOT  # noqa: E402,F401
+from paths import ENV as OUT  # noqa: E402
 PERIOD = 4  # cells
 
 # --- periodic value noise ---------------------------------------------------------------
@@ -423,7 +423,7 @@ def main():
     SPRITE_FX.append("particles green_firefly.psi fireflies 0 -32")
     SPRITE_FX.append("light green_firefly.psi c8822e90 -5 20 1 0 0.5")
     print("upright hut, campfire, lamp")
-    (ROOT / "custom_assets" / "env_manifest.json").write_text(json.dumps(manifest, indent=1), newline="\n")
+    (ASSETS / "env_manifest.json").write_text(json.dumps(manifest, indent=1), newline="\n")
     (OUT / "hotspots.txt").write_text("\n".join(HOTSPOTS) + "\n", newline="\n")
     (OUT / "sprite_fx.txt").write_text(
         "# particles <sprite> <system> <x> <y>       (data/particles.txt; offset from the sprite's top-left)\n"

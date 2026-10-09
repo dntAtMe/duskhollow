@@ -22,7 +22,7 @@ import numpy as np
 PX_PER_UNIT = 32.0 * math.sqrt(2.0)  # 45.25: one cell edge on screen
 ELEV = math.radians(30.0)  # 2:1 diamonds
 SIN_E, COS_E = math.sin(ELEV), math.cos(ELEV)
-LIGHT = np.array([-0.45, 0.35, 0.82])  # from the upper left, like the original art
+LIGHT = np.array([-0.45, 0.35, 0.82])  # from the upper left
 LIGHT = LIGHT / np.linalg.norm(LIGHT)
 
 

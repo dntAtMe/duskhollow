@@ -9,7 +9,7 @@
 //!   `.cover` sidecar;
 //! - player footsteps.
 //!
-//! Sounds come from `tools/sfxgen` (`custom_assets/content/sfx/`).
+//! Sounds come from `tools/sfxgen` (`assets/content/sfx/`).
 
 use super::{AudioSettings, ProximityGroup, Rng, SfxAt, SfxVoice};
 use crate::{
