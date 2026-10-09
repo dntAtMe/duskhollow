@@ -291,7 +291,8 @@ fn on_spell_events(
     }
 }
 
-/// Debug aid: `DUSK_FX_TEST=<spell id>` replays that spell's impact kit on the player every second.
+/// Debug aid: `DUSK_FX_TEST=<spell id>` replays that spell's go, impact and aura kits on the player
+/// every second.
 fn fx_test(
     mut commands: Commands,
     time: Res<Time>,
@@ -310,8 +311,9 @@ fn fx_test(
         return;
     }
     *next = time.elapsed_secs() + 1.0;
-    if let Some(kit) = data.spell_visuals.get(&spell).and_then(|v| v.impact.clone()) {
-        spawn_kit(&mut commands, &data, &assets, &mut queue, &kit, u);
+    let Some(visual) = data.spell_visuals.get(&spell) else { return };
+    for kit in [&visual.go, &visual.impact, &visual.aura_ontop].into_iter().flatten() {
+        spawn_kit(&mut commands, &data, &assets, &mut queue, kit, u);
     }
 }
 

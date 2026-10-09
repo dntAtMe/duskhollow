@@ -421,7 +421,7 @@ def main():
     SPRITE_FX.append(f"light {lamp_name} e25822c8 11 -60 1 0 0.8")
     # Ember-moths over the glade pond: mapgen.py places invisible `green_firefly.psi` sprites.
     SPRITE_FX.append("particles green_firefly.psi fireflies 0 -32")
-    SPRITE_FX.append("light green_firefly.psi b4782a48 -5 20 1 0 0.4")
+    SPRITE_FX.append("light green_firefly.psi c8822e90 -5 20 1 0 0.5")
     print("upright hut, campfire, lamp")
     (ROOT / "custom_assets" / "env_manifest.json").write_text(json.dumps(manifest, indent=1), newline="\n")
     (OUT / "hotspots.txt").write_text("\n".join(HOTSPOTS) + "\n", newline="\n")

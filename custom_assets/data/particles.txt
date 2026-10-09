@@ -97,16 +97,16 @@ alpha_var=0.35
 [fire_cast]
 sprite=3
 blend=add
-emission=80
+emission=85
 life=0.5,1.5
 direction=0
 spread=360
 speed=0,40
 gravity=-28,0
 radial=-110,0
-size=0.44,1.05,0
-color_start=1,0.64,0.14,0.6
-color_end=0.72,0.06,0.02,0
+size=0.46,1.1,0
+color_start=1,0.72,0.18,0.62
+color_end=0.74,0.08,0.02,0
 color_var=0.15
 
 # Ember Bolt's trail: a hot core leaving cooling cinders behind.

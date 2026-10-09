@@ -63,6 +63,11 @@ RAMPS = {
     "cyan": ["#000000", "#032222", "#085050", "#128a84", "#2ccabc", "#8af0e0", "#e6fffa"],
     "blood": ["#000000", "#2a0404", "#5c0a0a", "#9a1414", "#d83028", "#ff7a5c", "#ffd8c8"],
     "earth": ["#000000", "#1e1208", "#3e2814", "#6a4624", "#9a6c3a", "#c89a62", "#f0d4a0"],
+    # Duskhollow palette (docs/world.md: dull bone, rust, ash; nothing near-white) for the
+    # flipbooks of our spell kits (data/spell_visuals.txt).
+    "bone": ["#000000", "#1e1410", "#3e2c22", "#6a5040", "#9a7c62", "#c4a888", "#e0ccaa"],
+    "rust": ["#000000", "#2a0c06", "#561a0c", "#8a3414", "#bc5a22", "#e08a48", "#f0b880"],
+    "ash": ["#000000", "#140c14", "#2c1e2a", "#4a3646", "#6e5466", "#94788a", "#b8a0ac"],
     # untinted grey: effects the kit recolours with `sprcolor` (aura_001, *_003d, *_008d...)
     "white": ["#000000", "#1c1c1c", "#444444", "#747474", "#a8a8a8", "#d8d8d8", "#ffffff"],
 }
@@ -1090,7 +1095,7 @@ SPEC: dict[str, tuple] = {
     "fire_002.sa": (fam_burst, {"blobs": 14, "embers": 12}),
     "fire_002blue.sa": (fam_burst, {"ramp": "frost", "blobs": 14, "embers": 12}),
     "special_001_s.sa": (fam_burst, {"kind": "puff", "blobs": 9, "embers": 8}),
-    "effect_003.sa": (fam_burst, {"kind": "puff", "blobs": 8, "embers": 6}),
+    "effect_003.sa": (fam_burst, {"kind": "puff", "blobs": 8, "embers": 6, "ramp": "ash"}),
     "effect_008.sa": (fam_burst, {"kind": "spore", "blobs": 12, "embers": 30}),
     "special_002.sa": (fam_burst, {"kind": "spore", "blobs": 10, "embers": 20}),
     "lightning_cloud_02.sa": (fam_storm, {}),
@@ -1115,25 +1120,27 @@ SPEC: dict[str, tuple] = {
     "lightning_001.sa": (fam_bolt, {}),
     "lightning_001a.sa": (fam_bolt, {}),
     # weapon swings
-    "slash_001.sa": (fam_slash, {"kind": "line"}),
+    "slash_001.sa": (fam_slash, {"kind": "line", "ramp": "bone"}),
     "slash_002.sa": (fam_slash, {"kind": "arc", "a0": 0.0, "a1": 6.0}),
     "slash_002a.sa": (fam_slash, {"kind": "arc", "a0": -0.6, "a1": 2.6}),
-    "slash_002b.sa": (fam_slash, {"kind": "arc", "a0": 3.6, "a1": 0.2}),
-    "slash_002c.sa": (fam_slash, {"kind": "arc", "a0": -0.3, "a1": 3.0}),
+    "slash_002b.sa": (fam_slash, {"kind": "arc", "a0": 3.6, "a1": 0.2, "ramp": "blood"}),
+    "slash_002c.sa": (fam_slash, {"kind": "arc", "a0": -0.3, "a1": 3.0, "ramp": "rust"}),
     "slash_002d.sa": (fam_slash, {"kind": "arc", "a0": -1.4, "a1": 3.8}),
     # swirls, sparks, spirits, wind
     "dark_effect_001.sa": (fam_swirl, {}),
     "effect_bluepink_01.sa": (fam_swirl, {"arms": 3, "star": False}),
     "darkness_001.sa": (fam_swirl, {"orbs": 8, "star": False}),
     "effect_004.sa": (fam_rays, {"ramp": "fire"}),
-    "water_001.sa": (fam_rays, {"count": 26}),
+    "water_001.sa": (fam_rays, {"count": 26, "ramp": "bone"}),
     "effect_009.sa": (fam_rays, {"count": 28, "ring": True}),
     "darkness_002.sa": (fam_spirit, {}),
     "angel_001.sa": (fam_angel, {}),
     "angel_001a.sa": (fam_angel, {}),
     "wind_001.sa": (fam_wisps, {}),
     "wind_002.sa": (fam_rays, {"count": 16, "ring": True}),
-    **{n: (fam_whirl, {}) for n in ("wind_003.sa", "wind_003a.sa", "wind_003a_frfreet.sa", "wind_003b.sa")},
+    **{n: (fam_whirl, {}) for n in ("wind_003.sa", "wind_003a_frfreet.sa")},
+    "wind_003a.sa": (fam_whirl, {"ramp": "rust"}),
+    "wind_003b.sa": (fam_whirl, {"ramp": "bone"}),
     # moving things
     "effect_002.sa": (fam_comet, {}),
     "effect_002a.sa": (fam_comet, {}),

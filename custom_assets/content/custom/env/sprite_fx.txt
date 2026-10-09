@@ -6,4 +6,4 @@ light cg_campfire_0.png e25822c8 0 16 1 0 1.0
 particles cg_lamp_0.png lantern_embers 27 3
 light cg_lamp_0.png e25822c8 11 -60 1 0 0.8
 particles green_firefly.psi fireflies 0 -32
-light green_firefly.psi b4782a48 -5 20 1 0 0.4
+light green_firefly.psi c8822e90 -5 20 1 0 0.5
