@@ -1,7 +1,7 @@
 """Our own spell visual effects: `.sa` flipbooks and the particle texture atlas.
 
 Usage (from repo root):
-    python -I tools/artgen/spellfx.py              # all flipbooks + particles.png + previews
+    python -I tools/artgen/spellfx.py              # all flipbooks + fx_particles.png + previews
     python -I tools/artgen/spellfx.py cast_001.sa  # only some flipbooks (+ previews)
     python -I tools/artgen/spellfx.py --atlas      # only the particle atlas
 
@@ -10,21 +10,20 @@ particle bursts, rings, light columns, beams, lightning, slashes, whirlwinds... 
 float intensity field mapped through a short per-school palette ramp (black -> dark -> mid ->
 bright -> white-hot) with 4x4 Bayer ordered dithering, i.e. the oldschool "limited palette" look.
 
-Placement: the canvas position is fixed by game.db (`spell_visual_kit.spranim_x/y`), so for every
-original `scripts/animation/<name>.sa` we keep its ratio, canvas size, delay, loop range and frame
-count, and draw each frame into the bounding box the original frame occupied
-(`spellfx_layout.json`, measured by `spellfx_measure.py`: only boxes, a brightness envelope and a
-dominant colour). Frames are rendered at world resolution (canvas / ratio) and blown up by
-`ratio` with nearest neighbour, so they stay crisp at the client's 1/ratio draw scale.
+Placement: kits place a flipbook's canvas by `anim_x/anim_y` (`data/spell_visuals.txt`). Each
+`<name>.sa` keeps its ratio, canvas size, delay, loop range and frame count from
+`spellfx_layout.json` (our layout data: per-frame bounding boxes, a brightness envelope and a
+school ramp per flipbook), and each frame is drawn into its box. Frames are rendered at world
+resolution (canvas / ratio) and blown up by `ratio` with nearest neighbour, so they stay crisp at
+the client's 1/sqrt(ratio) draw scale.
 
-Output (used with `--art custom`):
-- `custom_assets/scripts/override/animation/<name>.sa` replaces the original script; its
-  `filename` is `sfx_<original filename>` so the frames have our own names:
+Output:
+- `custom_assets/scripts/override/animation/<name>.sa`, `filename=sfx_<name>`:
 - `custom_assets/content/custom/spellfx/sfx_*_<n>.png`: trimmed, palettized frames on opaque
   black (the client luma-keys those = additive look). Quest markers / arrows / the obelisk are
   drawn with real alpha instead.
-- `custom_assets/content/override/fx/particles.png`: 128x128 atlas of 16 white 32x32 particle
-  sprites (same slots as the original, `.psi` files pick cells by index), alpha in 5 dithered steps.
+- `custom_assets/content/custom/fx/fx_particles.png`: 128x128 atlas of 16 white 32x32 particle
+  sprites (`sprite=<cell>` in `data/particles.txt`), alpha in 5 dithered steps.
 - `custom_assets/preview/spellfx_*.png`: contact sheets (gitignored).
 """
 
@@ -47,7 +46,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LAYOUT = Path(__file__).with_name("spellfx_layout.json")
 OUT_FRAMES = ROOT / "custom_assets" / "content" / "custom" / "spellfx"
 OUT_SA = ROOT / "custom_assets" / "scripts" / "override" / "animation"
-OUT_ATLAS = ROOT / "custom_assets" / "content" / "override" / "fx" / "particles.png"
+OUT_ATLAS = ROOT / "custom_assets" / "content" / "custom" / "fx" / "fx_particles.png"
 PREVIEW = ROOT / "custom_assets" / "preview"
 TAU = 2 * math.pi
 
@@ -64,6 +63,11 @@ RAMPS = {
     "cyan": ["#000000", "#032222", "#085050", "#128a84", "#2ccabc", "#8af0e0", "#e6fffa"],
     "blood": ["#000000", "#2a0404", "#5c0a0a", "#9a1414", "#d83028", "#ff7a5c", "#ffd8c8"],
     "earth": ["#000000", "#1e1208", "#3e2814", "#6a4624", "#9a6c3a", "#c89a62", "#f0d4a0"],
+    # Duskhollow palette (docs/world.md: dull bone, rust, ash; nothing near-white) for the
+    # flipbooks of our spell kits (data/spell_visuals.txt).
+    "bone": ["#000000", "#1e1410", "#3e2c22", "#6a5040", "#9a7c62", "#c4a888", "#e0ccaa"],
+    "rust": ["#000000", "#2a0c06", "#561a0c", "#8a3414", "#bc5a22", "#e08a48", "#f0b880"],
+    "ash": ["#000000", "#140c14", "#2c1e2a", "#4a3646", "#6e5466", "#94788a", "#b8a0ac"],
     # untinted grey: effects the kit recolours with `sprcolor` (aura_001, *_003d, *_008d...)
     "white": ["#000000", "#1c1c1c", "#444444", "#747474", "#a8a8a8", "#d8d8d8", "#ffffff"],
 }
@@ -1091,7 +1095,7 @@ SPEC: dict[str, tuple] = {
     "fire_002.sa": (fam_burst, {"blobs": 14, "embers": 12}),
     "fire_002blue.sa": (fam_burst, {"ramp": "frost", "blobs": 14, "embers": 12}),
     "special_001_s.sa": (fam_burst, {"kind": "puff", "blobs": 9, "embers": 8}),
-    "effect_003.sa": (fam_burst, {"kind": "puff", "blobs": 8, "embers": 6}),
+    "effect_003.sa": (fam_burst, {"kind": "puff", "blobs": 8, "embers": 6, "ramp": "ash"}),
     "effect_008.sa": (fam_burst, {"kind": "spore", "blobs": 12, "embers": 30}),
     "special_002.sa": (fam_burst, {"kind": "spore", "blobs": 10, "embers": 20}),
     "lightning_cloud_02.sa": (fam_storm, {}),
@@ -1116,25 +1120,27 @@ SPEC: dict[str, tuple] = {
     "lightning_001.sa": (fam_bolt, {}),
     "lightning_001a.sa": (fam_bolt, {}),
     # weapon swings
-    "slash_001.sa": (fam_slash, {"kind": "line"}),
+    "slash_001.sa": (fam_slash, {"kind": "line", "ramp": "bone"}),
     "slash_002.sa": (fam_slash, {"kind": "arc", "a0": 0.0, "a1": 6.0}),
     "slash_002a.sa": (fam_slash, {"kind": "arc", "a0": -0.6, "a1": 2.6}),
-    "slash_002b.sa": (fam_slash, {"kind": "arc", "a0": 3.6, "a1": 0.2}),
-    "slash_002c.sa": (fam_slash, {"kind": "arc", "a0": -0.3, "a1": 3.0}),
+    "slash_002b.sa": (fam_slash, {"kind": "arc", "a0": 3.6, "a1": 0.2, "ramp": "blood"}),
+    "slash_002c.sa": (fam_slash, {"kind": "arc", "a0": -0.3, "a1": 3.0, "ramp": "rust"}),
     "slash_002d.sa": (fam_slash, {"kind": "arc", "a0": -1.4, "a1": 3.8}),
     # swirls, sparks, spirits, wind
     "dark_effect_001.sa": (fam_swirl, {}),
     "effect_bluepink_01.sa": (fam_swirl, {"arms": 3, "star": False}),
     "darkness_001.sa": (fam_swirl, {"orbs": 8, "star": False}),
     "effect_004.sa": (fam_rays, {"ramp": "fire"}),
-    "water_001.sa": (fam_rays, {"count": 26}),
+    "water_001.sa": (fam_rays, {"count": 26, "ramp": "bone"}),
     "effect_009.sa": (fam_rays, {"count": 28, "ring": True}),
     "darkness_002.sa": (fam_spirit, {}),
     "angel_001.sa": (fam_angel, {}),
     "angel_001a.sa": (fam_angel, {}),
     "wind_001.sa": (fam_wisps, {}),
     "wind_002.sa": (fam_rays, {"count": 16, "ring": True}),
-    **{n: (fam_whirl, {}) for n in ("wind_003.sa", "wind_003a.sa", "wind_003a_frfreet.sa", "wind_003b.sa")},
+    **{n: (fam_whirl, {}) for n in ("wind_003.sa", "wind_003a_frfreet.sa")},
+    "wind_003a.sa": (fam_whirl, {"ramp": "rust"}),
+    "wind_003b.sa": (fam_whirl, {"ramp": "bone"}),
     # moving things
     "effect_002.sa": (fam_comet, {}),
     "effect_002a.sa": (fam_comet, {}),
@@ -1229,7 +1235,7 @@ def build(name: str, lay: dict):
 
 
 def particle_atlas():
-    """16 white 32x32 sprites in the original's slots (the .psi files address cells by index):
+    """16 white 32x32 sprites (`data/particles.txt` picks cells by index):
     row 0: soft blob, sparkle cluster, 6-ray star, small burst
     row 1: thin X cross, solid star, 8-ray flare, small soft glow
     row 2: smoke clump, spiky starburst, bright flare, hollow ring
@@ -1340,7 +1346,7 @@ def main(argv):
     layout = json.loads(LAYOUT.read_text())
     if "--atlas" in argv or not argv:
         particle_atlas()
-        print("particles.png ->", OUT_ATLAS)
+        print("fx_particles.png ->", OUT_ATLAS)
         if argv:
             return
     names = [a for a in argv if a.endswith(".sa")] or sorted(layout)

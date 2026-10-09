@@ -320,7 +320,7 @@ def hut(seed: int) -> Model:
 
 
 def campfire(seed: int) -> Model:
-    """Ring of stones around crossed logs; the flames are the original campfire.psi particles."""
+    """Ring of stones around crossed logs; the flames are the `campfire` particles."""
     rng = np.random.default_rng(seed)
     prims = []
     for k in range(9):
@@ -410,19 +410,23 @@ def main():
     lamp_name = make_upright("lamp_0", lamp(1))
     manifest["upright"]["campfire"] = [fire]
     manifest["upright"]["lamp"] = [lamp_name]
-    # Effects, same semantics as the original sprite_psi / sprite_light tables (docs/formats.md):
-    # psi offset from the sprite's top-left; light offset from the cell's render position.
+    # Effects (sprite_fx.txt, docs/visuals.md): particles offset from the sprite's top-left; light
+    # offset from the cell's render position.
     fw, fh = Image.open(OUT / fire).size
-    SPRITE_FX.append(f"psi {fire} campfire.psi {fw // 2} {fh - 16 - 6}")
-    SPRITE_FX.append(f"light {fire} e25822c8 0 16 1 0 1.0")  # = original campfire_01.png light
+    SPRITE_FX.append(f"particles {fire} campfire {fw // 2} {fh - 16 - 6}")
+    SPRITE_FX.append(f"particles {fire} cairn_sparks {fw // 2} {fh - 16 - 10}")
+    SPRITE_FX.append(f"light {fire} e25822c8 0 16 1 0 1.0")
     lw, lh = Image.open(OUT / lamp_name).size
-    SPRITE_FX.append(f"psi {lamp_name} small_light_embers.psi {lw // 2 + 11} {lh - 16 - 66}")
-    SPRITE_FX.append(f"light {lamp_name} e25822c8 11 -60 1 0 0.8")  # = street_light.png colour
+    SPRITE_FX.append(f"particles {lamp_name} lantern_embers {lw // 2 + 11} {lh - 16 - 66}")
+    SPRITE_FX.append(f"light {lamp_name} e25822c8 11 -60 1 0 0.8")
+    # Ember-moths over the glade pond: mapgen.py places invisible `green_firefly.psi` sprites.
+    SPRITE_FX.append("particles green_firefly.psi fireflies 0 -32")
+    SPRITE_FX.append("light green_firefly.psi c8822e90 -5 20 1 0 0.5")
     print("upright hut, campfire, lamp")
     (ROOT / "custom_assets" / "env_manifest.json").write_text(json.dumps(manifest, indent=1), newline="\n")
     (OUT / "hotspots.txt").write_text("\n".join(HOTSPOTS) + "\n", newline="\n")
     (OUT / "sprite_fx.txt").write_text(
-        "# psi <sprite> <file.psi> <x> <y>          (offset from the sprite's top-left)\n"
+        "# particles <sprite> <system> <x> <y>       (data/particles.txt; offset from the sprite's top-left)\n"
         "# light <sprite> <rrggbbaa> <x> <y> <ground 0/1> <top 0/1> <scale>  (offset from the cell)\n"
         + "\n".join(SPRITE_FX)
         + "\n",

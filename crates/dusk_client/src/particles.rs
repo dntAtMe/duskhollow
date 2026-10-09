@@ -1,11 +1,9 @@
-//! `.psi` particle systems: the client's `ParticleSystem` rules (`dusk_formats::psi`)
-//! simulated on the CPU and drawn as one quad mesh per emitter, like the original's
-//! SFML vertex array. Additive systems use a material with SFML's `BlendAdd`
+//! Particle systems (`data/particles.txt`, simulated by `dusk_formats::psi`) on the CPU, drawn
+//! as one quad mesh per emitter over the `fx_particles.png` atlas. Additive systems blend
 //! (src alpha, one), the rest plain alpha blending.
 //!
 //! Owners spawn a [`ParticleEmitter`] and keep its `pos` up to date; the emitter despawns
-//! itself once stopped and empty. Like the original (which only updates systems while
-//! their sprite is drawn), emitters away from the camera are neither simulated nor drawn.
+//! itself once stopped and empty. Emitters away from the camera are neither simulated nor drawn.
 
 use crate::data::GameData;
 use crate::iso;
@@ -28,14 +26,14 @@ impl Plugin for ParticlesPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "particles.wgsl");
         app.add_plugins(Material2dPlugin::<FxMaterial>::default())
-            .init_resource::<PsiCache>()
+            .init_resource::<SystemCache>()
             .add_systems(Startup, init_materials)
             .add_systems(PostUpdate, (debug_camera, init_emitters, simulate_emitters).chain());
     }
 }
 
-/// Textured, vertex-coloured mesh with SFML-style blending: `BlendAdd` or `BlendAlpha`.
-/// Used for particles and for the `light_source.png` glows.
+/// Textured, vertex-coloured mesh with additive or alpha blending.
+/// Used for particles and for the light glows.
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
 #[bind_group_data(FxMaterialKey)]
 pub struct FxMaterial {
@@ -74,7 +72,7 @@ impl Material2d for FxMaterial {
         if key.bind_group_data.additive
             && let Some(fragment) = descriptor.fragment.as_mut()
         {
-            // sf::BlendAdd = (SrcAlpha, One, Add) for colour, (One, One, Add) for alpha.
+            // Additive: (SrcAlpha, One, Add) for colour, (One, One, Add) for alpha.
             let add = |src_factor| BlendComponent {
                 src_factor,
                 dst_factor: BlendFactor::One,
@@ -88,7 +86,7 @@ impl Material2d for FxMaterial {
     }
 }
 
-/// Shared materials over `particles.png`.
+/// Shared materials over the particle atlas (`dusk_formats::psi::TEXTURE`).
 #[derive(Resource)]
 pub struct FxMaterials {
     pub particles_add: Handle<FxMaterial>,
@@ -109,9 +107,9 @@ fn init_materials(
     });
 }
 
-/// Parsed `.psi` files by lowercase name (`None` = missing/broken, warned once).
+/// Particle systems by lowercase name (`None` = unknown, warned once).
 #[derive(Resource, Default)]
-struct PsiCache(HashMap<String, Option<ParticleSystemInfo>>);
+struct SystemCache(HashMap<String, Option<ParticleSystemInfo>>);
 
 /// A particle system in the world. Positions are Bevy world coordinates.
 #[derive(Component)]
@@ -165,7 +163,7 @@ fn init_emitters(
     mut commands: Commands,
     data: Res<GameData>,
     mats: Option<Res<FxMaterials>>,
-    mut cache: ResMut<PsiCache>,
+    mut cache: ResMut<SystemCache>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut q: Query<(Entity, &mut ParticleEmitter), Added<ParticleEmitter>>,
     mut seed: Local<u64>,
@@ -279,7 +277,7 @@ fn write_quads(mesh: &mut Mesh, sys: &ParticleSystem) {
     let (mut pos, mut uv, mut col, mut idx) =
         (Vec::with_capacity(n * 4), Vec::with_capacity(n * 4), Vec::with_capacity(n * 4), Vec::with_capacity(n * 6));
     for (i, p) in sys.particles.iter().enumerate() {
-        // Quad of side size*32 centred on the particle (spin is not rendered by the client).
+        // Quad of side size*32 centred on the particle (spin is not drawn).
         let h = p.size * CELL * 0.5;
         let (x, y) = (p.pos[0], -p.pos[1]);
         pos.extend([[x - h, y + h, 0.0], [x + h, y + h, 0.0], [x + h, y - h, 0.0], [x - h, y - h, 0.0]]);
@@ -311,13 +309,13 @@ pub fn quad_mesh(size: Vec2, color: Color) -> Mesh {
     m
 }
 
-/// Position (Bevy world) and draw depth of a map sprite's `sprite_psi` emitter:
-/// `sprite position - hotspot + offset` in the original's y-down pixels.
+/// Position (Bevy world) of a map sprite's particle emitter:
+/// `sprite position - hotspot + offset` in y-down pixels.
 pub fn sprite_emitter_pos(sprite_pos: Vec2, hotspot: Vec2, offset: IVec2) -> Vec2 {
     Vec2::new(sprite_pos.x - hotspot.x + offset.x as f32, sprite_pos.y + hotspot.y - offset.y as f32)
 }
 
-/// Resolves a spell visual kit's psystem offset expression (`-20`, `-height/2`, ...).
+/// Resolves a spell visual kit's particle offset expression (`-20`, `-height/2`, ...).
 pub fn kit_offset(expr: &str, unit_height: f32) -> f32 {
     use dusk_formats::spell::{FormulaVars, eval_formula};
     if expr.trim().is_empty() {

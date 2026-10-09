@@ -100,24 +100,6 @@ fn all_spell_formulas_evaluate() {
 }
 
 #[test]
-fn spell_visuals_load_and_animations_exist() {
-    let Some(root) = assets() else { return };
-    let db = GameDb::open(root.join("game.db")).unwrap();
-    let visuals = db.spell_visuals().unwrap();
-    let fireball = &visuals[&29];
-    assert_eq!(fireball.impact.as_ref().unwrap().anims[0].sa, "fire_001.sa");
-    let missing: Vec<_> = visuals
-        .values()
-        .flat_map(|v| [&v.traveling, &v.impact, &v.casting, &v.go])
-        .flatten()
-        .flat_map(|k| &k.anims)
-        .filter(|a| !root.join("scripts/animation").join(&a.sa).exists())
-        .map(|a| a.sa.clone())
-        .collect();
-    assert!(missing.len() < 10, "missing .sa scripts: {missing:?}");
-}
-
-#[test]
 fn custom_maps_parse_and_resolve() {
     use dusk_formats::custom::{CUSTOM_MAP_PREFIX, parse_spawns};
     let dir = dusk_formats::content_root().join("maps");
@@ -132,7 +114,7 @@ fn custom_maps_parse_and_resolve() {
         assert!(p.file_stem().unwrap().to_string_lossy().starts_with(CUSTOM_MAP_PREFIX));
         let m = MapFile::load(&p).unwrap();
         assert_eq!(m.cells.len() as u32, m.size * m.size);
-        // Every texture must exist in custom_assets/content (`.psi` entries are original particle systems).
+        // Every texture must exist in custom_assets/content (`.psi` entries are effect-only sprites).
         for t in m.textures.iter().filter(|t| !t.ends_with(".psi")) {
             assert!(pngs.contains(t.as_str()), "{}: missing texture {t}", p.display());
         }
@@ -141,49 +123,6 @@ fn custom_maps_parse_and_resolve() {
         n += 1;
     }
     assert!(n > 0);
-}
-
-#[test]
-fn all_particle_systems_parse_and_simulate() {
-    use dusk_formats::psi::{MAX_PARTICLES, ParticleSystem, ParticleSystemInfo};
-    let Some(root) = assets() else { return };
-    let all = files(&root.join("scripts/particles"), "psi");
-    assert!(all.len() >= 40);
-    for f in all {
-        let info = ParticleSystemInfo::load(&f).unwrap_or_else(|e| panic!("{}: {e}", f.display()));
-        let (tx, ty) = info.texture_origin();
-        assert!(tx < 128 && ty < 128, "{}: frame outside particles.png", f.display());
-        assert!(info.emission > 0 && info.emission <= 1000, "{}", f.display());
-        let mut s = ParticleSystem::new(info, 7);
-        for i in 0..300 {
-            s.set_position(i as f32, 0.0, i % 2 == 0);
-            s.update(1.0 / 60.0);
-            assert!(s.particles.len() <= MAX_PARTICLES);
-        }
-        assert!(!s.particles.is_empty(), "{}: nothing emitted", f.display());
-        assert!(s.particles.iter().all(|p| p.pos[0].is_finite() && p.pos[1].is_finite()));
-    }
-}
-
-#[test]
-fn sprite_effects_reference_existing_files() {
-    let Some(root) = assets() else { return };
-    let db = GameDb::open(root.join("game.db")).unwrap();
-    let psi = db.sprite_psi().unwrap();
-    assert_eq!(psi["campfire_01.png"][0].psi, "campfire.psi");
-    assert_eq!(psi["medieval-tavern_10000.png"].len(), 2);
-    for v in psi.values().flatten() {
-        assert!(root.join("scripts/particles").join(&v.psi).exists(), "{}", v.psi);
-    }
-    let lights = db.sprite_lights().unwrap();
-    let fire = &lights["campfire_01.png"][0];
-    assert_eq!((fire.color, fire.apply_ground, fire.apply_top, fire.scale), (0xe25822c8, true, false, 1.0));
-    assert!(db.zone_night_pct().unwrap()[&49] > 0.4);
-    let visuals = db.spell_visuals().unwrap();
-    let kits = visuals.values().flat_map(|v| [&v.traveling, &v.casting, &v.aura_ontop]).flatten();
-    for k in kits.filter(|k| k.psystem.ends_with(".psi")) {
-        assert!(root.join("scripts/particles").join(&k.psystem).exists(), "{}", k.psystem);
-    }
 }
 
 #[test]

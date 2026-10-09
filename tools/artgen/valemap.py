@@ -730,7 +730,7 @@ def main():
     check_paths(placed)
     (vale.OUT / "hotspots.txt").write_text("\n".join(vale.HOTSPOTS) + "\n", newline="\n")
     (vale.OUT / "sprite_fx.txt").write_text(
-        "# psi <sprite> <file.psi> <x> <y>          (offset from the sprite's top-left)\n"
+        "# particles <sprite> <system> <x> <y>       (data/particles.txt; offset from the sprite's top-left)\n"
         "# light <sprite> <rrggbbaa> <x> <y> <ground 0/1> <top 0/1> <scale>  (offset from the cell)\n"
         + "\n".join(vale.SPRITE_FX)
         + "\n",
