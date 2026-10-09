@@ -49,7 +49,7 @@ pub enum MapError {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TileLayer {
     pub texture: u32,
-    /// Raw per-layer value; looks like an f32 (0.6..1.0) in fanadin, 0 elsewhere.
+    /// Per-layer value, unused (our generators write 0).
     pub param: u32,
 }
 

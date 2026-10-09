@@ -1,4 +1,4 @@
-"""Writes the gaze cover sidecar (`maps/<name>.cover`, docs/demo-plan.md) for a custom map by
+"""Writes the gaze cover sidecar (`maps/<name>.cover`, docs/demo-plan.md) for a map by
 looking at its upright props: canopies (trees, pines) and walls cast shade, a hut's eaves are
 deep shelter, a campfire is a rest cairn.
 

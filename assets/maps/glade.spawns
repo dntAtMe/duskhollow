@@ -1,4 +1,4 @@
-# entry x y orientation wander_distance (cells) -- read by dusk_server for custom maps
+# entry x y orientation wander_distance (cells), read by dusk_server
 50023 38.9 43.3 0.86 4
 50022 12.3 19.7 3.03 4
 50022 42.6 37.1 0.03 4

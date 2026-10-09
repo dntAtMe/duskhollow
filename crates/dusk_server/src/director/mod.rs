@@ -2,7 +2,7 @@
 //! at the Glare Gate (which forces the Eye open via [`EyeCommand`]), villager barks and the end
 //! of the run. The run itself is data in [`script`].
 //!
-//! Tolerant by design: without the custom NPC templates nothing here triggers, and without a
+//! Tolerant by design: without the demo's NPC templates nothing here triggers, and without a
 //! `glare_gate` marker (`maps/<map>.markers`) the Warden fight simply never starts.
 //!
 //! Debug: `DUSK_QUEST_TEST=<stage>` starts every new player at that point of the run

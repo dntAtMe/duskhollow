@@ -1,7 +1,8 @@
 # HUD
 
-All HUD pieces use the original art from `content/interface/` at native pixel size (the
-original targets 1920x1080; at our default 1280x720 the pieces are placed so they don't overlap).
+All HUD pieces use our art from `assets/content/ui/` (`tools/artgen/ui.py` and friends) at native
+pixel size (laid out for 1920x1080; at our default 1280x720 the pieces are placed so they don't
+overlap).
 
 | Module | What |
 |---|---|
@@ -50,24 +51,23 @@ command-line launch (map / `--connect` / `--name` / `--class`, or a `DUSK_*` deb
 
 ## Unit frames
 
-`UnitFrame::setFrameStyle` (`FUN_0052f460`, `UnitFrame.cpp`) hard-codes
-the layout per style. Recovered offsets (frame-local pixels):
+Fixed layout per frame style (frame-local pixels; `tools/artgen/ui.py` draws the art to match):
 
 | Field | Style 1 (player, `unit_frame.png`) | Style 2 (target, `unit_frame_reverse.png`) | Style 3 (party) |
 |---|---|---|---|
 | HP bar (`unit_frame_hp*.png`) | 74,39 | 3,39 | 45,11 |
 | MP bar (`unit_frame_mp*.png`) | 84,70 | 23,70 | 55,33 |
-| Level badge (`+0x100`) | 71,105 | 330,112 | 51,54 |
-| Portrait centre (`+0x150`), radius (`+0x15c`) | 44,73 r45 | 328,73 r45 | 44,73 r13 |
-| HP / MP text (`+0x110`, `+0x118`) | 91,46 / 91,74 | 250,46 / 250,74 | 66,13 / 66,33 |
-| Aura row (`+0x90`) | 95,108 | 265,108 | 76,58 |
-| Cast bar (style 2 only, `+0x120`) | – | 300,10 | – |
+| Level badge | 71,105 | 330,112 | 51,54 |
+| Portrait centre, radius | 44,73 r45 | 328,73 r45 | 44,73 r13 |
+| HP / MP text | 91,46 / 91,74 | 250,46 / 250,74 | 66,13 / 66,33 |
+| Aura row | 95,108 | 265,108 | 76,58 |
+| Cast bar (style 2 only) | – | 300,10 | – |
 
 Bars are clipped by percentage (a clip node shrinks, the bar image stays put); the reverse
-style drains towards the portrait. Elite/boss targets (`npc_template.bool_elite/bool_boss`)
+style drains towards the portrait. Elite/boss targets (`elite=1` / `boss=1` in `npc_templates.txt`)
 get the `unit_frame_elite/boss.png` dragon ring; its circle centre is (65.5, 75.5) in the art,
 fitted by least squares, and is placed on the portrait centre. We draw the level badge at
-(330,108) and names above the HP bar (the original name position wasn't identified).
+(330,108) and names above the HP bar.
 
 Target mana: the server doesn't send NPC mana; the bar is shown full for casters
 (`ai_type = 1` or `mana > 0`) and empty otherwise.
@@ -79,8 +79,8 @@ Portraits are our close-ups (`content/portraits/portrait_custom_<model>.png`,
 (`portrait_{hostile,friendly,grey}.png`). The client bakes a round 78 px thumbnail on the CPU
 (80x80 images whole, larger cards: a 130 px square around y=115).
 
-NPC lookup (our files only): `portrait_custom_<npc model name>.png`, else
-`portrait_<npc_template.portrait>.png`, else the faction placeholder. The player uses
+NPC lookup: `portrait_custom_<npc model name>.png`, else
+`portrait_<portrait=>.png` (`npc_templates.txt`), else the faction placeholder. The player uses
 `portrait_custom_adventurer.png`.
 
 ## XP bar
@@ -127,8 +127,7 @@ Other units' bars also show while targeted or damaged.
 ## Minimap
 
 `minimap.png` (241x293) top-right; the map view is the 230x227 rectangle at (6,46) that
-`miniamp_decal.png` covers. The shipped `content/minimap/fanadin_map.jpg` (3200x1800) is a
-pre-rendered overview of Fanadin only, so instead a second `Camera2d` renders the live world
+`miniamp_decal.png` covers. A second `Camera2d` renders the live world
 around the player into a 2x supersampled texture (linear-filtered down). The decal's alpha is
 inverted into a dark overlay so the map fades out at the frame's brushed edges.
 
@@ -167,7 +166,7 @@ with the `WindowCommand` message (`Open` / `Close` / `Toggle`) and reads `Window
   (`ui_input.rs`).
 - Cursor: hand over buttons and friendly NPCs, crosshair over enemies, grab over lootable corpses
   (system cursors).
-- Window open / close play the legacy `window_open_a` / `window_close_a` sounds.
+- Window open / close play `ui_window_open` / `ui_window_close`.
 
 ### Esc priority
 

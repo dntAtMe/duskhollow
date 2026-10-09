@@ -1,10 +1,10 @@
 # Demo plan: "First Gaze"
 
-A 10–15 minute playable slice on a new map, `duskhollow`, with `--art custom`. Lore and art
+A 10–15 minute playable slice on the map `duskhollow`. Lore and art
 rules: [world.md](world.md).
 
 ```bash
-cargo run -p dusk_client -- duskhollow --art custom
+cargo run -p dusk_client -- duskhollow
 ```
 
 ## The run
@@ -50,16 +50,14 @@ back".
 
 ## Contracts between work streams
 
-- **Map files**: `custom_assets/maps/duskhollow.{map,spawns,cover,markers}`. `.cover` is
+- **Map files**: `assets/maps/duskhollow.{map,spawns,cover,markers}`. `.cover` is
   plain text: first line `W H`, then H rows of W chars (row = cell y, column = cell x); parsed by
   `dusk_formats::content::sidecars::CoverGrid`. `.markers` is `name x y [radius]` per line
   (`dusk_formats::content::sidecars::parse_markers`); demo names: `arrival`, `lowshade`, `red_fields`,
   `glare_gate`, `fallen_blade`, `still_pool`.
-- **NPC template format**: `[entry]` sections of `key=value` (see
-  `dusk_formats::content::sidecars::parse_npc_templates`); already merged into the server's and client's
-  template maps, with `model=` naming the sprite script in `scripts/npc/`.
-- **Custom NPC templates**: `custom_assets/data/npc_templates.txt`, entries ≥ 50000, loaded by both
-  server and client next to `game.db` templates. Reserved entries:
+- **NPC templates**: `assets/data/npc_templates.txt`, `[entry]` sections of `key=value`
+  (`dusk_formats::content::npcs`, docs/content.md), entries ≥ 50000, loaded by both server and
+  client, with `model=` naming the sprite script in `scripts/npc/`. The demo's entries:
 
   | Entry | Name | Model | Role |
   |---|---|---|---|
@@ -71,12 +69,12 @@ back".
   | 50011 | Lightworker | `lightworker` | friendly, wanders the fields, barks |
   | 50012 | Lowshade Guard | `lowshade_guard` | friendly, stands at the hamlet edge |
 
-- **Sound names** (`custom_assets/content/sfx/<name>.wav`, played via `audio::PlaySfx` by
+- **Sound names** (`assets/content/sfx/<name>.wav`, played via `audio::PlaySfx` by
   bare filename): `gaze_open`, `gaze_close`, `gaze_spot_enter`, `strain_heartbeat`,
   `strain_breath`, `strain_whisper`, `strain_overwhelm`, `cairn_kindle`, `cairn_rest`,
   `quest_accept`, `quest_progress`, `quest_complete`, `dialogue_open`, `title_sting`, `end_sting`,
   `hit_heavy`. Loops: `amb_open_sky`, `amb_shelter`, `amb_eye_open`, `loop_cairn_fire`.
-  Custom NPC voices by model: `npc_<model>_{aggro,attack,hit,death}.wav`.
+  NPC voices by model: `npc_<model>_{aggro,attack,hit,death}.wav`.
 - **Client gaze state**: `gaze::GazeView` resource (eye state, openness 0–1, strain, corruption,
   cover under the player, in-combat flag), written by the gaze stream, read by audio and HUD.
 
@@ -86,7 +84,7 @@ back".
    shade rendering, gaze spot, strain HUD + vignette, minimap eye.
 2. **Vale**: environment art in the crimson palette (cliffs and overhangs, covered huts, canopy
    shelters, red grain, cairn, Glare Gate, Fallen Blade), the map with spawns and cover.
-3. **Creatures and people**: custom NPC templates (server + client), models, sheets and portraits
+3. **Creatures and people**: NPC templates (server + client), models, sheets and portraits
    for the table above.
 4. **Sound**: procedural SFX and ambience generator, gaze-driven ambience mixing, NPC voices.
 5. **Director and feel**: NPC interaction + dialogue window, quest flow and tracker, scripted Eye

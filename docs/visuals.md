@@ -1,12 +1,12 @@
 # Visuals: spell kits, particles, map effects, lights
 
-Everything here is our own data under `custom_assets/` (no legacy files are read).
+Everything here is data under `assets/`; formats of the other files are in [content.md](content.md).
 
 | File | What | Loader |
 |---|---|---|
 | `data/spell_visuals.txt` | named visual kits + which kit each spell plays | `dusk_formats::content::visuals` |
 | `data/particles.txt` | particle systems | `dusk_formats::content::particles` (simulation: `dusk_formats::psi`) |
-| `content/custom/{env,vale}/sprite_fx.txt` | particle emitters and lights on map sprites | `dusk_formats::content::sprite_fx` |
+| `content/{env,vale}/sprite_fx.txt` | particle emitters and lights on map sprites | `dusk_formats::content::sprite_fx` |
 | `scripts/animation/*.sa` + `content/spellfx/` | flipbooks | `tools/artgen/spellfx.py` |
 | `content/fx/fx_particles.png` | particle atlas (4x4 cells of 32 px, white) | `tools/artgen/spellfx.py --atlas` |
 | `content/fx/fx_light_glow.png`, `fx_light_mask.png` | light glow and darkness cut-out | `tools/artgen/lightfx.py` |

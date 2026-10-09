@@ -46,7 +46,7 @@ pub struct Unit {
     /// One-shot animation layered over `anim` (swing, hit, block...).
     action: Option<(&'static str, f32, f32)>,
     pub scale: f32,
-    /// Visual height in unscaled pixels (from `npc_models.height`).
+    /// Visual height in unscaled pixels (`height=` in `npc_templates.txt`).
     pub height: f32,
     /// Seconds the animation stays frozen (hit-stop, see `feel`).
     pub hitstop: f32,

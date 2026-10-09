@@ -1,6 +1,6 @@
 //! Spell templates (`data/spells.txt`) and the formula language.
 //!
-//! Formulas (`mana_formula`, `effectN_scale_formula`, `duration_formula`) are
+//! Formulas (`mana=`, `effectN_formula=`, `duration_formula=` of `data/spells.txt`) are
 //! arithmetic over `+ - * /` and parentheses with the variables `clvl` (caster level),
 //! `splvl` (spell level), `value` (the effect's base value) and the caster's
 //! attributes `STR AGI WIL INT CUR` (substituted before evaluating).

@@ -570,7 +570,7 @@ SPAWNS = [
 
 
 def write_spawns(placed):
-    lines = ["# entry x y orientation wander_distance (cells) -- read by dusk_server for custom maps"]
+    lines = ["# entry x y orientation wander_distance (cells), read by dusk_server"]
     for e, x, y, o, w in SPAWNS:
         c = (int(x), int(y))
         if c in placed and placed[c][1] & FLAG_UNWALKABLE:

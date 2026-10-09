@@ -1,28 +1,25 @@
 # Combat
 
-The original server is not shipped and the client contains no combat code
-(only `Shared/GameMap.cpp`, `MapLogic.cpp`, `ItemDefiner.cpp`, `Config.cpp`,
-`MutualObject.cpp` are shared). Rules therefore come from three places:
+The server is authoritative for all combat. Every rule is tagged with where it comes from:
 
 | Tag | Source |
 |---|---|
-| **DATA** | our data files (`custom_assets/data`, `dusk_formats::content`) |
-| **TEXT** | the in-game stat tooltips, `scripts/text/stats/*.txt` |
+| **DATA** | our data files (`assets/data`, `dusk_formats::content`, see [content.md](content.md)) |
+| **TEXT** | what the in-game stat tooltips promise |
 | **DESIGN** | our choice where nothing above says anything; tune freely |
 
 Implementation: `crates/dusk_server/src/stats.rs` (formulas, unit-tested),
 `combat.rs` (swings, death, XP, respawn, regen), `ai.rs` (aggro/chase/leash).
 
-## Enums recovered from the client
+## Data enums
 
-The client's built-in DB editor registers every enum as `(id, name)` pairs
-(`FUN_005039d0`); extracted by `scratchpad/re/enums.py`-style parsing of
-`MOV EDX,id … PUSH "name"` sequences.
+The numbers our data files and the protocol use. Many are reserved for features that do not
+exist yet; the implemented ones are listed under Spells below.
 
-- **Faction** (`npc_template.faction`): 0 PlayerDefault, 1 Friendly, 2 Neutral, 3 Hostile
-- **AI type** (`npc_template.ai_type`): 0 MeleeAI, 1 CasterAI, 2 ArcherAI
+- **Faction** (`faction=` in `npc_templates.txt`): 0 PlayerDefault, 1 Friendly, 2 Neutral, 3 Hostile
+- **AI type** (`ai_type=`): 0 MeleeAI, 1 CasterAI, 2 ArcherAI
 - **Hit result**: 1 Miss, 2 Resist, 3 Evade, 4 Dodge, 5 Block, 6 Parry, 7 Crit, 8 Immune
-- **Spell effect** (`spell_template.effectN`): 1 SchoolDamage, 2 Teleport, 3 ApplyAura,
+- **Spell effect** (`effectN=` in `spells.txt`): 1 SchoolDamage, 2 Teleport, 3 ApplyAura,
   4 ManaDrain, 5 HealthDrain, 6 Heal, 7 Resurrect, 8 CreateItem, 10 SummonNpc,
   11 RestoreMana, 13 Dispel, 14 WeaponDamage, 17 ManaBurn, 18 Threat, 19 TriggerSpell,
   22 InterruptCast, 23 SummonObject, 24 ScriptEffect, 25 KnockBack, 26 ApplyAreaAura,
@@ -30,14 +27,14 @@ The client's built-in DB editor registers every enum as `(id, name)` pairs
   32 LootEffect, 33 Kill, 34 Gossip, 35 Inspect, 36 ApplyGemSocket, 37 Charge, 38 Duel,
   39 SlideFrom, 40 ApplyOrbEnchant, 41 LearnSpell, 42 NearestWp, 43 PullTo,
   44 DestroyGems, 45 CombineItem, 46 ExtractOrb, 47 ApplyBeyondEnchant
-- **Aura type** (`effectN_data1` when effect = ApplyAura): 1 PeriodicDamage, 2 PeriodicHeal,
+- **Aura type** (first value of `effectN_data` when effect = ApplyAura): 1 PeriodicDamage, 2 PeriodicHeal,
   3 InflictMechanic, 4 ModifyStat, 5 ModifyStatPct, 6 AbsorbDamage, 8 ModifyResistance,
   9 PeriodicTriggerSpell, 10 PeriodicRestoreMana, 11 ModifyMoveSpeedPct,
   12 MechanicImmunity, 13 SchoolImmunity, 14 ModifyDmgDealtPct, 15 ModifyDmgReceivedPct,
   16 ModifyMeleeSpeedPct, 17 ModifyRangedSpeedPct, 18 PeriodicMeleeDamage, 19 Model,
   20 PeriodicBurnMana, 21 Proc, 22 ModifyHealingDealtPct, 23 ModifyHealingRecvPct,
   24 PeriodicHealPct, 25 PeriodicRestoreManaPct, 26 RepopOntopOfSelf
-- **Target type** (`effectN_targetType`): 1 Unit_Caster, 2 Unit_Friendly,
+- **Target type** (`effectN_target=`): 1 Unit_Caster, 2 Unit_Friendly,
   3 Unit_AreaSrc_Friendly, 4 Unit_AreaDst_Friendly, 11 Misc, 13 Target_GameObject,
   14 Unit_Hostile, 15 Unit_AreaSrc_Hostile, 16 Unit_AreaDst_Hostile, 17 Unit_Any,
   18 Unit_AreaSrc_Friendly_FromDst, 19 Unit_AreaDst_Hostile_FromDst, 20 Target_Item
@@ -51,7 +48,7 @@ The client's built-in DB editor registers every enum as `(id, name)` pairs
   39 BlockChanceBonus, 40 DodgeChanceBonus, 43 NpcMeleeSkill, 44 NpcRangedSkill
 - **Mechanic**: 1 Confused, 2 Pacify, 3 Fear, 4 Root, 5 Silence, 6 Sleep, 7 Snare,
   8 Stun, 9 Incapacitated, 11 Polymorph, 13 Stealth, 14 Disrupt
-- **Spell attribute** (bit flags in `spell_template.attributes`, bit numbering TBD):
+- **Spell attribute** (bit flags in `attributes=`, reserved; none implemented yet):
   1 CanTargetDead, 2 CantCrit, 3 IgnoreArmor, 4 IgnoreStun, 5 IgnoreIncapacitated,
   6 IgnoreSleep, 7 IgnoreInvulnerability, 8 IgnoreLOS, 9 IgnoreResistances, 12 IgnoreConfused,
   13 IgnoreFear, 14 IgnorePolymorph, 15 ImpossibleBlock, 16 ImpossibleDodge,
@@ -62,8 +59,8 @@ The client's built-in DB editor registers every enum as `(id, name)` pairs
   37 DontStopCastingSound, 38 TargetPlayersOnly, 39 MouseoverTargeting,
   40 PersistsThroughDeath, 41 NotInArena, 42 NotInDungeon, 43 HalfDurationPlayers
 
-Spell formulas (`mana_formula`, `effectN_scale_formula`, `duration_formula`) use
-`clvl`, `splvl`, `value` and `+ - * /` without spaces (`scripts/text/STF_*.txt`).
+Spell formulas (`mana=`, `effectN_formula=`, `duration_formula=`) use `clvl`, `splvl`, `value`,
+the caster's `STR AGI WIL INT CUR`, numbers, `+ - * /` and parentheses.
 
 ## Melee rules
 
@@ -130,13 +127,13 @@ shared formulas `dusk_formats::spell`.
 | Charge (effect 37) | dash straight at the target up to 1.1 cells short of it, stopping at the first unwalkable step; the caster is snapped there (`Correct`) | DESIGN |
 | Not yet | threat, teleports, items/gameobject targets, summons, dispel, procs, spell ranks (`splvl` = 1) | |
 
-### Spells (`custom_assets/data/spells.txt`)
+### Spells (`assets/data/spells.txt`)
 
 Every spell is ours: `[entry]` sections of `key=value` (format in `dusk_formats::content::spells`).
 Player skills 50001.., auto attacks 50100/50101, item spells 50110.., NPC spells 51001...
-`custom_assets/data/class_spells.txt` lists what each class knows (`[class]`, `spell=` lines).
-Visuals are in `custom_assets/data/spell_visuals.txt` (`[spell N]` sections,
-`dusk_formats::content::visuals`); icons come from `python -I tools/artgen/icons.py --custom-spells`
+`assets/data/class_spells.txt` lists what each class knows (`[class]`, `spell=` lines).
+Visuals are in `assets/data/spell_visuals.txt` (`[spell N]` sections,
+`dusk_formats::content::visuals`); icons come from `python -I tools/artgen/icons.py`
 (`content/icons/spells/skill_<name>.png`).
 
 Aura type **100 ModifyStrainGainPct** is ours: data3 percent applied to positive gaze strain gains
@@ -178,7 +175,4 @@ spells land on the selected target when it is a friend, else on the caster.
 Tooltip numbers: `$E1min`-style tokens are computed client-side from the same formulas and the
 attributes in `PlayerStats`.
 
-Visuals: `spell_visual` → kits (`traveling` / `impact` / `casting` / `go`, the last on the caster at release) → `.sa` flipbooks.
-`.sa` frames are drawn at scale `1/ratio`; the canvas left edge is `feet.x - spranim_x`, its bottom
-is `feet + spranim_y` (y-down; may use `height`). Opaque frames are luma-keyed to emulate the
-original's screen/additive blending. Particles (`.psi`) and sounds are not implemented.
+Visuals (kits, flipbooks, particles, sounds): [visuals.md](visuals.md).

@@ -190,7 +190,7 @@ def write_spawns(rng, terrain, placed):
 
     Entries: data/npc_templates.txt (50020 Ditch Gnawer, 50021 Gnawer Rusher, 50022 Pit Crawler,
     50023 Thatch Spinner)."""
-    lines = ["# entry x y orientation wander_distance (cells) -- read by dusk_server for custom maps"]
+    lines = ["# entry x y orientation wander_distance (cells), read by dusk_server"]
 
     def free(x, y):
         return (int(x), int(y)) not in placed and 4 <= x < SIZE - 4 and 4 <= y < SIZE - 4

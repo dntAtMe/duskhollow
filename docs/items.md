@@ -4,10 +4,10 @@ Implementation: `crates/dusk_formats/src/item.rs` (tables + stat formulas, share
 client tooltips), `crates/dusk_server/src/items.rs` (inventories, equip rules, item use, loot),
 client `items_ui.rs` (windows, tooltips, loot) and `paper_doll.rs` (gear sprite layers).
 
-Tags as in [combat.md](combat.md): **DATA** our data files, **TEXT** in-game text / client
-strings, **DESIGN** our choice.
+Tags as in [combat.md](combat.md): **DATA** our data files, **TEXT** in-game text,
+**DESIGN** our choice.
 
-## Data (`custom_assets/data`, read by `dusk_formats::content::items` / `rules` / `npcs`)
+## Data (`assets/data`, read by `dusk_formats::content::items` / `rules` / `npcs`)
 
 | File | Use |
 |---|---|
@@ -126,9 +126,8 @@ entries per slot, to the whole map; also sent to newcomers for existing players)
   Click a bag item: equip / use; shift + right-click: destroy. Click an equipment slot: unequip.
 - Tooltips: quality-coloured name, slot/type, weapon value + speed, armour, block, affix bonuses,
   "Use:" effect, durability, required level (red if too high), sell price.
-- Paper doll: naked body (`default_*`, `head_short`) + gear layers in the order legs, feet, chest,
-  hands, head, shield, weapon (bow if no melee weapon) — DESIGN, the original's per-direction order
-  is unknown. Skipped for the generated `custom_player` sprite.
+- Paper doll: naked body (`scripts/player/custom_body.txt`) + gear layers (`scripts/player/<model>.txt`)
+  in the order legs, feet, chest, hands, head, shield, weapon (bow if no melee weapon), DESIGN.
 - Debug: `DUSK_OPEN_INVENTORY=1` opens both windows, `DUSK_TOOLTIP_ITEM=<n>` / `e<n>` forces the
   tooltip of bag / equipment slot n, `DUSK_AUTOPLAY=1` also loots, `DUSK_LOOT_WINDOW=1` leaves loot
   windows open instead.

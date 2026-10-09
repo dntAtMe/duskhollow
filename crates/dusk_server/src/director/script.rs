@@ -3,7 +3,7 @@
 
 use dusk_protocol::{QuestInfo, QuestMarker, QuestStatus};
 
-/// Custom NPC entries (docs/demo-plan.md).
+/// The demo's NPC entries (docs/demo-plan.md).
 pub mod entry {
     pub const GLAREWOLF: i64 = 50001;
     pub const GLAREWOLF_ALPHA: i64 = 50002;
