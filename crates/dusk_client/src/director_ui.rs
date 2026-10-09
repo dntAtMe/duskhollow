@@ -5,6 +5,9 @@
 //! `DUSK_TITLE_TEST=1` plays the title card on any map, `DUSK_END_TEST=1` shows the end card,
 //! `DUSK_QUEST_TEST=<stage>` (server side) starts the run at a stage, filling the tracker.
 
+use crate::journal::{Journal, objective_line};
+use crate::ui_input::CapturesPointer;
+use crate::windows::{Hint, WindowCommand};
 use crate::{
     audio::PlaySfx,
     chat::ChatSystemLine,
@@ -17,13 +20,15 @@ use crate::{
 };
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
-use dusk_protocol::{EntityId, QuestInfo, QuestStatus, ServerMsg};
+use dusk_protocol::{EntityId, QuestStatus, ServerMsg};
+use std::collections::HashSet;
 
 pub struct DirectorUiPlugin;
 
 impl Plugin for DirectorUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Quests>()
+            .init_resource::<Untracked>()
             .init_resource::<Boss>()
             .init_resource::<Cards>()
             .add_systems(Startup, spawn_ui.after(crate::combat_ui::load_font))
@@ -31,7 +36,7 @@ impl Plugin for DirectorUiPlugin {
                 Update,
                 (
                     receive,
-                    (update_tracker, animate_toast),
+                    (update_tracker, tracker_clicks, animate_toast),
                     update_boss_bar,
                     (start_title, animate_title, show_end_card, animate_end_card).chain(),
                 )
@@ -66,7 +71,16 @@ fn shadow() -> TextShadow {
 
 /// The local player's quests as last reported, in the order they were taken.
 #[derive(Resource, Default)]
-pub struct Quests(pub Vec<QuestInfo>);
+pub struct Quests(pub Vec<dusk_protocol::QuestInfo>);
+
+/// Quests the player hid from the tracker (journal Track / Untrack); everything else active is
+/// tracked.
+#[derive(Resource, Default)]
+pub struct Untracked(pub HashSet<u32>);
+
+/// A tracker entry: click opens the journal on it.
+#[derive(Component)]
+struct TrackerRow(u32);
 
 #[derive(Resource, Default)]
 struct Boss {
@@ -325,7 +339,8 @@ fn receive(
                         chat.write(ChatSystemLine(format!("Quest accepted: {}", q.title)));
                         pop(q.title.clone(), "Quest accepted".into());
                     }
-                    (_, QuestStatus::Done) if prev.as_ref().is_none_or(|p| p.status != QuestStatus::Done) => {
+                    // Completed quests replayed on join (no previous state) stay quiet.
+                    (Some(p), QuestStatus::Done) if p.status != QuestStatus::Done => {
                         sfx.write(PlaySfx::ui("quest_complete.wav"));
                         chat.write(ChatSystemLine(format!("Quest complete: {}", q.title)));
                         pop(q.title.clone(), "Quest complete".into());
@@ -377,24 +392,21 @@ fn receive(
     }
 }
 
-fn objective_line(q: &QuestInfo) -> String {
-    if q.need > 0 { format!("{} {}/{}", q.objective, q.count.min(q.need), q.need) } else { q.objective.clone() }
-}
-
 fn update_tracker(
     mut commands: Commands,
     quests: Res<Quests>,
+    untracked: Res<Untracked>,
     font: Res<UiFont>,
     tracker: Query<Entity, With<Tracker>>,
 ) {
-    if !quests.is_changed() {
+    if !quests.is_changed() && !untracked.is_changed() {
         return;
     }
     let Ok(root) = tracker.single() else { return };
     let f = |size: f32| TextFont { font: font.0.clone().into(), font_size: size.into(), ..default() };
     commands.entity(root).despawn_related::<Children>();
     commands.entity(root).with_children(|t| {
-        for q in quests.0.iter().filter(|q| q.status != QuestStatus::Done) {
+        for q in quests.0.iter().filter(|q| q.status != QuestStatus::Done && !untracked.0.contains(&q.id)) {
             let ready = q.status == QuestStatus::Ready;
             t.spawn((
                 Node {
@@ -406,6 +418,10 @@ fn update_tracker(
                 },
                 BackgroundColor(Color::srgba(0.04, 0.03, 0.03, 0.62)),
                 BorderColor::all(if ready { GOLD } else { BRONZE }),
+                Button,
+                CapturesPointer,
+                TrackerRow(q.id),
+                Hint::new(q.title.clone()).with_body("Click to open the journal (J)"),
             ))
             .with_children(|b| {
                 b.spawn((Text::new(q.title.clone()), f(14.0), TextColor(GOLD), shadow()));
@@ -418,6 +434,18 @@ fn update_tracker(
             });
         }
     });
+}
+
+fn tracker_clicks(
+    rows: Query<(&Interaction, &TrackerRow), Changed<Interaction>>,
+    mut journal: ResMut<Journal>,
+    mut out: MessageWriter<WindowCommand>,
+) {
+    for (i, r) in &rows {
+        if *i == Interaction::Pressed {
+            crate::journal::open_on(&mut journal, &mut out, r.0);
+        }
+    }
 }
 
 fn animate_toast(

@@ -118,15 +118,38 @@ impl Progress {
                 ("The Warden at the Glare Gate", objective, count, need, status)
             }
         };
-        QuestInfo { id: quest, title: title.into(), objective: objective.into(), count, need, status }
+        let journal = journal(quest);
+        QuestInfo {
+            id: quest,
+            title: title.into(),
+            objective: objective.into(),
+            count,
+            need,
+            status,
+            description: match status {
+                QuestStatus::Active => journal.active,
+                QuestStatus::Ready => journal.ready,
+                QuestStatus::Done => journal.done,
+            }
+            .into(),
+            giver: journal.giver.into(),
+            location: match status {
+                QuestStatus::Active => journal.location,
+                _ => journal.turn_in,
+            }
+            .into(),
+            reward: journal.reward.into(),
+        }
     }
 
-    /// Quests the tracker should show right now (on join).
+    /// Quests the journal and tracker should know about right now (on join), completed ones
+    /// included.
     pub fn open_quests(&self) -> Vec<QuestInfo> {
         match self.stage {
+            Stage::Start => vec![],
             Stage::Wolves => vec![self.quest_info(RED_FIELDS)],
-            Stage::Warden => vec![self.quest_info(WARDEN)],
-            _ => vec![],
+            Stage::WardenOffered => vec![self.quest_info(RED_FIELDS)],
+            Stage::Warden | Stage::End => vec![self.quest_info(RED_FIELDS), self.quest_info(WARDEN)],
         }
     }
 
@@ -171,6 +194,53 @@ impl Progress {
             }
             _ => vec![],
         }
+    }
+}
+
+// ---------------------------------------------------------------- journal
+
+/// Quest journal text (client `journal.rs`), one entry per quest.
+pub struct Journal {
+    pub giver: &'static str,
+    /// Where the work is.
+    pub location: &'static str,
+    /// Where to turn it in.
+    pub turn_in: &'static str,
+    pub reward: &'static str,
+    /// Log text per status.
+    pub active: &'static str,
+    pub ready: &'static str,
+    pub done: &'static str,
+}
+
+pub fn journal(quest: u32) -> Journal {
+    match quest {
+        RED_FIELDS => Journal {
+            giver: "Ysolde, the cairnkeeper",
+            location: "The Red Fields, east of Lowshade",
+            turn_in: "Ysolde, by the cairn in Lowshade",
+            reward: "3 Ember Draughts",
+            active: "Glarewolves came down off the open ground, and the lightworkers can't cut grain with \
+                     wolves at their backs. Kill four of them in the Red Fields.\n\nFight under the canopy \
+                     shelters where you can: under a tarp the Eye only half finds you.",
+            ready: "Four glarewolves lie dead in the rows. Ysolde will want to hear it. She keeps the cairn \
+                    in Lowshade, under the overhang.",
+            done: "The rows get cut today. Ysolde paid in ember draughts, brewed over the cairn fire. \
+                   Drink one when your head starts to ring.",
+        },
+        _ => Journal {
+            giver: "Ysolde, the cairnkeeper",
+            location: "The Glare Gate, north mouth of the vale",
+            turn_in: "Ysolde, by the cairn in Lowshade",
+            reward: "25 Gold Pieces",
+            active: "Warden Corvin stood at the Glare Gate for thirty-one years. Since the Eye opened wide he \
+                     hasn't come down, and the two who went up to look haven't either.\n\nGo north to the \
+                     gate. If he isn't Corvin any more, put him down.",
+            ready: "Corvin is relieved of his post, and the Eye has settled back to half-lidded. Return to \
+                    Ysolde in Lowshade.",
+            done: "Thirty-one years, and he still held the gate. Ysolde says to sit by the fire anyway. \
+                   Nobody rests. Sit anyway.",
+        },
     }
 }
 
@@ -393,7 +463,8 @@ mod tests {
         assert_eq!(ysolde(after_turn_in(RED_FIELDS)).choices[0].1, Action::Goto(Node::WardenOffer));
         p.apply(ysolde(Node::WardenOffer).choices[0].1);
         assert_eq!(p.stage, Stage::Warden);
-        assert_eq!(p.open_quests()[0].title, "The Warden at the Glare Gate");
+        assert_eq!(p.open_quests().last().unwrap().title, "The Warden at the Glare Gate");
+        assert_eq!(p.open_quests()[0].status, QuestStatus::Done);
 
         assert!(p.on_warden_down().is_some());
         assert!(p.on_warden_down().is_none());

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Same port the original client used.
 pub const DEFAULT_PORT: u16 = 16383;
 /// Bump on any incompatible message change.
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 /// Frames above this are rejected (protects against garbage length prefixes).
 pub const MAX_FRAME: usize = 1 << 20;
 
@@ -379,6 +379,14 @@ pub struct QuestInfo {
     pub count: u32,
     pub need: u32,
     pub status: QuestStatus,
+    /// Quest journal text for the current status (what happened, what to do next).
+    pub description: String,
+    /// Who gave the quest, e.g. "Ysolde, the cairnkeeper".
+    pub giver: String,
+    /// Where to go, e.g. "The Red Fields, east of Lowshade".
+    pub location: String,
+    /// Reward line, e.g. "3 Ember Draughts" (empty when none).
+    pub reward: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]

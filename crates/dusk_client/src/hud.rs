@@ -310,6 +310,9 @@ struct XpClip;
 struct XpText;
 #[derive(Component)]
 struct XpLabel;
+/// The XP bar's hover area.
+#[derive(Component)]
+struct XpBar;
 
 fn img(data: &GameData, assets: &AssetServer, name: &str) -> Handle<Image> {
     data.asset_path(name).map(|p| assets.load(p)).unwrap_or_default()
@@ -431,6 +434,7 @@ fn spawn_hud(mut commands: Commands, data: Res<GameData>, assets: Res<AssetServe
             },
             ImageNode::new(xp.clone()).with_color(Color::srgb(0.22, 0.17, 0.22)),
             Interaction::default(),
+            XpBar,
         ))
         .with_children(|b| {
             let mut clip = abs(Vec2::ZERO, Vec2::new(0.0, 12.0));
@@ -629,7 +633,7 @@ pub fn faction_color(f: i64) -> Color {
 
 fn update_xp_bar(
     state: Res<PlayerState>,
-    bar: Query<&Interaction, Changed<Interaction>>,
+    bar: Query<&Interaction, (Changed<Interaction>, With<XpBar>)>,
     mut clip: Query<&mut Node, With<XpClip>>,
     mut hover: Query<&mut Visibility, With<XpText>>,
     mut text: Query<&mut Text, With<XpLabel>>,

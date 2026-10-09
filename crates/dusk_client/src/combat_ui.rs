@@ -20,6 +20,7 @@ impl Plugin for CombatUiPlugin {
         app.add_systems(Startup, (load_font, spawn_hud).chain())
             .add_systems(Startup, spawn_target_ring)
             .add_systems(Update, (click_target, tab_target, sync_targeted, animate_floating_text, update_death_notice))
+            .add_systems(Update, (xp_feedback, low_health_warning))
             .add_systems(PostUpdate, follow_target_ring)
             .add_systems(Update, autoplay.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()));
     }
@@ -60,7 +61,6 @@ fn attack(state: &mut PlayerState, net: &Net, id: EntityId) {
 #[allow(clippy::too_many_arguments)]
 fn click_target(
     mouse: Res<ButtonInput<MouseButton>>,
-    keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     window: Query<&Window, With<PrimaryWindow>>,
     camera: Query<(&Camera, &GlobalTransform), With<crate::player::MainCamera>>,
@@ -70,8 +70,9 @@ fn click_target(
     units: Query<(Entity, &Unit, &Npc, &Transform), (Without<Dead>, Without<Player>)>,
     captured: Res<UiInputCaptured>,
     mut last_click: Local<Option<(EntityId, f32)>>,
+    esc: Res<crate::windows::EscAction>,
 ) {
-    if !captured.keyboard && keys.just_pressed(KeyCode::Escape) && state.target.is_some() {
+    if *esc == crate::windows::EscAction::ClearTarget && state.target.is_some() {
         if state.attacking {
             net.send(ClientMsg::StopAttack);
         }
@@ -319,6 +320,8 @@ pub enum FloatKind {
     /// Damage we took.
     Incoming,
     Heal,
+    /// Experience gained / level up (over the player).
+    Xp,
 }
 
 #[derive(Component)]
@@ -331,11 +334,13 @@ const FLOAT_SECS: f32 = 1.2;
 
 impl FloatingText {
     pub fn bundle(text: String, kind: FloatKind, cell: Vec2, height: f32) -> impl Bundle {
-        let (color, size) = match kind {
-            FloatKind::Outgoing => (Color::srgb(1.0, 1.0, 1.0), 16.0),
-            FloatKind::Crit => (Color::srgb(1.0, 0.85, 0.2), 22.0),
-            FloatKind::Incoming => (Color::srgb(1.0, 0.3, 0.3), 16.0),
-            FloatKind::Heal => (Color::srgb(0.35, 1.0, 0.35), 16.0),
+        // Bone instead of pure white (no near-white in the palette); crits get a "!".
+        let (color, size, text) = match kind {
+            FloatKind::Outgoing => (Color::srgb(0.93, 0.88, 0.78), 17.0, text),
+            FloatKind::Crit => (Color::srgb(1.0, 0.80, 0.25), 24.0, format!("{text}!")),
+            FloatKind::Incoming => (Color::srgb(1.0, 0.32, 0.26), 17.0, text),
+            FloatKind::Heal => (Color::srgb(0.42, 0.95, 0.38), 17.0, text),
+            FloatKind::Xp => (Color::srgb(0.80, 0.55, 0.95), 15.0, text),
         };
         let s = iso::to_screen(cell);
         (
@@ -343,6 +348,7 @@ impl FloatingText {
             Text2d(text),
             TextFont { font_size: size.into(), ..default() },
             TextColor(color),
+            bevy::sprite::Text2dShadow { offset: Vec2::new(1.5, -1.5), color: Color::BLACK.with_alpha(0.9) },
             Transform::from_xyz(s.x, s.y + height + 14.0, 950.0),
             // Main view only, not the minimap.
             crate::minimap::overlay_layer(),
@@ -350,14 +356,22 @@ impl FloatingText {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn animate_floating_text(
     mut commands: Commands,
     time: Res<Time>,
     font: Option<Res<UiFont>>,
-    mut texts: Query<(Entity, &mut FloatingText, &mut Transform, &mut TextColor, &mut TextFont)>,
+    mut texts: Query<(
+        Entity,
+        &mut FloatingText,
+        &mut Transform,
+        &mut TextColor,
+        &mut TextFont,
+        Option<&mut bevy::sprite::Text2dShadow>,
+    )>,
 ) {
     let dt = time.delta_secs();
-    for (e, mut f, mut t, mut c, mut tf) in &mut texts {
+    for (e, mut f, mut t, mut c, mut tf, shadow) in &mut texts {
         if f.age == 0.0 {
             if let Some(font) = &font {
                 tf.font = font.0.clone().into();
@@ -369,7 +383,11 @@ fn animate_floating_text(
             continue;
         }
         t.translation.y += 40.0 * dt;
-        c.0 = f.color.with_alpha(1.0 - (f.age / FLOAT_SECS).powi(2));
+        let a = 1.0 - (f.age / FLOAT_SECS).powi(2);
+        c.0 = f.color.with_alpha(a);
+        if let Some(mut s) = shadow {
+            s.color.set_alpha(0.9 * a);
+        }
     }
 }
 
@@ -378,20 +396,117 @@ fn animate_floating_text(
 #[derive(Component)]
 struct DeathNotice;
 
-/// Unit frames, XP bar etc. live in `hud.rs`; this is just the death message.
+#[derive(Component)]
+struct LowHealthVignette;
+
+/// Unit frames, XP bar etc. live in `hud.rs`; this is the death message and the low-health
+/// warning.
 fn spawn_hud(mut commands: Commands, font: Res<UiFont>) {
+    let f = |size: f32| TextFont { font: font.0.clone().into(), font_size: size.into(), ..default() };
+    let shadow = TextShadow { offset: Vec2::splat(2.0), color: Color::BLACK.with_alpha(0.9) };
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Percent(36.0),
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(6.0),
+                ..default()
+            },
+            Visibility::Hidden,
+            DeathNotice,
+        ))
+        .with_children(|d| {
+            d.spawn((Text::new("You have died."), f(34.0), TextColor(Color::srgb(0.85, 0.15, 0.1)), shadow));
+            d.spawn((
+                Text::new("The fire remembers you. Reviving at your cairn..."),
+                f(16.0),
+                TextColor(Color::srgb(0.84, 0.79, 0.68)),
+                shadow,
+            ));
+        });
+    // Pulsing crimson edges below 30 % health.
     commands.spawn((
-        Text::new("You have died. Reviving..."),
-        TextFont { font: font.0.clone().into(), font_size: 32.0.into(), ..default() },
-        TextColor(Color::srgb(0.85, 0.15, 0.1)),
-        Node { position_type: PositionType::Absolute, top: Val::Percent(40.0), left: Val::Percent(36.0), ..default() },
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        BackgroundGradient::from(RadialGradient::new(
+            UiPosition::CENTER,
+            RadialGradientShape::FarthestCorner,
+            vec![
+                ColorStop::new(Color::NONE, Val::Percent(55.0)),
+                ColorStop::new(Color::srgba(0.55, 0.02, 0.01, 0.55), Val::Percent(100.0)),
+            ],
+        )),
         Visibility::Hidden,
-        DeathNotice,
+        GlobalZIndex(-5),
+        LowHealthVignette,
     ));
 }
 
 fn update_death_notice(state: Res<PlayerState>, mut death: Query<&mut Visibility, With<DeathNotice>>) {
     if let Ok(mut v) = death.single_mut() {
         v.set_if_neq(if state.dead { Visibility::Visible } else { Visibility::Hidden });
+    }
+}
+
+/// Low health below this fraction pulses the screen edges.
+const LOW_HEALTH: f32 = 0.3;
+
+fn low_health_warning(
+    time: Res<Time>,
+    state: Res<PlayerState>,
+    mut vignette: Query<(&mut Visibility, &mut BackgroundGradient), With<LowHealthVignette>>,
+) {
+    let Ok((mut vis, mut grad)) = vignette.single_mut() else { return };
+    let ratio = state.hp.max(0) as f32 / state.max_hp.max(1) as f32;
+    if state.dead || state.max_hp <= 0 || ratio >= LOW_HEALTH {
+        vis.set_if_neq(Visibility::Hidden);
+        return;
+    }
+    vis.set_if_neq(Visibility::Inherited);
+    // Faster and stronger the closer to death.
+    let urgency = 1.0 - ratio / LOW_HEALTH;
+    let beat = (time.elapsed_secs() * (3.0 + 3.0 * urgency)).sin() * 0.5 + 0.5;
+    let a = 0.25 + 0.35 * urgency + 0.25 * beat;
+    if let Some(Gradient::Radial(r)) = grad.0.first_mut() {
+        if let Some(stop) = r.stops.last_mut() {
+            stop.color = Color::srgba(0.55, 0.02, 0.01, a.min(0.85));
+        }
+    }
+}
+
+/// "+N XP" over the player when experience comes in, "Level N" on a level up.
+fn xp_feedback(
+    mut commands: Commands,
+    state: Res<PlayerState>,
+    player: Query<&Unit, With<Player>>,
+    mut last: Local<Option<(u32, u32)>>,
+) {
+    if !state.is_changed() {
+        return;
+    }
+    let now = (state.level, state.xp);
+    let prev = last.replace(now);
+    let (Some((lvl, xp)), Ok(me)) = (prev, player.single()) else { return };
+    if lvl == 0 {
+        return;
+    }
+    if state.level > lvl {
+        commands.spawn(FloatingText::bundle(
+            format!("Level {}", state.level),
+            FloatKind::Crit,
+            me.pos,
+            me.height + 24.0,
+        ));
+    } else if state.xp > xp {
+        commands.spawn(FloatingText::bundle(format!("+{} XP", state.xp - xp), FloatKind::Xp, me.pos, me.height + 12.0));
     }
 }
