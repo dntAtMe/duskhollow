@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! dusk_client                                                 main menu (Play offline, Join, Options)
-//! dusk_client [MAP] [--class N] [--art custom]                offline: embedded server, start on MAP
+//! dusk_client [MAP] [--class N]                               offline: embedded server, start on MAP
 //! dusk_client --connect [HOST:PORT] [--name NAME] [--class N] online, world from dusk_server
 //! ```
 //! Classes are `player_class_stats.Class` 1..=4. Any game argument, or a debug variable
@@ -84,10 +84,6 @@ fn parse_args() -> Args {
                 class = args.next().and_then(|c| c.parse().ok()).unwrap_or(1);
                 game_args = true;
             }
-            // Read by `GameData::load_with` (custom player art); consume its value here.
-            "--art" => {
-                args.next();
-            }
             _ => {
                 map = Some(a);
                 game_args = true;
@@ -106,12 +102,11 @@ fn parse_args() -> Args {
 }
 
 /// Environment variables that do not mean "start the game directly".
-const MENU_SAFE_VARS: [&str; 14] = [
+const MENU_SAFE_VARS: [&str; 13] = [
     "DUSK_ASSETS",
     "DUSK_LEGACY",
     "DUSK_LEGACY_LOG",
     "DUSK_CUSTOM_ASSETS",
-    "DUSK_ART",
     "DUSK_AUDIO_LOG",
     "DUSK_MUSIC_VOLUME",
     "DUSK_SFX_VOLUME",
@@ -141,7 +136,7 @@ fn main() -> AppExit {
     let launch = launch_mode(&args);
     let settings = settings::Settings::load();
     let menu_launch = launch.is_menu();
-    let game_data = data::GameData::load_with(&root, menu_launch.then_some(settings.custom_art))
+    let game_data = data::GameData::load(&root)
         .expect("failed to load game data (legacy data: set DUSK_LEGACY or run `cargo run -p dusk_extract`)");
 
     // A menu launch opens the window as the player left it; the command line keeps 1280x720.

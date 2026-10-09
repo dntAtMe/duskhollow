@@ -1,35 +1,26 @@
-"""Our own item and spell icons (40x40), replacing the originals with `--art custom`.
+"""Item and spell icons (40x40) for our own data.
 
-Usage (from repo root):  python -I tools/artgen/icons.py [--only <substring>] [--no-preview]
-                         python -I tools/artgen/icons.py --custom-spells   (our skills, see below)
+Usage (from repo root):  python -I tools/artgen/icons.py [--force] [--only <substring>] [--no-preview]
 
-Reads the ORIGINAL data only for names and numbers: `assets/game.db` (`item_template.icon`, name,
-quality, model; `spell_template.icon`, name, description, cast_school, effects) and the file
-listings / pixel sizes of `assets/content/item_icons_new` and `spell_icons_new` (found via
-DUSK_ASSETS or an `assets/` folder above this repo). No original pixels are read or reused.
+Reads `custom_assets/data/spells.txt`, `items.txt` and `item_bases.txt` (whichever exist; the
+`[id]` / `[kind id]` + `key=value` text format) and collects every `icon=` name. An icon that
+already exists anywhere under `custom_assets/content/` (bare-name lookup, as in the client) is kept;
+a missing one is generated into `custom_assets/content/custom/icons/{items,spells}/`. `--force`
+regenerates every referenced icon that lives in those two folders (plus missing ones), `--only`
+limits the run to icon names containing the substring. Contact sheets go to `custom_assets/preview/`.
 
-Writes one PNG per original icon file name (same size) into
-`custom_assets/content/override/icons/{items,spells}/` -- the client resolves images by bare file
-name, so these replace the originals -- plus contact sheets in `custom_assets/preview/`.
-
-- Items (`icon_items.py`): real voxel models (weapons, armour by family and slot, flasks, rings,
-  gems, orbs, scrolls, food, junk ...) on a dark dithered card tinted by item quality, with a
-  bevelled frame in the quality colour. `scroll_<spell>.png` items are a parchment scroll with that
-  spell's icon inset in the top-left corner.
-- `--custom-spells`: icons for our own skills (`custom_assets/data/spells.txt`, `icon=` names) into
-  `custom_assets/content/custom/icons/spells/`. Custom-only names are always indexed, so they show
-  with and without `--art custom`. Recipes: `DUSK_RULES` in `icon_spells.py`.
-- Spells (`icon_spells.py`): symbolic motifs (flames, ice shards, holy light, skulls, arrows,
-  swords, shields, hands, wings ...) chosen from the spell's name / icon name / description by
-  keyword rules, painted in the palette of its school.
+- Items (`icon_items.py`): voxel models (weapons, armour by family and slot, flasks, rings, gems,
+  scrolls, food, junk ...) on a dark dithered card tinted by item quality, with a bevelled frame in
+  the quality colour. The motif comes from the item's `model`, then the icon name, then the data
+  (`equip_type`, `weapon_type`, `armor_type`) and name keywords. Item bases (generated gear) are
+  drawn at their `quality=` (default 2: the plain card).
+- Spells (`icon_spells.py`): symbolic motifs chosen from the spell's name / icon name / description
+  by keyword rules (`DUSK_RULES` first), painted in the palette of its school.
 """
 
 from __future__ import annotations
 
-import os
-import sqlite3
 import sys
-from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -38,11 +29,14 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).parent))
 import icon_items  # noqa: E402
 import icon_spells  # noqa: E402
-from iconlib import Canvas, rgb  # noqa: E402
+from iconlib import Canvas  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "custom_assets" / "content" / "override" / "icons"
+DATA = ROOT / "custom_assets" / "data"
+CONTENT = ROOT / "custom_assets" / "content"
+OUT = CONTENT / "custom" / "icons"
 PREVIEW = ROOT / "custom_assets" / "preview"
+SIZE = 40
 
 # quality -> (background ramp, frame light, frame dark)
 QUALITY_FRAME = {
@@ -55,55 +49,80 @@ QUALITY_FRAME = {
 }
 
 
-def find_assets() -> Path:
-    cands = [Path(os.environ["DUSK_ASSETS"])] if os.environ.get("DUSK_ASSETS") else []
-    p = ROOT
-    for _ in range(6):
-        cands.append(p / "assets")
-        p = p.parent
-    for c in cands:
-        if (c / "game.db").exists():
-            return c
-    raise SystemExit("original assets (game.db) not found; set DUSK_ASSETS")
+# --- data ---------------------------------------------------------------------------------------------
 
 
-def load(assets: Path):
-    """{icon lower: info} for items and spells, plus the original file names and sizes."""
-    db = sqlite3.connect(assets / "game.db")
-    items = {}
-    for icon, name, quality, model, equip in db.execute("select icon, name, quality, model, equip_type from item_template where icon is not null and icon != ''"):
-        e = items.setdefault(icon.lower(), {"names": Counter(), "qualities": Counter(), "models": Counter(), "equip": equip})
-        e["names"][name] += 1
-        if isinstance(quality, int):
-            e["qualities"][quality] += 1
-        if model:
-            e["models"][model] += 1
-    spells = {}
-    cols = "icon, name, description, cast_school, effect1, effect2, effect3, effect1_data1, effect2_data1, effect3_data1, effect1_positive"
-    for row in db.execute(f"select {cols} from spell_template where icon is not null and icon != '' order by entry"):
-        icon = row[0].lower()
-        if icon in spells:
+def sections(path: Path) -> list[tuple[str | None, str, dict]]:
+    """(kind, id, {key: [values]}) per `[id]` / `[kind id]` section; '#' comments."""
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
             continue
-        spells[icon] = {
-            "name": row[1] or "", "description": row[2] or "", "school": row[3] if isinstance(row[3], int) else None,
-            "effects": [e for e in row[4:7] if isinstance(e, int) and e], "auras": [a for a in row[7:10] if isinstance(a, int) and a],
-            "positive": row[10] == 1,
-        }
-    files = {}
-    for kind, folder in (("items", "item_icons_new"), ("spells", "spell_icons_new")):
-        for f in sorted(os.listdir(assets / "content" / folder)):
-            if f.lower().endswith(".png"):
-                with Image.open(assets / "content" / folder / f) as im:
-                    files[f] = (kind, im.size)
-    return items, spells, files
+        if line.startswith("[") and line.endswith("]"):
+            head = line[1:-1].split()
+            kind, sid = (head[0], head[1]) if len(head) > 1 else (None, head[0])
+            out.append((kind, sid, {}))
+            continue
+        if not out or "=" not in line:
+            continue
+        k, v = (s.strip() for s in line.split("=", 1))
+        out[-1][2].setdefault(k, []).append(v)
+    return out
 
 
-def item_info(e: dict | None) -> dict:
-    if not e:
-        return {"quality": 2}
-    q = max(e["qualities"]) if e["qualities"] else 2
-    return {"quality": q, "model": e["models"].most_common(1)[0][0] if e["models"] else "",
-            "name": e["names"].most_common(1)[0][0], "equip_type": e["equip"]}
+def first(d: dict, k: str, default=""):
+    return d.get(k, [default])[-1]
+
+
+def as_int(v, default=0):
+    try:
+        return int(str(v).strip())
+    except ValueError:
+        return default
+
+
+def spell_jobs() -> list[dict]:
+    jobs = []
+    for _, sid, d in sections(DATA / "spells.txt"):
+        icon = first(d, "icon")
+        if not icon:
+            continue
+        effects = [as_int(first(d, f"effect{i}")) for i in (1, 2, 3)]
+        jobs.append({
+            "kind": "spells", "icon": icon, "id": sid,
+            "info": {"name": first(d, "name"), "description": first(d, "description"),
+                     "school": as_int(first(d, "school", "1"), 1), "effects": [e for e in effects if e],
+                     "positive": first(d, "effect1_positive") == "1"},
+        })
+    return jobs
+
+
+def item_jobs() -> list[dict]:
+    jobs = []
+    for path, base in ((DATA / "items.txt", False), (DATA / "item_bases.txt", True)):
+        for _, sid, d in sections(path):
+            icon = first(d, "icon")
+            if not icon:
+                continue
+            jobs.append({
+                "kind": "items", "icon": icon, "id": sid,
+                "info": {"name": first(d, "name"), "model": first(d, "model"),
+                         "quality": as_int(first(d, "quality", "2"), 2),
+                         "equip_type": first(d, "equip_type"), "weapon_type": first(d, "weapon_type"),
+                         "armor_type": first(d, "armor_type"), "base": base},
+            })
+    return jobs
+
+
+def existing_icons() -> dict[str, Path]:
+    """Lowercase bare name -> file, for every PNG under our content."""
+    return {p.name.lower(): p for p in CONTENT.rglob("*.png")}
+
+
+# --- drawing ------------------------------------------------------------------------------------------
 
 
 def item_image(stem: str, info: dict, n: int, spells: dict) -> np.ndarray:
@@ -114,7 +133,7 @@ def item_image(stem: str, info: dict, n: int, spells: dict) -> np.ndarray:
         spell_stem = stem[len("scroll_"):]
         prims, rot, fit = icon_items.scroll("redmark", "redmark")
         cv.obj(prims, rot, fit=0.78, off=(0.12, -0.1))
-        inset = spell_image(spell_stem, spells.get(spell_stem.lower() + ".png", {"name": spell_stem}), 19)
+        inset = spell_image(spell_stem, spells.get(spell_stem.lower(), {"name": spell_stem}), 19)
         cv.layers.append(_place(inset, n, 2, 2))
     else:
         prims, rot, fit = icon_items.item_icon(stem, info)
@@ -147,80 +166,43 @@ def contact_sheet(images: list[tuple[str, np.ndarray]], path: Path, cols=16, zoo
     sheet.save(path)
 
 
-CUSTOM_SPELLS = ROOT / "custom_assets" / "data" / "spells.txt"
-CUSTOM_OUT = ROOT / "custom_assets" / "content" / "custom" / "icons" / "spells"
-
-
-def custom_spells() -> list[dict]:
-    """Our own skills from `custom_assets/data/spells.txt` (name, icon, school, effects)."""
-    out, cur = [], None
-    for line in CUSTOM_SPELLS.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("[") and line.endswith("]"):
-            cur = {"entry": int(line[1:-1]), "effects": [], "school": 1}
-            out.append(cur)
-            continue
-        if cur is None or "=" not in line:
-            continue
-        k, v = (s.strip() for s in line.split("=", 1))
-        if k in ("name", "icon", "description"):
-            cur[k] = v
-        elif k == "school":
-            cur["school"] = int(v)
-        elif k == "effect1_positive":
-            cur["positive"] = v == "1"
-    return out
-
-
-def make_custom_spell_icons(argv):
-    """Icons for our own skills (custom-only file names, shown with and without `--art custom`)."""
-    done = []
-    for s in custom_spells():
-        if not s.get("icon"):
-            continue
-        img = spell_image(s["icon"][:-4], s, 40)
-        out = CUSTOM_OUT / s["icon"]
-        out.parent.mkdir(parents=True, exist_ok=True)
-        Image.fromarray(img).save(out, optimize=True)
-        fn, pat = icon_spells.pick_recipe(s["icon"][:-4], s)
-        print(f"{s['entry']} {s['name']}: {s['icon']} ({pat})")
-        done.append((s["icon"], img))
-    if "--no-preview" not in argv:
-        contact_sheet(done, PREVIEW / "icons_custom_spells.png", cols=10, zoom=4)
-
-
 def main(argv):
-    if "--custom-spells" in argv:
-        return make_custom_spell_icons(argv)
+    force = "--force" in argv
     only = argv[argv.index("--only") + 1].lower() if "--only" in argv else None
-    assets = find_assets()
-    items, spells, files = load(assets)
-    referenced = set(items) | set(spells)
-    missing = sorted(i for i in referenced if i not in {f.lower() for f in files})
+    spells, items = spell_jobs(), item_jobs()
+    spell_info = {j["icon"][:-4].lower(): j["info"] for j in spells}
+    have = existing_icons()
     done = {"items": [], "spells": []}
-    for f, (kind, (w, h)) in files.items():
-        if only and only not in f.lower():
+    seen = set()
+    kept = 0
+    for job in spells + items:
+        icon, kind = job["icon"], job["kind"]
+        key = (kind, icon.lower())
+        if key in seen or (only and only not in icon.lower()):
             continue
-        stem = f[:-4]
+        seen.add(key)
+        out = OUT / kind / icon
+        current = have.get(icon.lower())
+        ours = current is not None and current.parent == out.parent
+        if current is not None and not (force and ours):
+            kept += 1
+            continue
+        stem = icon[:-4]
         if kind == "items":
-            img = item_image(stem, item_info(items.get(f.lower())), w, spells)
+            img = item_image(stem, job["info"], SIZE, spell_info)
         else:
-            img = spell_image(stem, spells.get(f.lower(), {"name": stem}), w)
-        if img.shape[:2] != (h, w):
-            img = np.array(Image.fromarray(img).resize((w, h), Image.NEAREST))
-        out = OUT / kind / f
+            img = spell_image(stem, job["info"], SIZE)
         out.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(img).save(out, optimize=True)
-        done[kind].append((f, img))
-    print(f"items: {len(done['items'])}, spells: {len(done['spells'])}")
-    unref = [f for f in files if f.lower() not in referenced]
-    print(f"generated but unreferenced by the DB: {len(unref)}")
-    print(f"referenced but missing from the original set: {missing}")
+        detail = ""
+        if kind == "spells":
+            detail = f" ({icon_spells.pick_recipe(stem, job['info'])[1]})"
+        print(f"{kind} {job['id']} {job['info']['name']}: {icon}{detail}")
+        done[kind].append((icon, img))
+    print(f"generated items: {len(done['items'])}, spells: {len(done['spells'])}; kept existing: {kept}")
     if "--no-preview" not in argv:
-        contact_sheet(done["items"], PREVIEW / "icons_items.png")
-        contact_sheet(done["spells"], PREVIEW / "icons_spells.png")
+        contact_sheet(done["items"], PREVIEW / "icons_new_items.png", cols=10, zoom=4)
+        contact_sheet(done["spells"], PREVIEW / "icons_new_spells.png", cols=10, zoom=4)
 
 
 if __name__ == "__main__":

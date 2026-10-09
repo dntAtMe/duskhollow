@@ -33,14 +33,28 @@ impl Plugin for CombatUiPlugin {
     }
 }
 
-/// Original UI font (Friz Quadrata, the classic MMO face shipped with the game).
+/// UI font pair (DejaVu Serif, free to redistribute; licence in `content/custom/fonts/LICENSE_DEJAVU`).
+pub const UI_FONT: &str = "DejaVuSerif.ttf";
+pub const UI_FONT_BOLD: &str = "DejaVuSerif-Bold.ttf";
+
+/// The regular UI face, used by every HUD, window and menu text.
 #[derive(Resource)]
 pub struct UiFont(pub Handle<Font>);
 
+/// The bold UI face (titles, headings).
+#[derive(Resource)]
+pub struct UiFontBold(pub Handle<Font>);
+
 pub fn load_font(mut commands: Commands, data: Res<GameData>, assets: Res<AssetServer>) {
-    let path =
-        data.asset_path("Friz Quadrata Regular.ttf").unwrap_or_else(|| "legacy://content/fonts/arial.ttf".into());
-    commands.insert_resource(UiFont(assets.load(path)));
+    let load = |name: &str| match data.asset_path(name) {
+        Some(p) => assets.load(p),
+        None => {
+            warn!("UI font {name} missing, using the built-in font");
+            Handle::default()
+        }
+    };
+    commands.insert_resource(UiFont(load(UI_FONT)));
+    commands.insert_resource(UiFontBold(load(UI_FONT_BOLD)));
 }
 
 // ---------------------------------------------------------------- targeting

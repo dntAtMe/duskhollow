@@ -1,0 +1,11 @@
+# Chat /help text: one chat line per line ('#' lines and blank lines are skipped).
+# Keep lines under ~60 characters so each fits the chat panel unwrapped.
+-- Words for an Ender under the Eye --
+WASD walks. Left-click marks a foe; right-click strikes it.
+Tab picks the next foe in sight; 1-0, - and = cast.
+C character, I pack, P abilities, J journal.
+Click a pouch on the fallen to loot; click the living to talk.
+Esc lets go of one thing at a time, then opens the menu.
+M hushes the music, N the rest. Enter speaks.
+Open sky wears on you; shade slows the strain, cairns clear it.
+/say <words> speaks aloud, /help repeats these words.

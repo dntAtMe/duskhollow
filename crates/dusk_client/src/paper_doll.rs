@@ -1,5 +1,5 @@
 //! Player sprites reflect equipped gear: every equipped item with a `model` adds the sprite
-//! layer `scripts/player/male/<model>.txt` on top of the naked body.
+//! layer `scripts/player/custom/<model>.txt` on top of the base body (`custom_body`).
 //!
 //! Driven by `ServerMsg::Appearance` (item entries per equipment slot) for every player,
 //! including ourselves; templates come from the client's item table, so the server only
@@ -27,8 +27,10 @@ impl Plugin for PaperDollPlugin {
     }
 }
 
-/// Naked body, back to front (same art as `unit::PAPER_DOLL` minus the default weapon).
-const BODY: &[&str] = &["default_legs", "default_feet", "default_chest", "default_hands", "head_short"];
+/// Sprite scripts of the player paper doll (`scripts/player/custom/<model>.txt`, tools/artgen/gear.py).
+pub const PLAYER_DIR: &str = "player/custom";
+/// The base body under all gear.
+pub const PLAYER_BODY: &str = "custom_body";
 
 /// DESIGN: gear draw order, back to front (legs under boots under chest under gloves; head,
 /// shield and weapon on top). The original's per-direction ordering is not recovered.
@@ -62,15 +64,13 @@ fn attach_gear(
     }
 }
 
-/// Model names to draw for an appearance, back to front. With `custom` (our generated art,
-/// tools/artgen/gear.py) the base body is `custom_body` from `player/custom`.
-pub fn layer_models(gear: &[u32], items: &ItemDb, custom: bool) -> Vec<String> {
+/// Model names to draw for an appearance, back to front, starting with the base body.
+pub fn layer_models(gear: &[u32], items: &ItemDb) -> Vec<String> {
     let model = |slot: usize| {
         let entry = *gear.get(slot)?;
         items.items.get(&(entry as i64)).filter(|t| t.has_model()).map(|t| t.model.clone())
     };
-    let mut out: Vec<String> =
-        if custom { vec!["custom_body".to_string()] } else { BODY.iter().map(|s| s.to_string()).collect() };
+    let mut out = vec![PLAYER_BODY.to_string()];
     for s in GEAR_ORDER {
         // DESIGN: with no melee weapon, a bow is shown in hand.
         let m = if s == slot::WEAPON { model(s).or_else(|| model(slot::RANGED)) } else { model(s) };
@@ -89,21 +89,20 @@ fn rebuild_layers(
     mut units: Query<&mut Unit>,
 ) {
     let Some(items) = items else { return };
-    // Our generated art has its own layers for the item models it covers; others are skipped
-    // rather than mixing in original sprites.
-    let dir = if data.custom_art { "player/custom" } else { "player/male" };
+    // Item models without a layer script are skipped.
+    let dir = PLAYER_DIR;
     for (e, gear, children) in &changed {
         for child in children.into_iter().flatten() {
             if layers.contains(*child) {
                 commands.entity(*child).despawn();
             }
         }
-        let mut names = layer_models(&gear.0, &items, data.custom_art);
+        let mut names = layer_models(&gear.0, &items);
         if let Ok(mut u) = units.get_mut(e) {
             u.heavy_weapon = names.iter().any(|n| HEAVY_WEAPONS.iter().any(|h| n.contains(h)));
         }
-        // Weapon smears (our art) go over everything.
-        if data.custom_art && SMEAR {
+        // Weapon smears go over everything.
+        if SMEAR {
             let smears: Vec<String> =
                 names.iter().map(|n| format!("{n}_smear")).filter(|s| data.sprite_script(dir, s).is_some()).collect();
             names.extend(smears);

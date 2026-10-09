@@ -41,9 +41,8 @@ pub struct Skin {
 }
 
 impl Skin {
-    pub fn load(data: &GameData, assets: &AssetServer, font: Handle<Font>) -> Self {
+    pub fn load(data: &GameData, assets: &AssetServer, font: Handle<Font>, bold: Handle<Font>) -> Self {
         let img = |n: &str| data.asset_path(&format!("{n}.png")).map(|p| assets.load(p)).unwrap_or_default();
-        let bold = data.asset_path("Friz Quadrata Bold.ttf").map(|p| assets.load(p)).unwrap_or(font.clone());
         Self {
             font,
             bold,
@@ -255,14 +254,10 @@ pub fn toggle(p: &mut ChildSpawnerCommands, skin: &Skin, key: ToggleKey, focus: 
             Focus(focus),
         ));
         if let Some(note) = note {
-            r.spawn((Text::new(note), skin.text(12.0), TextColor(FAINT), shadow(), ToggleNote(key)));
+            r.spawn((Text::new(note), skin.text(12.0), TextColor(FAINT), shadow()));
         }
     });
 }
-
-/// Small print next to a toggle (e.g. "restart to apply"), shown by the screen logic.
-#[derive(Component, Clone, Copy)]
-pub struct ToggleNote(pub ToggleKey);
 
 /// `<  value  >` with clickable arrows.
 pub fn cycler(p: &mut ChildSpawnerCommands, skin: &Skin, key: CycleKey, focus: usize, w: f32) {

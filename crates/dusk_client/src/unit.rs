@@ -241,11 +241,6 @@ pub struct Dead;
 #[derive(Component)]
 pub struct Targeted;
 
-/// Default naked look plus a starter weapon; draw order back-to-front.
-/// TODO: per-direction layer order (weapon behind body when facing away).
-const PAPER_DOLL: &[&str] =
-    &["default_legs", "default_feet", "default_chest", "default_hands", "head_short", "shortsword"];
-
 /// Spawns a unit with the given sprite-script layers; returns the parent entity.
 pub fn spawn_unit(
     commands: &mut Commands,
@@ -294,15 +289,8 @@ pub fn spawn_unit(
     Some(parent)
 }
 
-/// `scripts/npc/custom/<model>.txt` (our generated monster, tools/artgen/creatures.py) when running
-/// with `--art custom` and one exists, else the original `scripts/npc/<model>.txt`. Models that only
-/// exist as ours (custom NPC templates) use ours either way.
-fn npc_script_dir(data: &GameData, model: &str) -> &'static str {
-    let file = format!("{model}.txt");
-    let has_custom = data.root.join("scripts/npc/custom").join(&file).exists();
-    let custom = has_custom && (data.custom_art || data.find_file(&format!("scripts/npc/{file}")).is_none());
-    if custom { "npc/custom" } else { "npc" }
-}
+/// NPC sprite scripts: `scripts/npc/custom/<model>.txt` (tools/artgen/creatures.py).
+const NPC_DIR: &str = "npc/custom";
 
 /// Spawns an NPC by `npc_template.entry` at a cell position.
 pub fn spawn_npc(
@@ -318,7 +306,7 @@ pub fn spawn_npc(
     let scale = if template.model_scale > 0 { template.model_scale as f32 / 100.0 } else { 1.0 };
     let height = if model.height > 0 { model.height as f32 } else { 60.0 };
     let unit = Unit::new(pos, iso::direction_from_orientation(orientation), scale, height);
-    let dir = npc_script_dir(data, &model.name);
+    let dir = NPC_DIR;
     let smear = format!("{}_smear", model.name);
     let mut layers = vec![(dir, model.name.as_str())];
     if SMEAR && data.sprite_script(dir, &smear).is_some() {
@@ -338,15 +326,12 @@ pub fn spawn_paper_doll(
     pos: Vec2,
     orientation: f32,
 ) -> Option<Entity> {
-    let layers: Vec<_> = if data.custom_art {
-        let mut l = vec![("player/custom", "adventurer")];
-        if SMEAR {
-            l.push(("player/custom", "adventurer_smear"));
-        }
-        l
-    } else {
-        PAPER_DOLL.iter().map(|n| ("player/male", *n)).collect()
-    };
+    // The full look (`adventurer`) until the gear arrives and `paper_doll` layers it.
+    let dir = crate::paper_doll::PLAYER_DIR;
+    let mut layers = vec![(dir, "adventurer")];
+    if SMEAR {
+        layers.push((dir, "adventurer_smear"));
+    }
     let unit = Unit::new(pos, iso::direction_from_orientation(orientation), 1.0, PLAYER_HEIGHT);
     let e = spawn_unit(commands, data, assets, unit, &layers)?;
     commands.entity(e).insert(Name::new(name.to_string()));

@@ -5,7 +5,7 @@ original targets 1920x1080; at our default 1280x720 the pieces are placed so the
 
 | Module | What |
 |---|---|
-| `hud.rs` | Player / target unit frames, portraits, XP bar, `HudConfig` (config.ini options) |
+| `hud.rs` | Player / target unit frames, portraits, XP bar, `HudConfig` (name plate / minimap options) |
 | `chat.rs` | Chat panel, text entry, slash commands, system lines, speech bubbles |
 | `nameplates.rs` | Names + health bars over units |
 | `minimap.rs` | Minimap (render-to-texture), unit dots, zoom; owns the render-layer split |
@@ -14,6 +14,14 @@ original targets 1920x1080; at our default 1280x720 the pieces are placed so the
 | `windows.rs` | Window manager (stacking, placement, dragging, close boxes), `Esc` priority (`EscAction`), micro-menu, hint tooltips, cursor shapes |
 | `journal.rs` | Quest journal (`J`) |
 | `items_ui.rs` | Inventory, Character window (tabs), loot window, item tooltips |
+
+## Fonts
+
+Every UI text uses DejaVu Serif (`combat_ui::UI_FONT`, resource `UiFont`) and DejaVu Serif Bold
+for titles (`UI_FONT_BOLD`, `UiFontBold`), shipped in `content/custom/fonts/` with their licence
+(`LICENSE_DEJAVU`: Bitstream Vera licence + public-domain DejaVu changes; free to redistribute,
+renamed derivatives only). DejaVu runs wider than the condensed MMO faces, so fixed-width labels
+are sized for it.
 
 ## Front end (`state.rs`, `menu/`, `settings.rs`)
 
@@ -66,14 +74,14 @@ Target mana: the server doesn't send NPC mana; the bar is shown full for casters
 
 ### Portraits
 
-Portraits are cards of 210x330 (`content/portraits/npc_ports`, `ports_1..5`) plus 80x80
-faction placeholders (`portraits/portrait_{hostile,friendly,grey}.png`). The client bakes a
-round 78 px thumbnail on the CPU: a 130 px square around the face, where the face height of
-player portraits comes from `scripts/sprite/portrait_offset.txt` (`name=y`), else y=115.
+Portraits are our close-ups (`content/custom/portraits/portrait_custom_<model>.png`,
+`tools/artgen/portraits.py`) plus 80x80 faction placeholders
+(`portrait_{hostile,friendly,grey}.png`). The client bakes a round 78 px thumbnail on the CPU
+(80x80 images whole, larger cards: a 130 px square around y=115).
 
-NPC lookup: `portrait_<npc_template.portrait>.png` (13 templates set it), else
-`portrait_<npc model name>.png` (covers most monsters: goblin, wolf, skeleton...), else the
-faction placeholder. The player uses `portrait_male (90).png` until character creation exists.
+NPC lookup (our files only): `portrait_custom_<npc model name>.png`, else
+`portrait_<npc_template.portrait>.png`, else the faction placeholder. The player uses
+`portrait_custom_adventurer.png`.
 
 ## XP bar
 
@@ -89,7 +97,8 @@ over the panel scrolls.
 
 - `Enter` opens the input, `Enter` sends, `Escape` cancels. Plain text and `/say`, `/s` send
   `ClientMsg::Chat` (the server relays it map-wide, including back to us); `/help` prints
-  `scripts/text/help.txt`; other commands from that list answer "not available yet".
+  `data/help.txt` (our text: controls and the strain rule; `#` lines skipped); other commands
+  answer "not available yet".
 - System lines: welcome, level up, death. Other modules post with the `ChatSystemLine` message.
 - Speech bubbles: `saybox_*` 9-slice (4 px corners) in a 3x3 UI grid, max 220 px wide, over the
   speaking player for 5 s + 40 ms per character.
@@ -100,21 +109,20 @@ over the panel scrolls.
 
 `nameplate_bg.png` (102x12, fill well x 2..100, y 2..10) with `nameplate_hp.png` (hostile/neutral)
 or `nameplate_hp_party.png` (friendly, players) cropped to the health ratio, plus the name
-above in Friz Quadrata 13 px: hostile red, neutral yellow, friendly/players green. Children of
+above in the UI font at 13 px: hostile red, neutral yellow, friendly/players green. Children of
 the unit, counter-scaled, drawn at local z 500 so they sit above the world.
 
-Visibility follows the original `config.ini` `[System]` defaults:
+Visibility (`HudConfig` defaults; no options screen yet):
 
-| Option | Default | Effect |
+| Field | Default | Effect |
 |---|---|---|
-| `EnemyNameplateTick` | 1 | bars over hostile/neutral NPCs |
-| `FriendlyNameplateTick` | 0 | bars over friendly NPCs / players |
-| `YourNameTick` | 1 | our own name |
-| `YourNameplateTick` | 0 | our own bar |
-| `ShowNpcNameTick` / `ShowPlayerNameTick` | 1 | names |
+| `enemy_nameplates` | on | bars over hostile/neutral NPCs |
+| `friendly_nameplates` | off | bars over friendly NPCs / players |
+| `your_name` | on | our own name |
+| `your_nameplate` | off | our own bar |
+| `show_npc_names` / `show_player_names` | on | names |
 
-Other units' bars also show while targeted or damaged. `HudConfig` reads `<assets>/config.ini`
-if present (`dusk_extract` doesn't copy it; drop the install's file there to override).
+Other units' bars also show while targeted or damaged.
 
 ## Minimap
 
@@ -126,8 +134,8 @@ inverted into a dark overlay so the map fades out at the frame's brushed edges.
 
 - Dots: `minimap_enemy` (hostile), `minimap_neutral`, `minimap_friendly` (friendly NPCs and
   players), `minimap_dead` (corpses), 18x18. The player is a generated arrow rotated to our facing.
-- Zoom: 3 / 4.5 / 6 / 9 / 13 world px per minimap px; `MinimapZoom` (config.ini `[UI]`,
-  default 1) picks the start. Mouse wheel over the minimap, numpad `+` / `-`, or the
+- Zoom: 3 / 4.5 / 6 / 9 / 13 world px per minimap px; `HudConfig::minimap_zoom`
+  (default 1) picks the start. Mouse wheel over the minimap, numpad `+` / `-`, or the
   `minimap_button` (cycles).
 
 ### Render layers and cameras
@@ -254,7 +262,6 @@ Deferred:
 - Remembering window positions across sessions (needs the settings file), key rebinding.
 - Dragging items between bag slots and spells by drag-and-drop (both are click-to-pick).
 - `Esc` does not drop a spell held on the cursor (right-click does).
-- Legacy art (without `--art custom`): tab hot spots use our art's label positions.
 - Party frames, target-of-target, cast bar on the target frame (see below).
 
 ## Not done yet

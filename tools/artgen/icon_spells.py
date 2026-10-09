@@ -1073,7 +1073,20 @@ def r_draw_the_veil(cv, P):
     cv.paint(veil, "redmark", "lit", bevel=0.06, base=0.15)
 
 
+def r_potion(liquid):
+    def f(cv, P):
+        cv.glow(circle(0, -0.1, 0.55), 0.35, 0.45)
+        prims, rot, _ = it.flask(liquid, 3)
+        cv.obj(prims, rot, fit=0.8)
+    return f
+
+
 DUSK_RULES = [
+    (r"^attack$", r_sword()),
+    (r"^shoot$", r_bow),
+    (r"draught|potion|elixir", r_potion("ruby")),
+    (r"tonic", r_potion("sapphire")),
+    (r"gate slam|\bslam\b", r_slam),
     (r"^cairnbreaker$", r_cairnbreaker),
     (r"^open vein$", r_open_vein),
     (r"^skullcrack$", r_skullcrack),
