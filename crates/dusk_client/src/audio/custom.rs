@@ -1,13 +1,13 @@
-//! Duskhollow additions to the audio system (docs/audio.md, "Gaze layer" and after):
+//! Duskhollow parts of the audio system (docs/audio.md, "Gaze layer" and after):
 //!
-//! - the gaze ambience layer: open sky / shelter / open-Eye loops mixed on top of the zone
+//! - the gaze ambience layer: open sky / shelter / open-Eye loops mixed on top of the map
 //!   ambience from [`GazeView`] (cover, openness), plus strain cues (heartbeat >= 40,
 //!   whispers and breaths >= 70);
 //! - `DUSK_GAZE_FAKE` to drive [`GazeView`] without the server;
-//! - custom NPC voices (`npc_<model>_<event>.wav`) and greets on targeting;
-//! - data-driven proximity loops (`custom_assets/data/sprite_sounds.txt`) and cairn fire at
-//!   the `C` cells of a map's `.cover` sidecar;
-//! - player footsteps on custom maps.
+//! - NPC greets on targeting (`npc_<model>_greet.wav`);
+//! - proximity loops (`data/sprite_sounds.txt`) and cairn fire at the `C` cells of a map's
+//!   `.cover` sidecar;
+//! - player footsteps.
 //!
 //! Sounds come from `tools/sfxgen` (`custom_assets/content/custom/sfx/`).
 
@@ -15,13 +15,17 @@ use super::{AudioSettings, ProximityGroup, Rng, SfxAt, SfxVoice};
 use crate::{
     data::GameData,
     gaze::{CoverKind, EyeState, GazeView},
-    map_render::CurrentMap,
     player::Player,
     unit::{Npc, Targeted, Unit},
 };
 use bevy::audio::{AudioSinkPlayback, Volume};
 use bevy::prelude::*;
-use dusk_formats::{FileIndex, custom::CoverGrid, map::MapFile, sound::resolve_sound};
+use dusk_formats::{
+    FileIndex,
+    custom::CoverGrid,
+    map::MapFile,
+    sound::{SoundTables, SpriteSound, resolve_sound, voice_lines},
+};
 use std::collections::HashMap;
 
 /// DESIGN: gaze layer fade time (seconds for a full 0 -> 1 change).
@@ -48,70 +52,12 @@ pub(super) fn build(app: &mut App) {
 
 // ---------------------------------------------------------------- name resolution
 
-/// [`resolve_sound`], also accepting bare names of our own `.wav` files (`gaze_open`).
+/// Asset path of a sound name (bare names are our `.wav` files), see [`resolve_sound`].
 pub(super) fn resolve_sfx<'a>(index: &'a FileIndex, name: &str) -> Option<&'a str> {
-    resolve_sound(index, name).or_else(|| (!name.contains('.')).then(|| index.resolve(&format!("{name}.wav")))?)
-}
-
-/// Custom voice lines of an NPC model: `npc_<model>_<event>.wav` and `_1`.. `_4` variants.
-/// db events map to file events (`damage` -> `hit`, `die` -> `death`); a model without
-/// files falls back to its prefix (`glarewolf_alpha` -> `glarewolf`).
-pub(super) fn custom_voice(index: &FileIndex, model: &str, event: &str) -> Vec<String> {
-    let event = match event {
-        "damage" => "hit",
-        "die" => "death",
-        e => e,
-    };
-    let mut model = model.to_lowercase();
-    loop {
-        let lines: Vec<String> = std::iter::once(format!("npc_{model}_{event}.wav"))
-            .chain((1..=4).map(|i| format!("npc_{model}_{event}_{i}.wav")))
-            .filter(|n| index.resolve(n).is_some())
-            .collect();
-        match model.rsplit_once('_') {
-            Some((head, _)) if lines.is_empty() && !head.is_empty() => model = head.to_string(),
-            _ => return lines,
-        }
-    }
+    resolve_sound(index, name)
 }
 
 // ---------------------------------------------------------------- proximity loops
-
-/// One line of `custom_assets/data/sprite_sounds.txt`: `sprite sound radius`.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) struct SpriteSound {
-    /// Lowercased sprite file stem; a trailing `*` matches any stem with that prefix.
-    pattern: String,
-    sound: String,
-    radius: f32,
-}
-
-pub(super) fn parse_sprite_sounds(text: &str) -> Vec<SpriteSound> {
-    text.lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .filter_map(|l| {
-            let v: Vec<&str> = l.split_whitespace().collect();
-            let [sprite, sound, radius] = v[..] else { return None };
-            let sprite = sprite.to_lowercase();
-            let pattern = match sprite.strip_suffix('*') {
-                Some(p) => format!("{}*", p.rsplit_once('.').map_or(p, |s| s.0)),
-                None => sprite.rsplit_once('.').map_or(sprite.as_str(), |s| s.0).to_string(),
-            };
-            let sound = if sound.contains('.') { sound.to_string() } else { format!("{sound}.wav") };
-            Some(SpriteSound { pattern, sound, radius: radius.parse().ok()? })
-        })
-        .collect()
-}
-
-fn sprite_matches(pattern: &str, texture: &str) -> bool {
-    let tex = texture.to_lowercase();
-    let stem = tex.rsplit_once('.').map_or(tex.as_str(), |s| s.0);
-    match pattern.strip_suffix('*') {
-        Some(prefix) => stem.starts_with(prefix),
-        None => stem == pattern,
-    }
-}
 
 fn add_points(groups: &mut Vec<ProximityGroup>, sound: &str, radius: f32, points: Vec<Vec2>) {
     if points.is_empty() {
@@ -132,15 +78,15 @@ fn add_points(groups: &mut Vec<ProximityGroup>, sound: &str, radius: f32, points
     groups[i].points.extend(points);
 }
 
-/// Emitters of our own sprites (`sprite_sounds`) and cairn fire at the `.cover` `C` cells.
-pub(super) fn custom_proximity(
+/// Emitters of map sprites (`sprite_sounds`) and cairn fire at the `.cover` `C` cells.
+pub(super) fn proximity(
     groups: &mut Vec<ProximityGroup>,
     map: &MapFile,
     sprite_sounds: &[SpriteSound],
     cover: Option<&CoverGrid>,
 ) {
     for s in sprite_sounds {
-        let textures: Vec<bool> = map.textures.iter().map(|t| sprite_matches(&s.pattern, t)).collect();
+        let textures: Vec<bool> = map.textures.iter().map(|t| s.matches(t)).collect();
         let points = map
             .cells
             .iter()
@@ -155,15 +101,18 @@ pub(super) fn custom_proximity(
     }
 }
 
-/// Reads `sprite_sounds.txt` and the map's `.cover` and adds their emitters.
-pub(super) fn load_custom_proximity(groups: &mut Vec<ProximityGroup>, map: &MapFile, data: &GameData, name: &str) {
-    let sprite_sounds = std::fs::read_to_string(data.root.join("data/sprite_sounds.txt"))
-        .map(|t| parse_sprite_sounds(&t))
-        .unwrap_or_default();
+/// Adds the emitters of `sprite_sounds.txt` and of the map's `.cover` sidecar.
+pub(super) fn load_proximity(
+    groups: &mut Vec<ProximityGroup>,
+    map: &MapFile,
+    data: &GameData,
+    tables: &SoundTables,
+    name: &str,
+) {
     let cover = std::fs::read_to_string(data.root.join("maps").join(format!("{name}.cover")))
         .ok()
         .and_then(|t| CoverGrid::parse(&t));
-    custom_proximity(groups, map, &sprite_sounds, cover.as_ref());
+    proximity(groups, map, &tables.sprite_sounds, cover.as_ref());
 }
 
 // ---------------------------------------------------------------- DUSK_GAZE_FAKE
@@ -296,7 +245,10 @@ fn drive_gaze_layer(
         l.gain += (target - l.gain).clamp(-step, step);
         match l.entity {
             None if target > 0.0 && settings.music_gain() > 0.0 => {
-                let Some(path) = resolve_sound(&data.index, LAYER_SOUNDS[i]) else { continue };
+                let Some(path) = resolve_sound(&data.index, LAYER_SOUNDS[i]) else {
+                    settings.missing(LAYER_SOUNDS[i]);
+                    continue;
+                };
                 l.entity = Some(
                     commands
                         .spawn((
@@ -344,7 +296,10 @@ fn spawn_cue(
     if gain <= 0.0 {
         return;
     }
-    let Some(path) = resolve_sfx(&data.index, name) else { return };
+    let Some(path) = resolve_sfx(&data.index, name) else {
+        settings.missing(name);
+        return;
+    };
     commands.spawn((
         SfxVoice,
         AudioPlayer::new(assets.load(path.to_string())),
@@ -395,26 +350,23 @@ fn strain_cues(
 
 // ---------------------------------------------------------------- footsteps + greets
 
-/// Player footsteps on custom maps / with custom art: stone under deep shelter (roofed
-/// lanes, the cairn), dirt elsewhere.
+/// Player footsteps: stone under deep shelter (roofed lanes, the cairn), dirt elsewhere.
 #[allow(clippy::too_many_arguments)]
 fn footsteps(
     mut commands: Commands,
     data: Res<GameData>,
     assets: Res<AssetServer>,
     settings: Res<AudioSettings>,
-    current: Res<CurrentMap>,
     view: Res<GazeView>,
     mut rng: ResMut<Rng>,
     player: Query<&Unit, With<Player>>,
     mut walked: Local<(Option<Vec2>, f32)>,
 ) {
-    let custom = data.custom_art || current.name.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX);
     let Ok(unit) = player.single() else { return };
     let (last, dist) = &mut *walked;
     let moved = last.map_or(0.0, |l| l.distance(unit.pos));
     *last = Some(unit.pos);
-    if !custom || unit.anim != "run" || moved > 3.0 {
+    if unit.anim != "run" || moved > 3.0 {
         *dist = STEP_CELLS * 0.6; // first step comes quickly after starting to run
         return;
     }
@@ -428,7 +380,10 @@ fn footsteps(
         _ => "dirt",
     };
     let name = format!("foot_{surface}_{}.wav", 1 + rng.next() % 4);
-    let Some(path) = resolve_sfx(&data.index, &name) else { return };
+    let Some(path) = resolve_sfx(&data.index, &name) else {
+        settings.missing(&name);
+        return;
+    };
     let gain = STEP_GAIN * settings.sfx_gain();
     if gain > 0.0 {
         commands.spawn((
@@ -454,7 +409,7 @@ fn greet_on_target(
         if last.get(&e).is_some_and(|t| now - t < GREET_COOLDOWN) {
             continue;
         }
-        let lines = custom_voice(&data.index, model, "greet");
+        let lines = voice_lines(&data.index, model, "greet");
         if let Some(line) = rng.pick(&lines) {
             last.insert(e, now);
             out.write(super::PlaySfx { name: line.clone(), at: SfxAt::Unit(e), delay: 0.0 });
@@ -468,49 +423,6 @@ fn greet_on_target(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Every name of the demo-plan sound contract exists in `custom_assets` and decodes.
-    #[test]
-    fn contract_sounds_decode() {
-        use bevy::audio::{AudioSource, Decodable};
-        let dir = dusk_formats::content_root().join("content/custom/sfx");
-        let mut names: Vec<String> = [
-            "gaze_open",
-            "gaze_close",
-            "gaze_spot_enter",
-            "strain_heartbeat",
-            "strain_breath",
-            "strain_whisper",
-            "strain_overwhelm",
-            "cairn_kindle",
-            "cairn_rest",
-            "quest_accept",
-            "quest_progress",
-            "quest_complete",
-            "dialogue_open",
-            "title_sting",
-            "end_sting",
-            "hit_heavy",
-            "amb_open_sky",
-            "amb_shelter",
-            "amb_eye_open",
-            "loop_cairn_fire",
-        ]
-        .iter()
-        .map(|n| n.to_string())
-        .collect();
-        for model in ["glarewolf", "stooped", "hollowed_warden"] {
-            names.extend(["aggro", "attack", "hit", "death"].map(|e| format!("npc_{model}_{e}")));
-        }
-        for model in ["cairnkeeper", "lightworker", "lowshade_guard"] {
-            names.push(format!("npc_{model}_greet"));
-        }
-        for name in names {
-            let bytes = std::fs::read(dir.join(format!("{name}.wav"))).unwrap_or_else(|e| panic!("{name}: {e}"));
-            let source = AudioSource { bytes: bytes.into() };
-            assert!(source.decoder().take(4096).count() > 0, "{name} does not decode");
-        }
-    }
 
     #[test]
     fn fake_gaze_env() {
@@ -552,15 +464,9 @@ mod tests {
     }
 
     #[test]
-    fn custom_voices_and_bare_names() {
+    fn bare_names() {
         let mut index = FileIndex::default();
-        for n in ["npc_glarewolf_hit.wav", "npc_glarewolf_death.wav", "npc_stooped_attack_2.wav", "gaze_open.wav"] {
-            index.insert(n, &format!("content/custom/sfx/{n}"));
-        }
-        assert_eq!(custom_voice(&index, "Glarewolf", "damage"), ["npc_glarewolf_hit.wav"]);
-        assert_eq!(custom_voice(&index, "glarewolf_alpha", "die"), ["npc_glarewolf_death.wav"]);
-        assert_eq!(custom_voice(&index, "stooped", "attack"), ["npc_stooped_attack_2.wav"]);
-        assert!(custom_voice(&index, "cairnkeeper", "greet").is_empty());
+        index.insert("gaze_open.wav", "content/custom/sfx/gaze_open.wav");
         assert_eq!(resolve_sfx(&index, "gaze_open"), Some("content/custom/sfx/gaze_open.wav"));
         assert_eq!(resolve_sfx(&index, "gaze_open.wav"), Some("content/custom/sfx/gaze_open.wav"));
         assert_eq!(resolve_sfx(&index, "gaze_close"), None);
@@ -569,12 +475,7 @@ mod tests {
     #[test]
     fn sprite_sounds_and_cairns() {
         use dusk_formats::map::{Cell, TileLayer};
-        let s = parse_sprite_sounds("# c\ncustom_cairn* loop_cairn_fire 6\nBrazier.png fire.ogg 3\nbad line\n");
-        assert_eq!(s.len(), 2);
-        assert_eq!((s[0].pattern.as_str(), s[0].sound.as_str()), ("custom_cairn*", "loop_cairn_fire.wav"));
-        assert_eq!(s[1].pattern, "brazier");
-        assert!(sprite_matches("custom_cairn*", "Custom_Cairn_lit_02.png"));
-        assert!(sprite_matches("brazier", "brazier.png") && !sprite_matches("brazier", "brazier_2.png"));
+        let s = dusk_formats::sound::parse_sprite_sounds("custom_cairn* loop_cairn_fire 6\nbrazier fire.ogg 3\n");
         let layer = |t| Some(TileLayer { texture: t, param: 0 });
         let map = MapFile {
             size: 13,
@@ -590,7 +491,7 @@ mod tests {
         };
         let cover = CoverGrid::parse("3 2\n.sS\nC..\n").unwrap();
         let mut groups = Vec::new();
-        custom_proximity(&mut groups, &map, &s, Some(&cover));
+        proximity(&mut groups, &map, &s, Some(&cover));
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].sound, "loop_cairn_fire.wav");
         assert_eq!(groups[0].points, [Vec2::new(2.5, 3.5), Vec2::new(0.5, 1.5)]);

@@ -674,7 +674,7 @@ def _variants():
     return out
 
 
-PREFIXES = ("spell_", "ui_", "npc_goblin_", "npc_spider_", "npc_antlion_small_")
+PREFIXES = ("spell_", "ui_", "npc_")
 SOUNDS = {name: fn for name, fn in globals().items()
           if callable(fn) and not name.startswith("_") and (
               name.startswith(PREFIXES) or name in ("miss", "dodge", "parry", "level_up", "item_use"))}

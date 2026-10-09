@@ -1,22 +1,13 @@
-//! Every sound file named by `game.db` (and the hard-coded client sounds) resolves through
-//! `file_index.txt` to a valid OGG/WAV file. Missing db references are reported, not fatal
-//! (the original data has a few dangling ones). Skipped when assets are not extracted.
+//! Every sound our data and the client name (`content::sounds::referenced`: builtin event
+//! sounds and cues, spell kit sounds, sprite_sounds.txt, map music, the soundtrack, NPC voices)
+//! is one of our files with a valid container. Needs no legacy data.
 
-use dusk_formats::{
-    FileIndex,
-    db::GameDb,
-    map::MapFile,
-    sound::{RegionGrid, builtin, resolve_sound},
-};
+use dusk_formats::{content::sounds, content_root, sound::resolve_sound};
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-fn assets() -> Option<PathBuf> {
-    let p = dusk_formats::legacy_root();
-    p.join("game.db").exists().then_some(p)
-}
-
-/// Checks the container header: `OggS` + a Vorbis identification packet, or a PCM RIFF/WAVE.
+/// Checks the container header: a PCM RIFF/WAVE, `OggS` + a Vorbis identification packet, or
+/// MP3 (ID3 tag or a frame sync).
 fn check_header(path: &Path) -> Result<(), String> {
     let mut head = [0u8; 64];
     let n = std::fs::File::open(path).and_then(|mut f| f.read(&mut head)).map_err(|e| e.to_string())?;
@@ -29,57 +20,52 @@ fn check_header(path: &Path) -> Result<(), String> {
         let tag = u16::from_le_bytes([head[fmt + 8], head[fmt + 9]]);
         return if tag == 1 { Ok(()) } else { Err(format!("wav format tag {tag} (not PCM)")) };
     }
+    if head.starts_with(b"ID3") || (head.len() > 1 && head[0] == 0xFF && head[1] & 0xE0 == 0xE0) {
+        return Ok(());
+    }
     Err("unknown container".into())
 }
 
 #[test]
 fn referenced_sounds_exist_and_are_valid() {
-    let Some(root) = assets() else { return };
-    let index = FileIndex::load(root.join("file_index.txt")).unwrap();
-    let db = GameDb::open(root.join("game.db")).unwrap();
-    let refs = db.referenced_sounds().unwrap();
-    let mut missing = Vec::new();
-    let mut bad = Vec::new();
+    let root = content_root();
+    let index = sounds::index(&root);
+    let refs = sounds::referenced(&root, &index).unwrap();
+    let mut problems = Vec::new();
     for (source, name) in &refs {
         match resolve_sound(&index, name) {
-            None => missing.push(format!("{source}: {name}")),
+            None => problems.push(format!("{source}: {name} missing")),
             Some(rel) => {
                 if let Err(e) = check_header(&root.join(rel)) {
-                    bad.push(format!("{rel}: {e}"));
+                    problems.push(format!("{source}: {rel}: {e}"));
                 }
             }
         }
     }
-    for name in builtin::all() {
-        match resolve_sound(&index, name) {
-            None => bad.push(format!("built-in {name} missing")),
-            Some(rel) => {
-                if let Err(e) = check_header(&root.join(rel)) {
-                    bad.push(format!("{rel}: {e}"));
-                }
-            }
-        }
-    }
-    eprintln!("{} sound references, {} missing from the install:", refs.len(), missing.len());
-    for m in &missing {
-        eprintln!("  missing {m}");
-    }
-    assert!(bad.is_empty(), "invalid sound files: {bad:#?}");
-    // The shipped data has 6 dangling names (mostly music); anything beyond that is a regression.
-    assert!(missing.len() <= 8, "too many missing sounds: {missing:#?}");
+    assert!(problems.is_empty(), "{problems:#?}");
+    let sources = |prefix: &str| refs.iter().filter(|(s, _)| s.starts_with(prefix)).count();
+    assert_eq!(sources("builtin"), 27 + dusk_formats::sound::builtin::CUES.len());
+    assert!(sources("soundtrack") > 0, "no soundtrack");
+    assert!(sources("sprite_sounds.txt") > 0);
+    assert!(sources("npc_templates.txt") >= 12, "NPC voices: {}", sources("npc_templates.txt"));
+}
+
+/// The generated effects stay within the size budget of `tools/sfxgen` (16 MB).
+#[test]
+fn sfx_size_budget() {
+    let dir = content_root().join("content/custom/sfx");
+    let total: u64 = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "wav"))
+        .map(|e| e.metadata().unwrap().len())
+        .sum();
+    assert!(total <= 16 * 1024 * 1024, "{} has {:.2} MB of effects", dir.display(), total as f64 / 1048576.0);
 }
 
 #[test]
-fn every_map_has_playable_music_somewhere() {
-    let Some(root) = assets() else { return };
-    let index = FileIndex::load(root.join("file_index.txt")).unwrap();
-    let db = GameDb::open(root.join("game.db")).unwrap();
-    let tables = db.sound_tables().unwrap();
-    for info in db.maps().unwrap() {
-        let Ok(map) = MapFile::load(root.join("maps").join(format!("{}.map", info.name))) else { continue };
-        let grid = RegionGrid::new(&map);
-        let zone_tracks = grid.zones.values().filter_map(|z| tables.zones.get(&(*z as i64))).flat_map(|z| &z.music);
-        let playable = info.music.iter().chain(zone_tracks).any(|t| resolve_sound(&index, t).is_some());
-        assert!(playable, "map {} has no playable music", info.name);
-    }
+fn sprite_sounds_parse() {
+    let tables = sounds::load(&content_root()).unwrap();
+    assert!(tables.sprite_sounds.iter().any(|s| s.pattern == "custom_cairn*" && s.sound == "loop_cairn_fire.wav"));
+    assert!(tables.sprite_sounds.iter().all(|s| s.radius > 0.0));
 }

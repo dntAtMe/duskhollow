@@ -1,18 +1,21 @@
-//! Audio: per-zone music and ambience (crossfaded), distance-attenuated sound effects for
-//! melee, spells, NPC voices, level-up and UI, plus looping sounds next to certain map
-//! sprites (`sprite_proximity_sound`). See `docs/audio.md` for what is data vs. DESIGN.
+//! Audio: per-map music and ambience (crossfaded), distance-attenuated sound effects for
+//! melee, spells, NPC voices, level-up and UI, plus looping sounds next to map sprites
+//! (`data/sprite_sounds.txt`). See `docs/audio.md`.
 //!
+//! Every sound is one of our files (`tools/sfxgen`, the soundtrack); names that only exist in
+//! the legacy data pack never resolve ([`resolve_sound`]).
 //! Other modules can trigger a sound by writing a [`PlaySfx`] message.
 //! Keys: `M` toggles music + ambience, `N` toggles sound effects.
-//! `DUSK_AUDIO_LOG=1` logs every sound that starts (at `info` level).
-//! Duskhollow additions (gaze ambience layer, custom NPC voices, cairn fire, footsteps,
-//! `DUSK_GAZE_FAKE`) live in [`custom`].
+//! `DUSK_AUDIO_LOG=1` logs every sound that starts (at `info` level) and every missing one.
+//! The gaze ambience layer, NPC voices, proximity emitters, footsteps and `DUSK_GAZE_FAKE`
+//! live in [`custom`].
 
 mod custom;
 
 use crate::{
     combat_ui::UiFont,
     data::GameData,
+    items_ui::{ItemDb, ItemsState},
     map_render::{CurrentMap, MapLoaded},
     net::{CombatNet, Net, PlayerState, SpellNet},
     player::Player,
@@ -21,8 +24,9 @@ use crate::{
 use bevy::audio::{AudioSinkPlayback, PlaybackMode, Volume};
 use bevy::prelude::*;
 use dusk_formats::{
+    item::slot,
     map::MapFile,
-    sound::{RegionGrid, RegionSound, SoundTables, builtin, resolve_sound, split_playlist},
+    sound::{SoundTables, builtin, resolve_sound, split_playlist, voice_lines},
 };
 use dusk_protocol::{HitResult, ServerMsg};
 use std::collections::HashMap;
@@ -33,8 +37,7 @@ const NEAR: f32 = 4.0;
 const FAR: f32 = 18.0;
 /// DESIGN: music/ambience crossfade duration.
 const FADE_SECS: f32 = 2.0;
-/// How often the player's zone/area and proximity sounds are re-evaluated.
-const REGION_CHECK: f32 = 0.5;
+/// How often the proximity loops are re-evaluated.
 const PROXIMITY_CHECK: f32 = 0.25;
 /// DESIGN: an NPC/player voices at most one line per this many seconds (deaths excepted).
 const VOICE_COOLDOWN: f32 = 1.5;
@@ -61,7 +64,6 @@ impl Plugin for AudioPlugin {
                     update_listener,
                     toggle_keys.run_if(crate::state::in_game),
                     on_map_loaded,
-                    update_regions,
                     drive_tracks,
                     drive_proximity,
                     combat_sounds.run_if(crate::state::in_game),
@@ -78,7 +80,7 @@ impl Plugin for AudioPlugin {
 
 // ---------------------------------------------------------------- settings
 
-/// Volumes are linear gains (the original's `config.ini` uses 0..100 SFML volumes).
+/// Volumes are linear gains (the options menu and the env overrides use 0..100).
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub struct AudioSettings {
     /// Music and ambience.
@@ -93,7 +95,7 @@ pub struct AudioSettings {
 }
 
 impl Default for AudioSettings {
-    /// Defaults of the original `config.ini`: `VolumeMusic=15`, `VolumeSfx=20`.
+    /// DESIGN: music 15 %, effects 20 % (the options menu changes them).
     fn default() -> Self {
         Self {
             music_on: true,
@@ -107,30 +109,15 @@ impl Default for AudioSettings {
 }
 
 impl AudioSettings {
-    /// Reads `EnableMusic`, `EnableSfx`, `VolumeMusic`, `VolumeSfx` from an original-style `config.ini`.
-    pub fn apply_config(&mut self, text: &str) {
-        for line in text.lines() {
-            let Some((key, value)) = line.split_once('=') else { continue };
-            let value = value.trim();
-            let flag = || matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes");
-            let volume = || value.parse::<f32>().ok().map(|v| (v / 100.0).clamp(0.0, 1.0));
-            match key.trim() {
-                "EnableMusic" => self.music_on = flag(),
-                "EnableSfx" => self.sfx_on = flag(),
-                "VolumeMusic" => self.music_volume = volume().unwrap_or(self.music_volume),
-                "VolumeSfx" => self.sfx_volume = volume().unwrap_or(self.sfx_volume),
-                _ => {}
-            }
+    /// Applies `DUSK_MUSIC_VOLUME` / `DUSK_SFX_VOLUME` (0..100; unparsable values are ignored).
+    fn apply_env(&mut self, var: impl Fn(&str) -> Option<String>) {
+        let volume = |name| var(name).and_then(|v| v.trim().parse::<f32>().ok()).map(|v| (v / 100.0).clamp(0.0, 1.0));
+        if let Some(v) = volume("DUSK_MUSIC_VOLUME") {
+            self.music_volume = v;
         }
-    }
-
-    /// `DUSK_MUSIC_VOLUME` / `DUSK_SFX_VOLUME` (0..100) override the config.
-    fn apply_env(&mut self) {
-        let lines: String = [("DUSK_MUSIC_VOLUME", "VolumeMusic"), ("DUSK_SFX_VOLUME", "VolumeSfx")]
-            .iter()
-            .filter_map(|(env, key)| std::env::var(env).ok().map(|v| format!("{key}={v}\n")))
-            .collect();
-        self.apply_config(&lines);
+        if let Some(v) = volume("DUSK_SFX_VOLUME") {
+            self.sfx_volume = v;
+        }
     }
 
     fn music_gain(&self) -> f32 {
@@ -139,6 +126,22 @@ impl AudioSettings {
 
     fn sfx_gain(&self) -> f32 {
         if self.sfx_on { self.sfx_volume * self.master_volume } else { 0.0 }
+    }
+
+    /// Reports a sound name that does not resolve to one of our files (once per name; a warning
+    /// with `DUSK_AUDIO_LOG`).
+    fn missing(&self, name: &str) {
+        static SEEN: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        let mut seen = SEEN.lock().unwrap();
+        if seen.iter().any(|n| n == name) {
+            return;
+        }
+        seen.push(name.to_string());
+        if self.log {
+            warn!("audio: missing sound {name}");
+        } else {
+            debug!("audio: missing sound {name}");
+        }
     }
 
     fn log(&self, what: std::fmt::Arguments) {
@@ -173,24 +176,19 @@ fn update_listener(
 }
 
 fn setup(mut commands: Commands, data: Res<GameData>, mut settings: ResMut<AudioSettings>) {
-    if let Some(text) = data.find_file("config.ini").and_then(|p| std::fs::read_to_string(p).ok()) {
-        settings.apply_config(&text);
-    }
-    settings.apply_env();
+    settings.apply_env(|name| std::env::var(name).ok());
     let tables = dusk_formats::content::sounds::load(&data.root).unwrap_or_else(|e| {
         warn!("audio: cannot read sound tables: {e}");
         SoundTables::default()
     });
     info!(
-        "audio: music {:.0}% ({}), sfx {:.0}% ({}); {} zones, {} areas, {} npc sound sets, {} proximity sprites",
+        "audio: music {:.0}% ({}), sfx {:.0}% ({}); {} soundtrack tracks, {} sprite sounds",
         settings.music_volume * 100.0,
         if settings.music_on { "on" } else { "off" },
         settings.sfx_volume * 100.0,
         if settings.sfx_on { "on" } else { "off" },
-        tables.zones.len(),
-        tables.areas.len(),
-        tables.npc.len(),
-        tables.proximity.len()
+        tables.soundtrack.len(),
+        tables.sprite_sounds.len()
     );
     commands.insert_resource(SoundDb(tables));
 }
@@ -231,7 +229,7 @@ pub enum SfxAt {
     Unit(Entity),
 }
 
-/// Request to play a sound effect by its original bare filename.
+/// Request to play a sound effect by name (bare names are our `.wav` files: `gaze_open`).
 #[derive(Message, Clone, Debug)]
 pub struct PlaySfx {
     pub name: String,
@@ -304,7 +302,7 @@ fn play_sfx(
             continue;
         }
         let Some(path) = custom::resolve_sfx(&data.index, &sfx.name) else {
-            debug!("audio: missing sound {}", sfx.name);
+            settings.missing(&sfx.name);
             continue;
         };
         commands.spawn((
@@ -339,54 +337,21 @@ struct FadingOut;
 
 #[derive(Default)]
 struct ChannelState {
-    /// Playable tracks for the current region.
+    /// Playable tracks of the current map.
     playlist: Vec<String>,
     current: Option<(Entity, String)>,
 }
 
 #[derive(Resource, Default)]
 struct Music {
-    region: RegionGrid,
-    map_music: Vec<String>,
-    map_ambience: Vec<String>,
     music: ChannelState,
     ambience: ChannelState,
-    /// Last evaluated (zone, area).
-    key: (u32, u32),
-    /// Region seen at the previous check, not applied yet.
-    pending: Option<(u32, u32)>,
-    /// Force re-evaluation (new map).
-    dirty: bool,
-    check: f32,
-    /// Our own soundtrack (`custom_assets/content/custom/music/`) when it replaces the original
-    /// music: always on custom maps (they have no db music), everywhere with `--art custom`.
-    custom_playlist: Option<Vec<String>>,
 }
 
-/// File names of the custom soundtrack, sorted.
-fn custom_soundtrack(data: &GameData) -> Vec<String> {
-    let mut tracks: Vec<String> = std::fs::read_dir(data.root.join("content/custom/music"))
-        .map(|d| {
-            d.flatten()
-                .map(|e| e.file_name().to_string_lossy().into_owned())
-                .filter(|n| n.ends_with(".mp3") || n.ends_with(".ogg"))
-                .collect()
-        })
-        .unwrap_or_default();
-    tracks.sort();
-    tracks
-}
-
-/// First candidate list with a playable entry (filtered to playable ones), else the playable
-/// part of `fallback`. Precedence (area, then zone, then map) follows the original's
-/// zone-change code (`FUN_00555d50`), which checks `area_template` before `zone_template`.
-fn choose_playlist(
-    candidates: &[Option<&Vec<String>>],
-    fallback: &[String],
-    playable: impl Fn(&str) -> bool,
-) -> Vec<String> {
-    let filter = |l: &[String]| l.iter().filter(|t| playable(t)).cloned().collect::<Vec<_>>();
-    candidates.iter().flatten().map(|l| filter(l)).find(|l| !l.is_empty()).unwrap_or_else(|| filter(fallback))
+/// DESIGN: a map's `music=` list (its playable tracks), else the whole soundtrack.
+fn map_playlist(map_music: &[String], soundtrack: &[String], playable: impl Fn(&str) -> bool) -> Vec<String> {
+    let own: Vec<String> = map_music.iter().filter(|t| playable(t)).cloned().collect();
+    if own.is_empty() { soundtrack.iter().filter(|t| playable(t)).cloned().collect() } else { own }
 }
 
 /// Fades out the channel's current track and starts another one from its playlist.
@@ -425,12 +390,16 @@ fn start_track(
     state.current = Some((e, name));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn on_map_loaded(
     mut commands: Commands,
     mut loaded: MessageReader<MapLoaded>,
     current: Res<CurrentMap>,
     data: Res<GameData>,
+    assets: Res<AssetServer>,
     db: Res<SoundDb>,
+    settings: Res<AudioSettings>,
+    mut rng: ResMut<Rng>,
     mut music: ResMut<Music>,
     mut proximity: ResMut<Proximity>,
 ) {
@@ -438,11 +407,23 @@ fn on_map_loaded(
         return;
     }
     let info = data.maps.iter().find(|m| m.name == current.name);
-    music.map_music = info.map(|i| split_playlist(&i.music.join(","))).unwrap_or_default();
-    music.map_ambience = info.map(|i| split_playlist(&i.ambience)).unwrap_or_default();
-    let custom_map = current.name.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX);
-    music.custom_playlist = (custom_map || data.custom_art).then(|| custom_soundtrack(&data)).filter(|t| !t.is_empty());
-    music.dirty = true;
+    let playable = |t: &str| resolve_sound(&data.index, t).is_some();
+    let map_music = info.map(|i| split_playlist(&i.music.join(","))).unwrap_or_default();
+    let music_list = map_playlist(&map_music, &db.0.soundtrack, playable);
+    let ambience_list: Vec<String> =
+        info.map(|i| split_playlist(&i.ambience)).unwrap_or_default().into_iter().filter(|t| playable(t)).collect();
+    settings.log(format_args!("map {}: music {music_list:?}, ambience {ambience_list:?}", current.name));
+    let music = &mut *music;
+    for (state, list, channel) in
+        [(&mut music.music, music_list, Channel::Music), (&mut music.ambience, ambience_list, Channel::Ambience)]
+    {
+        // A track that is also on the new map's list keeps playing.
+        let keep = state.current.as_ref().is_some_and(|(_, name)| list.contains(name));
+        state.playlist = list;
+        if !keep {
+            start_track(&mut commands, &assets, &data, &settings, &mut rng, state, channel);
+        }
+    }
 
     for g in proximity.groups.drain(..) {
         if let Some(e) = g.entity {
@@ -450,86 +431,13 @@ fn on_map_loaded(
         }
     }
     let path = data.find_file(&format!("maps/{}.map", current.name));
-    let Some(Ok(map)) = path.map(MapFile::load) else {
-        music.region = RegionGrid::default();
-        return;
-    };
-    music.region = RegionGrid::new(&map);
-    proximity.groups = proximity_groups(&map, &db.0);
-    custom::load_custom_proximity(&mut proximity.groups, &map, &data, &current.name);
+    let Some(Ok(map)) = path.map(MapFile::load) else { return };
+    custom::load_proximity(&mut proximity.groups, &map, &data, &db.0, &current.name);
     info!(
-        "audio: map {}: {} zone chunks, {} area chunks, proximity sounds {:?}",
+        "audio: map {}: proximity sounds {:?}",
         current.name,
-        music.region.zones.len(),
-        music.region.areas.len(),
         proximity.groups.iter().map(|g| (g.sound.as_str(), g.points.len())).collect::<Vec<_>>()
     );
-}
-
-#[allow(clippy::too_many_arguments)]
-fn update_regions(
-    mut commands: Commands,
-    time: Res<Time>,
-    data: Res<GameData>,
-    assets: Res<AssetServer>,
-    db: Res<SoundDb>,
-    settings: Res<AudioSettings>,
-    mut rng: ResMut<Rng>,
-    mut music: ResMut<Music>,
-    listener: Res<Listener>,
-) {
-    music.check -= time.delta_secs();
-    if music.check > 0.0 && !music.dirty {
-        return;
-    }
-    music.check = REGION_CHECK;
-    let Some(pos) = listener.0 else { return };
-    let key = music.region.at(pos.x, pos.y);
-    if !music.dirty {
-        // DESIGN: zone-less chunks (borders, unpainted terrain) keep whatever plays, and a new
-        // region must hold for two checks, so walking along a border does not flip-flop.
-        if key == music.key || key == (0, 0) || music.pending != Some(key) {
-            music.pending = (key != music.key && key != (0, 0)).then_some(key);
-            return;
-        }
-    }
-    music.pending = None;
-    music.dirty = false;
-    music.key = key;
-    let zone: Option<&RegionSound> = db.0.zones.get(&(key.0 as i64));
-    let area: Option<&RegionSound> = db.0.areas.get(&(key.1 as i64));
-    let playable = |t: &str| resolve_sound(&data.index, t).is_some();
-    let music_list = match &music.custom_playlist {
-        Some(tracks) => tracks.clone(),
-        None => choose_playlist(&[area.map(|a| &a.music), zone.map(|z| &z.music)], &music.map_music, playable),
-    };
-    let ambience_list =
-        choose_playlist(&[area.map(|a| &a.ambience), zone.map(|z| &z.ambience)], &music.map_ambience, playable);
-    // Compare by the file actually played (`zorkfouralchs.mp3` resolves to `zorkfouralchs_01.ogg`).
-    let canonical = |l: Vec<String>| -> Vec<String> {
-        l.iter()
-            .filter_map(|t| resolve_sound(&data.index, t))
-            .map(|p| p.rsplit('/').next().unwrap_or(p).to_string())
-            .collect()
-    };
-    let (music_list, ambience_list) = (canonical(music_list), canonical(ambience_list));
-    settings.log(format_args!(
-        "region zone {} '{}', area {} '{}': music {music_list:?}, ambience {ambience_list:?}",
-        key.0,
-        zone.map_or("", |z| z.name.as_str()),
-        key.1,
-        area.map_or("", |a| a.name.as_str()),
-    ));
-    let music = &mut *music;
-    for (state, list, channel) in
-        [(&mut music.music, music_list, Channel::Music), (&mut music.ambience, ambience_list, Channel::Ambience)]
-    {
-        let keep = state.current.as_ref().is_some_and(|(_, name)| list.contains(name));
-        state.playlist = list;
-        if !keep {
-            start_track(&mut commands, &assets, &data, &settings, &mut rng, state, channel);
-        }
-    }
 }
 
 /// Fades tracks in/out, applies the volume settings and picks the next song when one ends.
@@ -588,31 +496,6 @@ struct Proximity {
 #[derive(Component)]
 struct ProximityVoice;
 
-/// Groups every map cell whose layers use a `sprite_proximity_sound` sprite by sound.
-fn proximity_groups(map: &MapFile, tables: &SoundTables) -> Vec<ProximityGroup> {
-    let by_texture: Vec<_> = map.textures.iter().map(|t| tables.proximity.get(&t.to_lowercase())).collect();
-    let mut groups: HashMap<String, ProximityGroup> = HashMap::new();
-    for cell in &map.cells {
-        let centre = Vec2::new(cell.x as f32 + 0.5, cell.y as f32 + 0.5);
-        for layer in cell.layers.iter().flatten() {
-            let Some(Some(p)) = by_texture.get(layer.texture as usize) else { continue };
-            let g = groups.entry(p.sound.to_lowercase()).or_insert_with(|| ProximityGroup {
-                sound: p.sound.clone(),
-                radius: p.radius,
-                points: Vec::new(),
-                entity: None,
-                gain: 0.0,
-                target: 0.0,
-            });
-            g.radius = g.radius.max(p.radius);
-            g.points.push(centre);
-        }
-    }
-    let mut v: Vec<_> = groups.into_values().collect();
-    v.sort_by(|a, b| a.sound.cmp(&b.sound));
-    v
-}
-
 /// DESIGN: linear falloff from the nearest emitter to silence at `radius` cells.
 fn proximity_gain(points: &[Vec2], radius: f32, listener: Vec2) -> f32 {
     if radius <= 0.0 {
@@ -647,7 +530,10 @@ fn drive_proximity(
         g.gain += (g.target - g.gain).clamp(-step, step);
         match g.entity {
             None if g.target > 0.0 && settings.sfx_gain() > 0.0 => {
-                let Some(path) = resolve_sound(&data.index, &g.sound) else { continue };
+                let Some(path) = resolve_sound(&data.index, &g.sound) else {
+                    settings.missing(&g.sound);
+                    continue;
+                };
                 g.entity = Some(
                     commands
                         .spawn((
@@ -688,21 +574,24 @@ fn npc_model<'a>(data: &'a GameData, npc: &Npc) -> Option<&'a str> {
     data.npc_models.get(&template.model_id).map(|m| m.name.as_str())
 }
 
-/// `npc_sounds` lines of a model event, else our own `npc_<model>_<event>.wav` files.
-fn voice_lines(data: &GameData, db: &SoundTables, model: &str, event: &str) -> Vec<String> {
-    match db.npc_sounds(model, event) {
-        [] => custom::custom_voice(&data.index, model, event),
-        lines => lines.to_vec(),
-    }
+/// DESIGN: the hit sounds of a melee swing by the local player: edged weapons (axe, sword,
+/// dagger) cut, the rest (mace, staff, wand) and an empty hand thud. `None` = unknown weapon.
+fn player_hit_sounds(items: Option<&ItemsState>, db: Option<&ItemDb>) -> Option<&'static [&'static str]> {
+    let Some(weapon) = items?.equipment.get(slot::WEAPON)? else { return Some(&builtin::HIT_UNARMED) };
+    Some(match db?.items.get(&(weapon.entry as i64))?.weapon_type {
+        1 | 4 | 6 => &builtin::HIT_BLADE,
+        _ => &builtin::HIT_BLUNT,
+    })
 }
 
-/// Melee results (`ServerMsg::Swing`) and deaths: hit/miss sounds from the original
-/// client's hard-coded tables, NPC voices from `npc_sounds`.
+/// Melee results (`ServerMsg::Swing`) and deaths: hit/miss sounds ([`builtin`]) and NPC
+/// voices (`npc_<model>_<event>`).
 #[allow(clippy::too_many_arguments)]
 fn combat_sounds(
     time: Res<Time>,
     data: Res<GameData>,
-    db: Res<SoundDb>,
+    items: Option<Res<ItemsState>>,
+    item_db: Option<Res<ItemDb>>,
     net: Res<Net>,
     mut rng: ResMut<Rng>,
     mut timers: Local<VoiceTimers>,
@@ -713,7 +602,7 @@ fn combat_sounds(
 ) {
     let now = time.elapsed_secs();
     let timers = &mut *timers;
-    // Plays a random `npc_sounds` line for an NPC unit (throttled unless `throttle` is false).
+    // Plays a random voice line for an NPC unit (throttled unless `throttle` is false).
     let voice = |out: &mut MessageWriter<PlaySfx>,
                  rng: &mut Rng,
                  last_voice: &mut HashMap<Entity, f32>,
@@ -724,7 +613,7 @@ fn combat_sounds(
         if throttle && last_voice.get(&e).is_some_and(|t| now - t < VOICE_COOLDOWN) {
             return;
         }
-        if let Some(s) = rng.pick(&voice_lines(&data, &db.0, model, event)) {
+        if let Some(s) = rng.pick(&voice_lines(&data.index, model, event)) {
             last_voice.insert(e, now);
             out.write(PlaySfx::at_unit(s.clone(), e));
         }
@@ -736,11 +625,16 @@ fn combat_sounds(
                 let tgt = net.entities.get(target).copied();
                 let att_npc = att.is_some_and(|e| npcs.contains(e));
                 let hit = matches!(result, HitResult::Hit | HitResult::Crit);
-                // FUN_00554030 / FUN_0054ce40 / FUN_0054fe50. DESIGN: players are assumed to
-                // wield a blade (weapon_type is not mirrored on the client yet).
+                // DESIGN: NPCs hit with claws and fists; other players are assumed to wield a blade.
+                let hits: &[&str] = if att_npc {
+                    &builtin::HIT_UNARMED
+                } else if Some(*attacker) == net.my_id {
+                    player_hit_sounds(items.as_deref(), item_db.as_deref()).unwrap_or(&builtin::HIT_BLADE)
+                } else {
+                    &builtin::HIT_BLADE
+                };
                 let sound = match result {
-                    HitResult::Hit | HitResult::Crit if att_npc => rng.pick(&builtin::HIT_UNARMED).copied(),
-                    HitResult::Hit | HitResult::Crit => rng.pick(&builtin::HIT_BLADE).copied(),
+                    HitResult::Hit | HitResult::Crit => rng.pick(hits).copied(),
                     HitResult::Miss | HitResult::Evade => Some(builtin::MISS),
                     HitResult::Dodge => Some(builtin::DODGE),
                     HitResult::Block => rng.pick(&builtin::BLOCK).copied(),
@@ -755,7 +649,7 @@ fn combat_sounds(
                 if let Some(a) = att.filter(|_| att_npc) {
                     let engaged = timers.last_swing.insert(a, now).is_some_and(|t| now - t < AGGRO_GAP);
                     let model = npcs.get(a).ok().and_then(|n| npc_model(&data, n)).unwrap_or_default();
-                    let aggro = !engaged && !voice_lines(&data, &db.0, model, "aggro").is_empty();
+                    let aggro = !engaged && !voice_lines(&data.index, model, "aggro").is_empty();
                     voice(
                         &mut out,
                         &mut rng,
@@ -771,9 +665,10 @@ fn combat_sounds(
                     } else if Some(*target) == net.my_id
                         && !timers.last_voice.get(&t).is_some_and(|l| now - l < VOICE_COOLDOWN)
                     {
-                        // DESIGN: the paper doll is always male for now.
                         timers.last_voice.insert(t, now);
-                        out.write(PlaySfx::at_unit(builtin::PLAYER_HURT_MALE, t));
+                        if let Some(s) = rng.pick(&builtin::PLAYER_HURT) {
+                            out.write(PlaySfx::at_unit(*s, t));
+                        }
                     }
                 }
             }
@@ -800,8 +695,9 @@ fn spell_sounds(
     mut events: MessageReader<SpellNet>,
     mut out: MessageWriter<PlaySfx>,
 ) {
-    let kit_sound =
-        |k: &Option<dusk_formats::spell::VisualKit>| k.as_ref().map(|k| k.sound.clone()).filter(|s| s.contains('.'));
+    let kit_sound = |k: &Option<dusk_formats::spell::VisualKit>| {
+        k.as_ref().map(|k| k.sound.trim().to_string()).filter(|s| !s.is_empty() && s != "0")
+    };
     for SpellNet(msg) in events.read() {
         match msg {
             ServerMsg::CastStart { caster, spell, .. } => {
@@ -926,86 +822,63 @@ mod tests {
     }
 
     #[test]
-    fn config_ini() {
+    fn env_volumes() {
         let mut s = AudioSettings::default();
-        s.apply_config("[Audio]\nEnableMusic=0\nEnableSfx=1\nVolumeMusic=40\nVolumeSfx = 250\nOther=3\n");
-        assert!(!s.music_on && s.sfx_on);
+        let env = |name: &str| match name {
+            "DUSK_MUSIC_VOLUME" => Some("40".to_string()),
+            "DUSK_SFX_VOLUME" => Some(" 250 ".to_string()),
+            _ => None,
+        };
+        s.apply_env(env);
+        assert_eq!((s.music_volume, s.sfx_volume), (0.4, 1.0));
+        s.apply_env(|_| Some("loud".to_string()));
         assert_eq!((s.music_volume, s.sfx_volume), (0.4, 1.0));
     }
 
     #[test]
-    fn playlist_precedence() {
+    fn map_music_or_soundtrack() {
         let playable = |t: &str| t != "missing.ogg";
-        let area = vec![];
-        let zone = vec!["missing.ogg".to_string(), "z.ogg".to_string()];
-        let map = vec!["m.ogg".to_string()];
-        assert_eq!(choose_playlist(&[Some(&area), Some(&zone)], &map, playable), ["z.ogg"]);
-        let only_missing = vec!["missing.ogg".to_string()];
-        assert_eq!(choose_playlist(&[None, Some(&only_missing)], &map, playable), ["m.ogg"]);
+        let soundtrack = vec!["a.mp3".to_string(), "b.mp3".to_string()];
+        let own = vec!["missing.ogg".to_string(), "m.ogg".to_string()];
+        assert_eq!(map_playlist(&own, &soundtrack, playable), ["m.ogg"]);
+        assert_eq!(map_playlist(&own[..1], &soundtrack, playable), soundtrack);
+        assert_eq!(map_playlist(&[], &soundtrack, playable), soundtrack);
     }
 
-    /// Every sound the db or the client names decodes with Bevy's decoders (OGG/Vorbis + WAV).
+    /// Every sound our data and the client name (`content::sounds::referenced`) is one of our
+    /// files and decodes with Bevy's decoders (WAV, OGG/Vorbis, MP3).
     #[test]
     fn referenced_sounds_decode() {
         use bevy::audio::{AudioSource, Decodable};
-        let root = dusk_formats::legacy_root();
-        let Ok(db) = dusk_formats::db::GameDb::open(root.join("game.db")) else { return };
-        let index = dusk_formats::FileIndex::load(root.join("file_index.txt")).unwrap();
-        let mut names: Vec<String> = db.referenced_sounds().unwrap().into_iter().map(|(_, n)| n).collect();
-        names.extend(builtin::all().into_iter().map(str::to_string));
+        let root = dusk_formats::content_root();
+        let index = dusk_formats::content::sounds::index(&root);
+        let refs = dusk_formats::content::sounds::referenced(&root, &index).unwrap();
+        let mut names: Vec<&str> = refs.iter().map(|(_, n)| n.as_str()).collect();
         names.sort();
         names.dedup();
         let mut failed = Vec::new();
-        let mut decoded = 0;
-        for name in names {
-            let Some(rel) = resolve_sound(&index, &name) else { continue };
+        for name in &names {
+            let Some(rel) = resolve_sound(&index, name) else {
+                failed.push(format!("{name}: missing"));
+                continue;
+            };
             let bytes = std::fs::read(root.join(rel)).unwrap();
             let source = AudioSource { bytes: bytes.into() };
-            let ok = std::panic::catch_unwind(|| source.decoder().take(4096).count() > 0).unwrap_or(false);
-            if ok {
-                decoded += 1;
-            } else {
-                failed.push(rel.to_string());
+            if !std::panic::catch_unwind(|| source.decoder().take(4096).count() > 0).unwrap_or(false) {
+                failed.push(format!("{rel}: does not decode"));
             }
         }
-        assert!(failed.is_empty(), "undecodable sounds: {failed:?}");
-        assert!(decoded > 200, "only {decoded} sounds decoded");
+        assert!(failed.is_empty(), "{failed:#?}");
+        assert!(names.len() > 60, "only {} sounds referenced", names.len());
     }
 
     #[test]
-    fn proximity_from_map_sprites() {
-        use dusk_formats::map::{Cell, TileLayer};
-        use dusk_formats::sound::ProximitySound;
-        let layer = |t| Some(TileLayer { texture: t, param: 0 });
-        let map = MapFile {
-            size: 13,
-            textures: vec!["grass.png".into(), "Campfire_01.png".into(), "water_shallow.png".into()],
-            cells: vec![
-                Cell { x: 2, y: 3, flags: 0, layers: [layer(0), None, layer(1)] },
-                Cell { x: 5, y: 5, flags: 0, layers: [layer(2), None, None] },
-                Cell { x: 6, y: 5, flags: 0, layers: [layer(2), None, None] },
-            ],
-            terrain_textures: vec![],
-            terrain: vec![],
-            zones: vec![],
-            areas: vec![],
-        };
-        let mut tables = SoundTables::default();
-        for (sprite, sound, radius) in
-            [("campfire_01.png", "fireplace.ogg", 4.0), ("water_shallow.png", "ambient_water_lake.ogg", 2.0)]
-        {
-            tables.proximity.insert(sprite.into(), ProximitySound { sound: sound.into(), radius });
-        }
-        let groups = proximity_groups(&map, &tables);
-        assert_eq!(groups.len(), 2);
-        assert_eq!((groups[0].sound.as_str(), groups[0].points.len()), ("ambient_water_lake.ogg", 2));
-        assert_eq!(
-            (groups[1].sound.as_str(), groups[1].points.as_slice()),
-            ("fireplace.ogg", &[Vec2::new(2.5, 3.5)][..])
-        );
-        assert_eq!(proximity_gain(&groups[1].points, 4.0, Vec2::new(2.5, 3.5)), 1.0);
-        assert!((proximity_gain(&groups[1].points, 4.0, Vec2::new(4.5, 3.5)) - 0.5).abs() < 1e-6);
-        assert_eq!(proximity_gain(&groups[0].points, 2.0, Vec2::new(20.0, 20.0)), 0.0);
+    fn proximity_falloff() {
+        let points = [Vec2::new(2.5, 3.5)];
+        assert_eq!(proximity_gain(&points, 4.0, Vec2::new(2.5, 3.5)), 1.0);
+        assert!((proximity_gain(&points, 4.0, Vec2::new(4.5, 3.5)) - 0.5).abs() < 1e-6);
+        assert_eq!(proximity_gain(&points, 2.0, Vec2::new(20.0, 20.0)), 0.0);
+        assert_eq!(proximity_gain(&points, 0.0, Vec2::new(2.5, 3.5)), 0.0);
     }
 
     #[test]

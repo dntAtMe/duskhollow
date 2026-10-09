@@ -13,12 +13,14 @@ python -I tools/sfxgen/sfxgen.py --preview        # + spectrograms in custom_ass
 python -I tools/sfxgen/sfxgen.py --check          # analyse the files on disk only
 ```
 
-Designs are in `tools/sfxgen/sounds.py` (one function per file, fixed seeds, so output is
-reproducible); DSP helpers in `tools/sfxgen/dsp.py`. Every file is mastered to an active-RMS
-target (`TARGETS` in sounds.py: one-shots -18 dBFS, ambience loops and footsteps -24, quiet
-cues in between) and soft-limited to a -1 dBFS peak. The script prints peak, loudness,
+Designs are in `tools/sfxgen/sounds.py` (ambience, gaze, story cues, footsteps, Duskhollow
+voices) and `tools/sfxgen/sounds_game.py` (combat, UI, spell kits, glade creatures); one
+function or generated variant per file, fixed seeds, so output is reproducible. DSP helpers
+in `tools/sfxgen/dsp.py`. Every file is mastered to an active-RMS
+target (`TARGETS` in sounds.py / sounds_game.py: one-shots -18 dBFS, ambience loops and footsteps
+-24, UI -27 to -29, quiet cues in between) and soft-limited to a -1 dBFS peak. The script prints peak, loudness,
 spectral centroid, DC, loop-seam continuity and high-frequency transients, and fails on
-clipping, DC, edge clicks, seam jumps or a total size over 12 MB.
+clipping, DC, edge clicks, seam jumps or a total size over 16 MB.
 
 Loops (`amb_*`, `loop_*`) are periodic by construction: every source has the loop length as
 period, filters run on a tiled copy and reverb is a circular convolution, so the last sample
@@ -33,9 +35,16 @@ flows into the first.
 | Cairn | `cairn_kindle`, `cairn_rest`, `loop_cairn_fire` (loop) |
 | Quests, UI, stings | `quest_accept`, `quest_progress`, `quest_complete`, `dialogue_open`, `title_sting`, `end_sting`, `hit_heavy` |
 | Ambience loops | `amb_open_sky`, `amb_shelter`, `amb_eye_open` |
-| NPC voices | `npc_{glarewolf,stooped,hollowed_warden}_{aggro,attack,hit,death}`, `npc_{cairnkeeper,lightworker,lowshade_guard}_greet` |
+| Duskhollow voices | `npc_{glarewolf,stooped,hollowed_warden}_{aggro,attack,hit,death}`, `npc_{cairnkeeper,lightworker,lowshade_guard}_greet` |
 | Footsteps | `foot_{dirt,stone}_{1..4}` |
+| Melee results | `hit_npc_{1..4}`, `hit_blade_{1..4}`, `hit_blunt_{1..4}`, `miss`, `dodge`, `parry`, `block_{1..3}`, `player_hurt_{1..3}` |
+| Alerts and UI | `level_up`, `ui_click`, `ui_target`, `ui_window_open`, `ui_window_close`, `item_use` |
+| Spell kits | `spell_{heavy_slash,bleed_hit,skull_crack,dash,blade_hit,ground_slam,knife_throw,fire_cast,ember_whoosh,ember_burst,hook_throw,hook_hit,bow_draw,arrow_release,arrow_hit,ember_heal,veil,warden_sweep,warden_roar}` |
+| Glade creatures | `npc_{goblin,spider,antlion_small}_{aggro,attack,hit,death}` |
 
-Adding an NPC voice: write `def npc_<model>_<event>()` in sounds.py (events `aggro`, `attack`,
+The event sound names are the constants of `dusk_formats::sound::builtin`; kits name theirs in
+`data/spell_visuals.txt` (`sound=spell_veil`).
+
+Adding an NPC voice: write `def npc_<model>_<event>()` in sounds.py or sounds_game.py (events `aggro`, `attack`,
 `hit`, `death`, `greet`; optional variants `_1`..`_4`) and regenerate; the client picks it up
 by model name.
