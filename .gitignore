@@ -1,8 +1,6 @@
 /target
-# Extracted original game assets (copyrighted, produced by `cargo run -p dusk_extract`)
-/assets
-# generated previews (python -I tools/artgen/character.py)
-/custom_assets/preview
+# generated previews (python -I tools/artgen/character.py --preview, sfxgen spectrograms)
+/assets/preview
 /_run_*.exe
 /.claude/
 __pycache__/
