@@ -1,12 +1,6 @@
-//! Map sidecars of our maps (`.spawns`, `.markers`, `.cover`); the data files are read by
-//! `crate::content`.
+//! Map sidecars: `maps/<name>.spawns`, `.markers` and `.cover` next to `maps/<name>.map`.
 
-use crate::db::NpcSpawn;
-use crate::spell::SpellTemplate;
-use std::path::Path;
-
-/// Prefix of our maps (`custom_assets/maps`), as opposed to legacy ones.
-pub const CUSTOM_MAP_PREFIX: &str = "custom_";
+use super::types::NpcSpawn;
 
 /// Parses a `maps/<name>.spawns` sidecar: `entry x y orientation wander_distance` per line,
 /// `#` comments. Spawns get synthetic guids from `first_guid` and wander if the distance is > 0.
@@ -32,23 +26,7 @@ pub fn parse_spawns(text: &str, map: i64, first_guid: i64) -> Vec<NpcSpawn> {
         .collect()
 }
 
-/// First NPC template entry (and model id) of `data/npc_templates.txt` ([`crate::content::npcs`]).
-pub const CUSTOM_NPC_FIRST: i64 = 50000;
-
-/// First spell entry of `data/spells.txt` ([`crate::content::spells`]).
-pub const CUSTOM_SPELL_FIRST: i64 = crate::content::spells::FIRST_SPELL;
-
-/// Parses `data/spells.txt` text (see [`crate::content::spells`]); empty on errors.
-pub fn parse_spells(text: &str) -> Vec<SpellTemplate> {
-    crate::content::sections::parse(text).and_then(|s| crate::content::spells::parse(&s)).unwrap_or_default()
-}
-
-/// Loads `<root>/data/spells.txt` (empty if missing or broken).
-pub fn load_spells(root: &Path) -> Vec<SpellTemplate> {
-    std::fs::read_to_string(root.join("data/spells.txt")).map(|t| parse_spells(&t)).unwrap_or_default()
-}
-
-/// A named point of a custom map (`maps/<name>.markers`: `name x y [radius]` per line, cells).
+/// A named point of a map (`maps/<name>.markers`: `name x y [radius]` per line, cells).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Marker {
     pub name: String,

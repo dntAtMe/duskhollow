@@ -11,7 +11,7 @@
 //! - `data/class_spells.txt`: `[class]` with `spell=<entry>` (repeat, in order).
 
 use super::sections::{self, Section};
-use crate::db::{ClassStats, ExpLevel};
+use super::types::{ClassStats, ExpLevel};
 use crate::item::{self, stat, weapon};
 use crate::spell::{FormulaVars, eval_formula};
 use anyhow::{Context, bail};
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn shipped_rules_are_valid() {
-        let root = crate::content_root();
+        let root = crate::assets_root();
         let data = root.join("data");
         for (file, keys) in [("classes.txt", CLASS_KEYS), ("exp.txt", EXP_KEYS), ("class_spells.txt", CLASS_SPELL_KEYS)]
         {
@@ -210,7 +210,7 @@ mod tests {
     /// Levels 1-6 stay within 10 % of the pacing the game was tuned with.
     #[test]
     fn early_pacing_is_kept() {
-        let r = load(&crate::content_root()).unwrap();
+        let r = load(&crate::assets_root()).unwrap();
         let tuned = [(100, 20), (100, 20), (123, 24), (150, 30), (195, 39), (267, 44)];
         for (l, (exp, kill)) in r.exp_levels.iter().zip(tuned) {
             assert!((l.exp as f32 / exp as f32 - 1.0).abs() <= 0.1, "level {} exp {}", l.level, l.exp);

@@ -21,7 +21,7 @@ use bevy::image::ImageSampler;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use std::collections::HashMap;
 
 pub struct MinimapPlugin;

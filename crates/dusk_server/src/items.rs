@@ -42,7 +42,7 @@ pub struct ItemData {
 }
 
 impl ItemData {
-    /// `root`: our content root.
+    /// `root`: the asset root.
     pub fn load(root: &Path) -> anyhow::Result<Self> {
         use dusk_formats::content;
         let tables = content::items::load(root)?;
@@ -704,7 +704,7 @@ mod tests {
 
     #[test]
     fn loot_rolls_are_sane_on_real_data() {
-        let d = ItemData::load(&dusk_formats::content_root()).unwrap();
+        let d = ItemData::load(&dusk_formats::assets_root()).unwrap();
         let mut rng = Rng::default();
         let (mut gold, mut drops) = (0, 0);
         for i in 0..2000 {

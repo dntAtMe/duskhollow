@@ -31,7 +31,7 @@ pub mod aura {
     pub const MODIFY_MOVE_SPEED_PCT: i64 = 11;
     pub const MODIFY_DMG_DEALT_PCT: i64 = 14;
     pub const MODIFY_DMG_RECEIVED_PCT: i64 = 15;
-    /// Ours (not a legacy aura type): percent change to gaze strain gain (data3, e.g. -50).
+    /// Percent change to gaze strain gain (data3, e.g. -50).
     pub const MODIFY_STRAIN_GAIN_PCT: i64 = 100;
 }
 

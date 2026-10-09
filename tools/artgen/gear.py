@@ -3,7 +3,7 @@
 Usage (from repo root):  python -I tools/artgen/gear.py [model ...]
 
 Every layer is rendered with the adventurer's skeleton and animations (character.py) and written
-under the original item model name (`item_template.model`), e.g. `scripts/player/custom/leather_chest.txt`,
+under the original item model name (`item_template.model`), e.g. `scripts/player/leather_chest.txt`,
 so equipping any item with that model shows our art (client: `--art custom`).
 
 Layers are depth-tested against the body: a gear pixel is kept only where the gear is in front of

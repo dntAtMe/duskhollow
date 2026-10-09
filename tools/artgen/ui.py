@@ -12,7 +12,7 @@ so each image keeps the original pixel size and puts its wells / bar tracks / bu
 holes exactly where the client expects them; the numbers are repeated next to each
 generator below.
 
-Output: `custom_assets/content/override/ui/<original name>.png`; with `--art custom`
+Output: `custom_assets/content/ui/<original name>.png`; with `--art custom`
 the client resolves these instead of the originals (same bare file name).
 
     python -I tools/artgen/ui.py              # write the override set

@@ -289,8 +289,8 @@ pub fn spawn_unit(
     Some(parent)
 }
 
-/// NPC sprite scripts: `scripts/npc/custom/<model>.txt` (tools/artgen/creatures.py).
-const NPC_DIR: &str = "npc/custom";
+/// NPC sprite scripts: `scripts/npc/<model>.txt` (tools/artgen/creatures.py).
+const NPC_DIR: &str = "npc";
 
 /// Spawns an NPC by `npc_template.entry` at a cell position.
 pub fn spawn_npc(

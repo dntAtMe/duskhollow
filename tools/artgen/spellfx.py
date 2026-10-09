@@ -18,11 +18,11 @@ resolution (canvas / ratio) and blown up by `ratio` with nearest neighbour, so t
 the client's 1/sqrt(ratio) draw scale.
 
 Output:
-- `custom_assets/scripts/override/animation/<name>.sa`, `filename=sfx_<name>`:
-- `custom_assets/content/custom/spellfx/sfx_*_<n>.png`: trimmed, palettized frames on opaque
+- `custom_assets/scripts/animation/<name>.sa`, `filename=sfx_<name>`:
+- `custom_assets/content/spellfx/sfx_*_<n>.png`: trimmed, palettized frames on opaque
   black (the client luma-keys those = additive look). Quest markers / arrows / the obelisk are
   drawn with real alpha instead.
-- `custom_assets/content/custom/fx/fx_particles.png`: 128x128 atlas of 16 white 32x32 particle
+- `custom_assets/content/fx/fx_particles.png`: 128x128 atlas of 16 white 32x32 particle
   sprites (`sprite=<cell>` in `data/particles.txt`), alpha in 5 dithered steps.
 - `custom_assets/preview/spellfx_*.png`: contact sheets (gitignored).
 """

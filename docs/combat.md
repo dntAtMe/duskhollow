@@ -137,7 +137,7 @@ Player skills 50001.., auto attacks 50100/50101, item spells 50110.., NPC spells
 `custom_assets/data/class_spells.txt` lists what each class knows (`[class]`, `spell=` lines).
 Visuals are in `custom_assets/data/spell_visuals.txt` (`[spell N]` sections,
 `dusk_formats::content::visuals`); icons come from `python -I tools/artgen/icons.py --custom-spells`
-(`content/custom/icons/spells/skill_<name>.png`).
+(`content/icons/spells/skill_<name>.png`).
 
 Aura type **100 ModifyStrainGainPct** is ours: data3 percent applied to positive gaze strain gains
 (Draw the Veil: −50 %). Tested end to end in `dusk_server::spells::skill_tests`.

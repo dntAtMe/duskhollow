@@ -2,7 +2,7 @@
 
 Usage (from repo root):  python -I tools/artgen/portraits.py
 
-Writes `custom_assets/content/custom/portraits/portrait_custom_<model>.png` (80x80, the HUD uses
+Writes `custom_assets/content/portraits/portrait_custom_<model>.png` (80x80, the HUD uses
 small portraits whole and cuts the circle itself). The client prefers these with `--art custom`.
 """
 

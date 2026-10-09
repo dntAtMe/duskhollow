@@ -6,7 +6,7 @@
 #   ambience  ambience loop; empty = none
 #   darkness  0 = full light .. 1 = black
 
-[custom_duskhollow]
+[duskhollow]
 id=10000
 title=Duskhollow
 default=1
@@ -14,7 +14,7 @@ music=
 ambience=
 darkness=0
 
-[custom_glade]
+[glade]
 id=10001
 title=The Glade
 music=

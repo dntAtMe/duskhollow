@@ -1,5 +1,5 @@
 //! Player sprites reflect equipped gear: every equipped item with a `model` adds the sprite
-//! layer `scripts/player/custom/<model>.txt` on top of the base body (`custom_body`).
+//! layer `scripts/player/<model>.txt` on top of the base body (`custom_body`).
 //!
 //! Driven by `ServerMsg::Appearance` (item entries per equipment slot) for every player,
 //! including ourselves; templates come from the client's item table, so the server only
@@ -27,8 +27,8 @@ impl Plugin for PaperDollPlugin {
     }
 }
 
-/// Sprite scripts of the player paper doll (`scripts/player/custom/<model>.txt`, tools/artgen/gear.py).
-pub const PLAYER_DIR: &str = "player/custom";
+/// Sprite scripts of the player paper doll (`scripts/player/<model>.txt`, tools/artgen/gear.py).
+pub const PLAYER_DIR: &str = "player";
 /// The base body under all gear.
 pub const PLAYER_BODY: &str = "custom_body";
 

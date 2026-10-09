@@ -20,7 +20,7 @@ use crate::{
 use bevy::input::InputSystems;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use dusk_protocol::{ClientMsg, EntityId, QuestMarker, ServerMsg};
 use std::collections::HashMap;
 

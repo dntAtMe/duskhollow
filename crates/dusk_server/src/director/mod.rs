@@ -20,8 +20,8 @@ use crate::world::{
     Dead, Faction, GameWorld, Hidden, Home, Motion, NetId, NetIndex, Npc, OnMap, Outbox, Player, Scope, entity_info,
 };
 use bevy::prelude::*;
-use dusk_formats::custom::{Marker, parse_markers};
-use dusk_formats::db::faction;
+use dusk_formats::content::sidecars::{Marker, parse_markers};
+use dusk_formats::content::types::faction;
 use dusk_protocol::{ClientMsg, EntityId, Item, QuestMarker, ServerMsg};
 use script::{Action, Outcome, Progress, entry};
 use std::collections::HashMap;

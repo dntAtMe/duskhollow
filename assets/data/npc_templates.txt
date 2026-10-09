@@ -1,4 +1,4 @@
-# Every NPC template (entries >= 50000; dusk_formats::content::npcs). Models: scripts/npc/custom
+# Every NPC template (entries >= 50000; dusk_formats::content::npcs). Models: scripts/npc
 # (tools/artgen/valefolk.py, creatures.py). Factions: 1 friendly, 2 neutral (only fights back),
 # 3 hostile. Unset health / weapon_value derive from the level (stats.rs).
 # Loot: junk=<items> (data/items.txt 100-199), loot=<table> (data/loot.txt),
@@ -115,7 +115,7 @@ health=420
 weapon_value=16
 armor=90
 
-# --- the glade (custom_glade) ---
+# --- the glade ---
 
 [50020]
 name=Ditch Gnawer

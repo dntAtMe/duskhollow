@@ -16,7 +16,7 @@ use crate::{
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use dusk_protocol::{EntityId, HitResult, ServerMsg};
 
 pub const HITSTOP: bool = true;

@@ -4,7 +4,7 @@ use crate::ai::Rng;
 use crate::stats::{Stats, npc_stats};
 use bevy::prelude::*;
 use dusk_formats::{
-    db::{ClassStats, ExpLevel, NpcTemplate},
+    content::types::{ClassStats, ExpLevel, NpcTemplate},
     map::{MapFile, WalkGrid},
     spell::SpellTemplate,
 };
@@ -26,7 +26,7 @@ pub struct GameWorld {
     pub exp_levels: Vec<ExpLevel>,
     pub spells: HashMap<i64, SpellTemplate>,
     /// NPC spawns by map id (`dusk_formats::content::maps::spawns`).
-    pub spawns: HashMap<i64, Vec<dusk_formats::db::NpcSpawn>>,
+    pub spawns: HashMap<i64, Vec<dusk_formats::content::types::NpcSpawn>>,
     /// class -> starting spells (`data/class_spells.txt`)
     pub class_spells: HashMap<i64, Vec<i64>>,
     /// New characters (and the dead) appear here.
@@ -35,7 +35,7 @@ pub struct GameWorld {
 }
 
 impl GameWorld {
-    /// `root`: our content root ([`dusk_formats::content_root`]). `start_map`: override the
+    /// `root`: the asset root ([`dusk_formats::assets_root`]). `start_map`: override the
     /// spawn map (offline play); default is the default map's start point.
     pub fn load(root: &Path, start_map: Option<&str>) -> anyhow::Result<Self> {
         use dusk_formats::content;
@@ -132,7 +132,7 @@ pub struct Npc {
     pub entry: i64,
 }
 
-/// NPC template `faction` (see `dusk_formats::db::faction`); players use PLAYER_DEFAULT.
+/// NPC template `faction` (see `dusk_formats::content::types::faction`); players use PLAYER_DEFAULT.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub struct Faction(pub i64);
 

@@ -2,7 +2,7 @@
 
 Usage (from repo root):  python -I tools/artgen/lightfx.py
 
-Writes to `custom_assets/content/custom/fx/`:
+Writes to `custom_assets/content/fx/`:
 - `fx_light_glow.png` (422x193): the additive glow drawn on (and around) a light, tinted with the
   light's colour and scaled by its scale. White with an elliptical falloff (2.2 : 1, flattened like
   ground light in the isometric view), peak alpha ~0.38, Bayer-dithered alpha steps.

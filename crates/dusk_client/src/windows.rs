@@ -33,7 +33,7 @@ use bevy::input::InputSystems;
 use bevy::prelude::*;
 use bevy::ui::{RelativeCursorPosition, UiSystems};
 use bevy::window::{CursorIcon, PrimaryWindow, SystemCursorIcon};
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use std::collections::HashMap;
 
 pub struct WindowsPlugin;

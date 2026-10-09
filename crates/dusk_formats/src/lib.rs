@@ -1,11 +1,9 @@
-//! Parsers for our content and the legacy data files. Engine-agnostic: no Bevy here,
-//! so both client and server (and tests) can use them.
+//! Parsers for our content. Engine-agnostic: no Bevy here, so both client and server (and tests)
+//! can use them.
 //!
-//! See `docs/formats.md` for the reverse-engineered layouts.
+//! See `docs/content.md` for every file format and how to add content.
 
 pub mod content;
-pub mod custom;
-pub mod db;
 pub mod item;
 pub mod map;
 pub mod path;
@@ -19,134 +17,136 @@ pub mod sprite_script;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-/// Asset-source prefix of files served from [`legacy_root`] (registered by the client as a
-/// Bevy asset source; [`fs_path`] maps it back to a filesystem path).
-pub const LEGACY_SOURCE: &str = "legacy://";
-
-/// Our own content (data, maps, scripts, art produced by `tools/artgen`):
-/// `$DUSK_CUSTOM_ASSETS`, else `<workspace>/custom_assets`, else `custom_assets/` next to the
-/// executable.
-pub fn content_root() -> PathBuf {
-    if let Some(p) = std::env::var_os("DUSK_CUSTOM_ASSETS") {
+/// The asset root (`data/`, `maps/`, `scripts/`, `content/`): `$DUSK_ASSETS`, else
+/// `<workspace>/assets` (dev builds), else `assets/` next to the executable.
+pub fn assets_root() -> PathBuf {
+    if let Some(p) = std::env::var_os("DUSK_ASSETS") {
         return PathBuf::from(p);
     }
-    let dev = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../custom_assets");
-    if dev.exists() {
-        return dev.canonicalize().unwrap_or(dev);
-    }
-    std::env::current_exe()
-        .ok()
-        .and_then(|e| e.parent().map(|p| p.join("custom_assets")))
-        .unwrap_or_else(|| "custom_assets".into())
-}
-
-/// The legacy data pack (`game.db`, `file_index.txt`, legacy maps/scripts/content):
-/// `$DUSK_LEGACY`, else `$DUSK_ASSETS`, else `<workspace>/assets` (dev builds), else `assets/`
-/// next to the executable.
-pub fn legacy_root() -> PathBuf {
-    for var in ["DUSK_LEGACY", "DUSK_ASSETS"] {
-        if let Some(p) = std::env::var_os(var) {
-            return PathBuf::from(p);
-        }
-    }
     let dev = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
-    if dev.join("game.db").exists() {
+    if dev.join("data").exists() {
         return dev.canonicalize().unwrap_or(dev);
     }
     std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.join("assets"))).unwrap_or_else(|| "assets".into())
 }
 
-/// Alias of [`legacy_root`] (legacy tests and tools).
-pub fn assets_root() -> PathBuf {
-    legacy_root()
-}
-
-/// `DUSK_LEGACY_LOG=1`: prints every distinct legacy access once (`[legacy] kind: what`), the
-/// runtime inventory of what still comes from the legacy data pack.
-pub fn legacy_log_enabled() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("DUSK_LEGACY_LOG").is_ok_and(|v| v == "1"))
-}
-
-/// Records one legacy access (see [`legacy_log_enabled`]); repeated accesses print once.
-pub fn legacy_note(kind: &str, what: impl std::fmt::Display) {
-    if !legacy_log_enabled() {
-        return;
-    }
-    static SEEN: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<String>>> = std::sync::OnceLock::new();
-    let line = format!("{kind}: {what}");
-    if SEEN.get_or_init(Default::default).lock().unwrap().insert(line.clone()) {
-        eprintln!("[legacy] {line}");
-    }
-}
-
-/// Filesystem path of an asset path as returned by [`FileIndex::resolve`]: `legacy://<rel>` is
-/// under [`legacy_root`] (logged), anything else under [`content_root`].
-pub fn fs_path(rel: &str) -> PathBuf {
-    match rel.strip_prefix(LEGACY_SOURCE) {
-        Some(rest) => {
-            legacy_note("file", rest);
-            legacy_root().join(rest)
-        }
-        None => content_root().join(rel),
-    }
-}
-
-/// `<root>/<rel>` if it exists, else the legacy file of the same relative path (logged), else
-/// `None`. Scripts and maps are read this way.
+/// `<root>/<rel>` if it exists. Scripts and maps are read this way.
 pub fn find_file(root: &Path, rel: &str) -> Option<PathBuf> {
-    let own = root.join(rel);
-    if own.exists() {
-        return Some(own);
-    }
-    let legacy = legacy_root().join(rel);
-    legacy.exists().then(|| {
-        legacy_note("file", rel);
-        legacy
-    })
+    let p = root.join(rel);
+    p.exists().then_some(p)
 }
 
-/// Basename -> asset path lookup (the legacy `file_index.txt` plus our content files).
-/// The original client resolves textures by bare, case-insensitive filename.
+/// Basename -> asset path lookup over every file under `<root>/content`. Data files, maps and
+/// sprite scripts name art, sounds and fonts by bare, case-insensitive file name.
 #[derive(Debug, Default, Clone)]
 pub struct FileIndex {
     map: HashMap<String, String>,
 }
 
+/// Files that are never looked up by bare name: metadata written next to the art
+/// (`sprite_fx.txt`, `hotspots.txt`, `roofs.txt`) and notes (`README.md`).
+fn indexed(name: &str) -> bool {
+    let n = name.to_lowercase();
+    !(n.ends_with(".txt") || n.ends_with(".md"))
+}
+
 impl FileIndex {
-    pub fn load(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        Self::load_prefixed(path, "")
-    }
-
-    /// Like [`FileIndex::load`], with `prefix` (e.g. [`LEGACY_SOURCE`]) put before every path.
-    pub fn load_prefixed(path: impl AsRef<Path>, prefix: &str) -> std::io::Result<Self> {
-        let text = std::fs::read_to_string(path)?;
-        let map = text
-            .lines()
-            .filter_map(|l| l.split_once('\t'))
-            .map(|(k, v)| (k.to_string(), format!("{prefix}{v}")))
-            .collect();
-        Ok(Self { map })
-    }
-
-    /// The legacy `file_index.txt` of [`legacy_root`], every path as `legacy://<rel>` (empty if
-    /// there is no legacy data).
-    pub fn load_legacy() -> Self {
-        let path = legacy_root().join("file_index.txt");
-        if !path.exists() {
-            return Self::default();
+    /// Walks `<root>/content`; paths are relative to `root` with `/` separators. Two indexed
+    /// files with the same case-insensitive name are an error (a bare name must be unambiguous).
+    pub fn scan(root: &Path) -> anyhow::Result<Self> {
+        let mut index = Self::default();
+        let mut stack = vec![root.join("content")];
+        let mut dupes = Vec::new();
+        while let Some(dir) = stack.pop() {
+            let entries = std::fs::read_dir(&dir).map_err(|e| anyhow::anyhow!("{}: {e}", dir.display()))?;
+            for e in entries.flatten() {
+                let path = e.path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                let name = e.file_name().to_string_lossy().into_owned();
+                if !indexed(&name) {
+                    continue;
+                }
+                let Ok(rel) = path.strip_prefix(root) else { continue };
+                let rel = rel.to_string_lossy().replace('\\', "/");
+                if let Some(old) = index.map.insert(name.to_lowercase(), rel.clone()) {
+                    dupes.push(format!("{old} and {rel}"));
+                }
+            }
         }
-        legacy_note("file", "file_index.txt");
-        Self::load_prefixed(path, LEGACY_SOURCE).unwrap_or_default()
+        if !dupes.is_empty() {
+            dupes.sort();
+            anyhow::bail!("duplicate file names under {}/content: {}", root.display(), dupes.join(", "));
+        }
+        Ok(index)
     }
 
-    /// Adds (or overrides) a basename -> relative path entry.
+    /// Adds (or replaces) a basename -> relative path entry.
     pub fn insert(&mut self, name: &str, rel: &str) {
         self.map.insert(name.to_lowercase(), rel.replace('\\', "/"));
     }
 
-    /// Asset path: relative to [`content_root`], or `legacy://<path relative to legacy_root>`.
+    /// Asset path relative to the asset root.
     pub fn resolve(&self, name: &str) -> Option<&str> {
         self.map.get(&name.to_lowercase()).map(String::as_str)
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    /// Every `(lowercase name, path)`.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.map.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tree(name: &str, files: &[&str]) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("dusk_index_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for f in files {
+            let p = root.join(f);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, b"x").unwrap();
+        }
+        root
+    }
+
+    #[test]
+    fn scan_indexes_bare_names() {
+        let root = tree(
+            "ok",
+            &["content/ui/A.png", "content/sfx/hit.wav", "content/env/sprite_fx.txt", "content/vale/sprite_fx.txt"],
+        );
+        let index = FileIndex::scan(&root).unwrap();
+        assert_eq!(index.resolve("a.PNG"), Some("content/ui/A.png"));
+        assert_eq!(index.resolve("hit.wav"), Some("content/sfx/hit.wav"));
+        assert_eq!(index.resolve("sprite_fx.txt"), None, "metadata is not indexed");
+        assert_eq!(index.len(), 2);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn scan_rejects_duplicate_names() {
+        let root = tree("dupe", &["content/ui/a.png", "content/sprites/A.png"]);
+        let err = FileIndex::scan(&root).unwrap_err().to_string();
+        assert!(err.contains("duplicate") && err.contains("a.png") && err.contains("A.png"), "{err}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn shipped_content_has_unique_names() {
+        let index = FileIndex::scan(&assets_root()).unwrap();
+        assert!(index.len() > 1000);
     }
 }

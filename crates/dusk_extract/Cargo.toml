@@ -1,9 +1,0 @@
-[package]
-name = "dusk_extract"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-
-[dependencies]
-zip.workspace = true
-anyhow.workspace = true

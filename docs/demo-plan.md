@@ -1,10 +1,10 @@
 # Demo plan: "First Gaze"
 
-A 10–15 minute playable slice on a new map, `custom_duskhollow`, with `--art custom`. Lore and art
+A 10–15 minute playable slice on a new map, `duskhollow`, with `--art custom`. Lore and art
 rules: [world.md](world.md).
 
 ```bash
-cargo run -p dusk_client -- custom_duskhollow --art custom
+cargo run -p dusk_client -- duskhollow --art custom
 ```
 
 ## The run
@@ -50,14 +50,14 @@ back".
 
 ## Contracts between work streams
 
-- **Map files**: `custom_assets/maps/custom_duskhollow.{map,spawns,cover,markers}`. `.cover` is
+- **Map files**: `custom_assets/maps/duskhollow.{map,spawns,cover,markers}`. `.cover` is
   plain text: first line `W H`, then H rows of W chars (row = cell y, column = cell x); parsed by
-  `dusk_formats::custom::CoverGrid`. `.markers` is `name x y [radius]` per line
-  (`dusk_formats::custom::parse_markers`); demo names: `arrival`, `lowshade`, `red_fields`,
+  `dusk_formats::content::sidecars::CoverGrid`. `.markers` is `name x y [radius]` per line
+  (`dusk_formats::content::sidecars::parse_markers`); demo names: `arrival`, `lowshade`, `red_fields`,
   `glare_gate`, `fallen_blade`, `still_pool`.
 - **NPC template format**: `[entry]` sections of `key=value` (see
-  `dusk_formats::custom::parse_npc_templates`); already merged into the server's and client's
-  template maps, with `model=` naming the sprite script in `scripts/npc/custom/`.
+  `dusk_formats::content::sidecars::parse_npc_templates`); already merged into the server's and client's
+  template maps, with `model=` naming the sprite script in `scripts/npc/`.
 - **Custom NPC templates**: `custom_assets/data/npc_templates.txt`, entries ≥ 50000, loaded by both
   server and client next to `game.db` templates. Reserved entries:
 
@@ -71,7 +71,7 @@ back".
   | 50011 | Lightworker | `lightworker` | friendly, wanders the fields, barks |
   | 50012 | Lowshade Guard | `lowshade_guard` | friendly, stands at the hamlet edge |
 
-- **Sound names** (`custom_assets/content/custom/sfx/<name>.wav`, played via `audio::PlaySfx` by
+- **Sound names** (`custom_assets/content/sfx/<name>.wav`, played via `audio::PlaySfx` by
   bare filename): `gaze_open`, `gaze_close`, `gaze_spot_enter`, `strain_heartbeat`,
   `strain_breath`, `strain_whisper`, `strain_overwhelm`, `cairn_kindle`, `cairn_rest`,
   `quest_accept`, `quest_progress`, `quest_complete`, `dialogue_open`, `title_sting`, `end_sting`,

@@ -50,7 +50,7 @@ fn main() {
                     println!("welcome #{your_id} on {map} at ({:.1}, {:.1})", p.x, p.y);
                     me = Some(your_id);
                     pos = p;
-                    let path = dusk_formats::content::maps::map_file(&dusk_formats::content_root(), &map, "map")
+                    let path = dusk_formats::content::maps::map_file(&dusk_formats::assets_root(), &map, "map")
                         .expect("bot needs the map file");
                     grid = Some(MapFile::load(path).expect("bot needs the map file").walk_grid());
                 }

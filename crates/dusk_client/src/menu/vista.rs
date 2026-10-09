@@ -1,4 +1,4 @@
-//! The living backdrop of the main menu: the real `custom_duskhollow` map around Lowshade's
+//! The living backdrop of the main menu: the real `duskhollow` map around Lowshade's
 //! cairn under a slow camera drift, the crimson grade and fire glows of the game, the Eye's
 //! lid breathing, embers rising, a dark vignette, and the title card.
 
@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 /// The vista map and the cell the camera drifts around (Lowshade's rest cairn, docs/world.md).
-pub const VISTA_MAP: &str = "custom_duskhollow";
+pub const VISTA_MAP: &str = "duskhollow";
 const VISTA_CELL: Vec2 = Vec2::new(17.0, 34.0);
 /// Drift: cells of sway and its (slow) angular speeds.
 const DRIFT: Vec2 = Vec2::new(4.5, 3.0);
@@ -50,7 +50,7 @@ fn rng(seed: &mut u32) -> f32 {
     (*seed % 10_000) as f32 / 10_000.0
 }
 
-/// Requests the vista map if another one is loaded (e.g. after a session on a legacy map).
+/// Requests the vista map if another one is loaded (e.g. after a session on another map).
 pub(super) fn request_map(
     mut map: ResMut<CurrentMap>,
     data: Res<crate::data::GameData>,

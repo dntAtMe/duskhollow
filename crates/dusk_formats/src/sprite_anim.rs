@@ -1,5 +1,5 @@
 //! `scripts/animation/*.sa` — spell/effect flipbooks, one PNG per frame
-//! (`<filename>_<n>.png` in `content/animations/*`).
+//! (`<filename>_<n>.png` in `content/spellfx/`, written by `tools/artgen/spellfx.py`).
 //!
 //! ```text
 //! ratio=4
@@ -11,7 +11,8 @@
 //!
 //! 1,39,43           // frame n, offset of trimmed image inside canvas
 //! ```
-//! `ratio` meaning unknown yet (scale divisor?).
+//! `ratio`: area ratio of the drawn frames to world pixels (the client draws them at
+//! `1 / sqrt(ratio)` scale).
 
 #[derive(Debug, Clone, Default)]
 pub struct SpriteAnim {

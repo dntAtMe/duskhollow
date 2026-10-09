@@ -10,7 +10,7 @@ in the "iron & oak" look of `ui.py`:
   (6 + 34 i, 6) and `ui_micro_icon_<name>.png` (22x22) icons: the micro-menu next to the
   action bar (character, inventory, abilities, journal, menu).
 
-Output: `custom_assets/content/custom/ui/` (our own names, always available).
+Output: `custom_assets/content/ui/` (our own names, always available).
 
     python -I tools/artgen/windows_ui.py
 """

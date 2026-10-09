@@ -4,7 +4,7 @@ Usage (from repo root):
     python -I tools/artgen/character.py            # writes custom_assets/...
     python -I tools/artgen/character.py --preview  # preview strips into custom_assets/preview/
 
-Output: `custom_assets/content/custom/custom_adventurer.png` + `custom_assets/scripts/player/custom/adventurer.txt`
+Output: `custom_assets/content/custom/custom_adventurer.png` + `custom_assets/scripts/player/adventurer.txt`
 using the same `[anim] frames= duration= type= frame=F,D,x,y,w,h,px,py` format as
 `scripts/player/male/*.txt` (see docs/formats.md), so the engine renders it like original sprites.
 """

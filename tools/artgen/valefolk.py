@@ -3,7 +3,7 @@
 Usage (from repo root):  python -I tools/artgen/valefolk.py [model ...]
 
 Same pipeline as creatures.py (SDF voxel models on a skeleton -> 8-direction sheets), written to
-`custom_assets/scripts/npc/custom/<model>.txt` + `content/custom/custom_npc_<model>.png`:
+`custom_assets/scripts/npc/<model>.txt` + `content/custom/custom_npc_<model>.png`:
 
 | model | who |
 |---|---|

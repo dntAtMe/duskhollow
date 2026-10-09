@@ -1,8 +1,8 @@
 //! Every sound our data and the client name (`content::sounds::referenced`: builtin event
 //! sounds and cues, spell kit sounds, sprite_sounds.txt, map music, the soundtrack, NPC voices)
-//! is one of our files with a valid container. Needs no legacy data.
+//! is one of our files with a valid container.
 
-use dusk_formats::{content::sounds, content_root, sound::resolve_sound};
+use dusk_formats::{content::sounds, assets_root, sound::resolve_sound};
 use std::io::Read;
 use std::path::Path;
 
@@ -28,7 +28,7 @@ fn check_header(path: &Path) -> Result<(), String> {
 
 #[test]
 fn referenced_sounds_exist_and_are_valid() {
-    let root = content_root();
+    let root = assets_root();
     let index = sounds::index(&root);
     let refs = sounds::referenced(&root, &index).unwrap();
     let mut problems = Vec::new();
@@ -53,7 +53,7 @@ fn referenced_sounds_exist_and_are_valid() {
 /// The generated effects stay within the size budget of `tools/sfxgen` (16 MB).
 #[test]
 fn sfx_size_budget() {
-    let dir = content_root().join("content/custom/sfx");
+    let dir = assets_root().join("content/sfx");
     let total: u64 = std::fs::read_dir(&dir)
         .unwrap()
         .flatten()
@@ -65,7 +65,7 @@ fn sfx_size_budget() {
 
 #[test]
 fn sprite_sounds_parse() {
-    let tables = sounds::load(&content_root()).unwrap();
-    assert!(tables.sprite_sounds.iter().any(|s| s.pattern == "custom_cairn*" && s.sound == "loop_cairn_fire.wav"));
+    let tables = sounds::load(&assets_root()).unwrap();
+    assert!(tables.sprite_sounds.iter().any(|s| s.pattern == "cg_campfire*" && s.sound == "loop_cairn_fire.wav"));
     assert!(tables.sprite_sounds.iter().all(|s| s.radius > 0.0));
 }

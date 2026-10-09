@@ -295,6 +295,7 @@ fn setup(
         model.addr = addr.clone();
     }
     model.maps = start_maps(&data);
+    // A saved map that no longer exists (e.g. renamed) falls back to the default map.
     model.map = model.maps.iter().position(|(m, _)| *m == settings.map).unwrap_or(0);
 }
 
@@ -302,11 +303,10 @@ fn setup(
 /// name. Labels are the map titles, else the name in words.
 fn start_maps(data: &GameData) -> Vec<(String, String)> {
     let default = dusk_formats::content::maps::default_map(&data.maps).map(|m| m.name.clone());
-    let mut maps: Vec<&dusk_formats::db::MapInfo> = data.maps.iter().collect();
+    let mut maps: Vec<&dusk_formats::content::types::MapInfo> = data.maps.iter().collect();
     maps.sort_by_key(|m| (Some(&m.name) != default.as_ref(), m.name.clone()));
     let label = |n: &str| {
-        let base = n.strip_prefix("custom_").unwrap_or(n);
-        base.split('_')
+        n.split('_')
             .map(|w| {
                 let mut c = w.chars();
                 c.next().map(|f| f.to_uppercase().chain(c).collect::<String>()).unwrap_or_default()

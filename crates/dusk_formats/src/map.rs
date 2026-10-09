@@ -10,29 +10,28 @@
 //!   u8  flags                  // FLAG_UNWALKABLE / FLAG_BLOCK (see consts)
 //!   layer[3]:
 //!     u8 present
-//!     if present: u32 texture, u32 param  // param: f32 in fanadin (0.6..1.0), meaning TBD
+//!     if present: u32 texture, u32 param  // param: unused (0)
 //! u32 terrain_texture_count
 //! cstr terrain_textures[..]
 //! if terrain_texture_count > 0:
 //!   u32 n; n * (u32 terrain_id, u32 terrain_texture)
-//! u32 n; n * (u32 terrain_id, u32 zone_id)      // zone_template.id
-//! u32 n; n * (u32 area_id,    u32 terrain_id)   // area_template.id
+//! u32 n; n * (u32 terrain_id, u32 zone_id)      // zone ids (parsed, unused)
+//! u32 n; n * (u32 area_id,    u32 terrain_id)   // area ids (parsed, unused)
 //! ```
 //!
 //! Terrain chunks are `TERRAIN_CHUNK` x `TERRAIN_CHUNK` cells on a grid of
 //! `size / TERRAIN_CHUNK` (integer division) per side; `terrain_id = row * w + col`.
 //! Each chunk draws one repeated texture centred (origin = texture centre) on the
 //! render position of cell `(col * 13, row * 13)`.
-//! Source: `GameMap::loadFromDisk` / `ClientMap::saveToDisk` in the legacy client.
 
 use thiserror::Error;
 
 pub const LAYERS: usize = 3;
-/// Cells per terrain chunk side (`getTerrainWidth() = size / 13`).
+/// Cells per terrain chunk side (a map has `size / 13` chunks per side).
 pub const TERRAIN_CHUNK: u32 = 13;
-/// Map editor draws `mapeditor_unwalkable_tile.png` for this bit.
+/// The cell cannot be walked on.
 pub const FLAG_UNWALKABLE: u8 = 0x20;
-/// Map editor draws `mapeditor_block_tile.png` for this bit (line of sight / missiles?).
+/// The cell blocks (set together with unwalkable on walls).
 pub const FLAG_BLOCK: u8 = 0x40;
 
 #[derive(Debug, Error)]

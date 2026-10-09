@@ -8,10 +8,8 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-# wav: original sfx; mp3: our own soundtrack (custom_assets/content/custom/music)
+# wav: our sound effects (assets/content/sfx); mp3: our soundtrack (assets/content/music)
 bevy = { version = "0.19.1", features = ["wav", "mp3"] }
-rusqlite = { version = "0.40", features = ["bundled"] }
-zip = { version = "8.6", default-features = false, features = ["deflate"] }
 anyhow = "1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

@@ -5,7 +5,7 @@ Usage (from repo root):  python -I tools/artgen/icons.py [--force] [--only <subs
 Reads `custom_assets/data/spells.txt`, `items.txt` and `item_bases.txt` (whichever exist; the
 `[id]` / `[kind id]` + `key=value` text format) and collects every `icon=` name. An icon that
 already exists anywhere under `custom_assets/content/` (bare-name lookup, as in the client) is kept;
-a missing one is generated into `custom_assets/content/custom/icons/{items,spells}/`. `--force`
+a missing one is generated into `custom_assets/content/icons/{items,spells}/`. `--force`
 regenerates every referenced icon that lives in those two folders (plus missing ones), `--only`
 limits the run to icon names containing the substring. Contact sheets go to `custom_assets/preview/`.
 

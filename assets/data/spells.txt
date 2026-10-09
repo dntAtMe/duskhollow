@@ -16,7 +16,7 @@
 #   abilities_tab: 1 Spells (default), 0 Actions.
 #   Tooltip tokens: $E1min $E1max (effect values), $E2D3 (raw data3), $DUR, $INVL.
 #   Visuals: data/spell_visuals.txt.
-#   Icons: tools/artgen/icons.py --custom-spells -> content/custom/icons/spells/.
+#   Icons: tools/artgen/icons.py --custom-spells -> content/icons/spells/.
 #
 # Balance (level 1, starter gear): a fire bolt does ~28 on a 1.5 s cast / 6 s cooldown, a big
 # swing 135% weapon / 7 s. Glarewolves have 42 hp, the Alpha 150, Corvin 180 x boss.

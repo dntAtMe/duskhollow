@@ -7,9 +7,9 @@ Everything here is our own data under `custom_assets/` (no legacy files are read
 | `data/spell_visuals.txt` | named visual kits + which kit each spell plays | `dusk_formats::content::visuals` |
 | `data/particles.txt` | particle systems | `dusk_formats::content::particles` (simulation: `dusk_formats::psi`) |
 | `content/custom/{env,vale}/sprite_fx.txt` | particle emitters and lights on map sprites | `dusk_formats::content::sprite_fx` |
-| `scripts/override/animation/*.sa` + `content/custom/spellfx/` | flipbooks | `tools/artgen/spellfx.py` |
-| `content/custom/fx/fx_particles.png` | particle atlas (4x4 cells of 32 px, white) | `tools/artgen/spellfx.py --atlas` |
-| `content/custom/fx/fx_light_glow.png`, `fx_light_mask.png` | light glow and darkness cut-out | `tools/artgen/lightfx.py` |
+| `scripts/animation/*.sa` + `content/spellfx/` | flipbooks | `tools/artgen/spellfx.py` |
+| `content/fx/fx_particles.png` | particle atlas (4x4 cells of 32 px, white) | `tools/artgen/spellfx.py --atlas` |
+| `content/fx/fx_light_glow.png`, `fx_light_mask.png` | light glow and darkness cut-out | `tools/artgen/lightfx.py` |
 
 Art rules (docs/world.md): only fire glows; ember, rust, oxblood, dull bone; nothing near-white.
 
@@ -23,7 +23,7 @@ anim_y=18
 anim_blend=0            # optional; anim_color=rrggbbaa tint; anim2* = a second flipbook
 particles=ember_sparks  # optional particle system + offset (px, y down, may use `height`)
 particles_y=-height/2
-sound=spell_ember_burst # bare name: content/custom/sfx/<name>.wav
+sound=spell_ember_burst # bare name: content/sfx/<name>.wav
 unit_glow=f08c283f      # rrggbbaa; colours the orb of a projectile without flipbook/particles
 
 [spell 50007]

@@ -17,7 +17,7 @@ border widths below are repeated there (`SLICE_*`):
   (the Ashpriest). `menu_class_ring_sel.png`: the selection ring drawn over a medallion.
 - `menu_rule.png` (360x14): bronze rule with a central lozenge, under the title.
 
-Output: `custom_assets/content/custom/ui/` (our own names, always available).
+Output: `custom_assets/content/ui/` (our own names, always available).
 
     python -I tools/artgen/menu_ui.py              # write the set
     python -I tools/artgen/menu_ui.py --preview    # also custom_assets/preview/menu_sheet.png

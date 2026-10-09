@@ -9,7 +9,7 @@ use crate::world::{
 };
 use bevy::prelude::*;
 use crossbeam_channel::{Receiver, TryRecvError};
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use dusk_protocol::{ClientMsg, PROTOCOL_VERSION, ServerMsg, net::ServerConnection};
 
 /// Players may move this much faster than the client's run speed before being corrected.

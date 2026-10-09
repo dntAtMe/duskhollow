@@ -1,12 +1,12 @@
-"""Builds a playable map entirely from our own art: `custom_glade`.
+"""Builds a playable map entirely from our own art: `glade`.
 
 Usage (from repo root, after enviro.py):  python -I tools/artgen/mapgen.py
 
 Writes:
-- `custom_assets/maps/custom_glade.map` in the original `.map` format (docs/formats.md)
-- `custom_assets/maps/custom_glade.spawns`: `entry x y orientation wander` per line, read by our server
+- `custom_assets/maps/glade.map` in the original `.map` format (docs/formats.md)
+- `custom_assets/maps/glade.spawns`: `entry x y orientation wander` per line, read by our server
 - unique blended ground tiles for cells where terrain types meet
-  (`custom_assets/content/custom/env/map/cg_glade_*.png`); pure cells reuse the periodic tiles.
+  (`custom_assets/content/env/map/cg_glade_*.png`); pure cells reuse the periodic tiles.
 
 Layout: a meadow ringed by forest, a winding dirt path crossing it, and a ruined cobble plaza with
 broken walls where goblins camp.
@@ -29,7 +29,7 @@ from enviro import PERIOD, TILE_H, TILE_W, diamond_coords, ground_texture, perio
 
 ROOT = Path(__file__).resolve().parents[2]
 CA = ROOT / "custom_assets"
-NAME = "custom_glade"
+NAME = "glade"
 SIZE = 52
 PLAZA = (32.0, 18.0)
 POND = (13.0, 40.0)  # centre; elliptical, radii below

@@ -355,7 +355,7 @@ mod tests {
 
     #[test]
     fn shipped_items_are_valid() {
-        let root = crate::content_root();
+        let root = crate::assets_root();
         let data = root.join("data");
         for (file, keys) in [
             ("items.txt", ITEM_KEYS),
@@ -376,7 +376,7 @@ mod tests {
                 assert!(spells.contains_key(s), "{}: unknown spell {s}", it.name);
             }
             if it.has_model() {
-                let script = root.join(format!("scripts/player/custom/{}.txt", it.model));
+                let script = root.join(format!("scripts/player/{}.txt", it.model));
                 assert!(script.exists(), "{}: no paper-doll script {}", it.name, it.model);
             }
             if it.generated {

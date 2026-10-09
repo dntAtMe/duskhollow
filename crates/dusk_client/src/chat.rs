@@ -48,7 +48,7 @@ pub struct ChatSystemLine(pub String);
 
 /// Scrollback lines kept.
 const MAX_LINES: usize = 200;
-/// `/help` text, relative to our content root.
+/// `/help` text, relative to the asset root.
 const HELP_FILE: &str = "data/help.txt";
 /// Lines shown at once (wrapped lines take more room; the top is clipped).
 const VISIBLE: usize = 14;

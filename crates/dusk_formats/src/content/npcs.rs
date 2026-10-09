@@ -2,14 +2,14 @@
 //! `data/npc_templates.txt`.
 //!
 //! One `[entry]` section per template; each template brings its own model with `id = entry`.
-//! Keys: [`NpcTemplate`] field names plus `model` (sprite script under `scripts/npc/custom/`),
+//! Keys: [`NpcTemplate`] field names plus `model` (sprite script under `scripts/npc/`),
 //! `height` (pixels, nameplate offset), `level=MIN[-MAX]`, `resist=frost,fire,shadow,holy`,
 //! `spellN=spell,chance,interval_ms,cooldown_ms,target_type` (N = 1..=4), and loot:
 //! `loot=<loot table>` (`data/loot.txt`), `loot_chances=green,blue,gold,purple` (percent, -1 =
 //! default), `gold_ratio=` (percent of the default gold, -1 = default), `junk=<item>,<item>`.
 
 use super::sections::{self, Section};
-use crate::db::{NpcModel, NpcSpell, NpcTemplate, faction};
+use super::types::{NpcModel, NpcSpell, NpcTemplate, faction};
 use crate::item::NpcLoot;
 use anyhow::{Context, bail};
 use std::collections::HashMap;
@@ -26,6 +26,9 @@ pub struct Npcs {
     /// Model id -> junk item entries.
     pub junk: HashMap<i64, Vec<i64>>,
 }
+
+/// First template entry (and model id); entries below are not ours to use.
+pub const FIRST_ENTRY: i64 = 50000;
 
 pub const KEYS: &[&str] = &[
     "name",
@@ -214,20 +217,20 @@ mod tests {
 
     #[test]
     fn shipped_templates_are_valid() {
-        let root = crate::content_root();
+        let root = crate::assets_root();
         let s = sections::load(&root.join("data/npc_templates.txt")).unwrap();
         assert!(sections::unknown_keys(&s, KEYS).is_empty());
         let n = load(&root).unwrap();
         let spells = super::super::spells::load(&root).unwrap();
         for t in n.templates.values() {
-            assert!(t.entry >= crate::custom::CUSTOM_NPC_FIRST && !t.name.is_empty(), "{t:?}");
+            assert!(t.entry >= FIRST_ENTRY && !t.name.is_empty(), "{t:?}");
             let m = &n.models[&t.model_id];
-            assert!(root.join(format!("scripts/npc/custom/{}.txt", m.name)).exists(), "{}: model {}", t.name, m.name);
+            assert!(root.join(format!("scripts/npc/{}.txt", m.name)).exists(), "{}: model {}", t.name, m.name);
             for sp in &t.spells {
                 assert!(spells.contains_key(&sp.spell), "{}: unknown spell {}", t.name, sp.spell);
             }
         }
-        // The glade's creatures (formerly legacy templates).
+        // The glade's creatures.
         for e in 50020..=50023 {
             assert!(n.templates.contains_key(&e), "{e}");
         }

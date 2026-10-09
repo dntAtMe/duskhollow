@@ -2,7 +2,7 @@
 
 Usage (from repo root):  python -I tools/artgen/enviro.py
 
-Writes `custom_assets/content/custom/env/*.png` plus `custom_assets/env_manifest.json` (what exists,
+Writes `custom_assets/content/env/*.png` plus `custom_assets/env_manifest.json` (what exists,
 used by mapgen.py). Pivots follow the engine's default for map sprites without a `sprite_hotspot`
 row: horizontally centred, 16 px above the bottom (= centre of the cell's diamond).
 

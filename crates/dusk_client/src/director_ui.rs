@@ -1,5 +1,5 @@
 //! Presentation of the demo run: quest tracker (under the minimap), quest toasts and sounds,
-//! the boss bar of scripted encounters, the title card on `custom_duskhollow` and the end card.
+//! the boss bar of scripted encounters, the title card on `duskhollow` and the end card.
 //!
 //! Debug: `DUSK_BOSS_TEST=1` shows the boss bar (Corvin's template, if any, at 62 %),
 //! `DUSK_TITLE_TEST=1` plays the title card on any map, `DUSK_END_TEST=1` shows the end card,
@@ -56,7 +56,7 @@ impl Plugin for DirectorUiPlugin {
 }
 
 /// The title card plays on this map.
-pub const TITLE_MAP: &str = "custom_duskhollow";
+pub const TITLE_MAP: &str = "duskhollow";
 const TOAST_SECS: f32 = 3.6;
 const BOSS_FADE_SECS: f32 = 3.0;
 /// Boss bar segments (oldschool notches).

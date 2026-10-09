@@ -5,7 +5,7 @@ use crate::spells::{Auras, Casting, control_of};
 use crate::stats::{Roll, Stats};
 use crate::world::{Dead, Faction, GameWorld, Hidden, Home, Motion, NetId, Npc, OnMap, Outbox, Player, Scope, Wander};
 use bevy::prelude::*;
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use dusk_protocol::ServerMsg;
 
 /// Cells per second while wandering.

@@ -10,7 +10,7 @@ use crate::combat::{Attacking, CombatClock, Evading, LastAttacker, player_stats_
 use crate::stats::{Roll, Stats, resolve_melee};
 use crate::world::{Dead, Faction, GameWorld, Hidden, Motion, NetId, Npc, OnMap, Outbox, Player, Scope};
 use bevy::prelude::*;
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use dusk_formats::spell::{FormulaVars, SpellEffect, SpellTemplate, aura, effect, eval_formula, mechanic, target};
 use dusk_protocol::{EntityId, HitResult, ServerMsg, SpellId};
 use std::collections::HashMap;
@@ -944,7 +944,7 @@ pub fn combat_mana(
     }
 }
 
-/// The Duskhollow skills (`custom_assets/data/spells.txt`) end to end through the cast pipeline,
+/// The Duskhollow skills (`assets/data/spells.txt`) end to end through the cast pipeline,
 /// on the real data (skipped without extracted assets).
 #[cfg(test)]
 mod skill_tests {
@@ -964,16 +964,16 @@ mod skill_tests {
     }
 
     impl Sim {
-        fn new() -> Option<Self> {
-            let root = dusk_formats::content_root();
-            let world = GameWorld::load(&root, Some("custom_duskhollow")).unwrap();
+        fn new() -> Self {
+            let root = dusk_formats::assets_root();
+            let world = GameWorld::load(&root, Some("duskhollow")).unwrap();
             let (map, start) = world.start;
             let dir = (0..16)
                 .map(|i| Vec2::from_angle(i as f32 * std::f32::consts::TAU / 16.0))
                 .find(|d| (0..=28).all(|k| world.is_walkable(map, start + *d * (k as f32 * 0.25))))
                 .expect("open ground around the arrival point");
             let known: Vec<SpellId> = world.spells.keys().filter(|e| **e >= 50000).map(|e| *e as SpellId).collect();
-            assert!(known.len() >= 10, "custom skills loaded: {known:?}");
+            assert!(known.len() >= 10, "skills loaded: {known:?}");
             let cs = *world.class_stats(1, 1).unwrap();
             let gaze = crate::gaze::Gaze::load(&root, &world);
             let mut app = App::new();
@@ -1002,7 +1002,7 @@ mod skill_tests {
                 ))
                 .id();
             app.update();
-            Some(Self { app, player, start, dir })
+            Self { app, player, start, dir }
         }
 
         /// A level 1 glarewolf `dist` cells from the start, unable to dodge, parry or block.
@@ -1094,7 +1094,7 @@ mod skill_tests {
 
     #[test]
     fn every_skill_casts_and_lands() {
-        let Some(mut sim) = Sim::new() else { return };
+        let mut sim = Sim::new();
 
         // Cairnbreaker: 0.7 s wind-up, then a heavy weapon hit.
         let wolf = sim.wolf(10, 1.0);
@@ -1178,7 +1178,7 @@ mod skill_tests {
 
     #[test]
     fn draw_the_veil_halves_strain_gain() {
-        let Some(mut sim) = Sim::new() else { return };
+        let mut sim = Sim::new();
         // Out of combat, under open sky at the arrival point: compare 6 s of strain gain.
         sim.run(1.0);
         let strain = |sim: &Sim| sim.app.world().get::<crate::gaze::Strain>(sim.player).unwrap().strain;
@@ -1200,7 +1200,7 @@ mod skill_tests {
 
     #[test]
     fn class_kit_skills_land() {
-        let Some(mut sim) = Sim::new() else { return };
+        let mut sim = Sim::new();
         let (a, b, far) = (sim.wolf(20, 3.0), sim.wolf(21, 4.0), sim.wolf(22, 7.5));
 
         // Hurled Brand: 1.8 s cast, a brand in flight, one fire hit.
@@ -1252,7 +1252,7 @@ mod skill_tests {
 
     #[test]
     fn potions_and_npc_spells() {
-        let Some(mut sim) = Sim::new() else { return };
+        let mut sim = Sim::new();
         // Ember Draught: 9 health every 2 s for 20 s, without knowing the spell.
         sim.app.world_mut().entity_mut(sim.player).insert(Spellbook::new(vec![]));
         sim.app.world_mut().get_mut::<Stats>(sim.player).unwrap().hp = 1;

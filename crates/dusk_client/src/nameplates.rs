@@ -13,7 +13,7 @@ use crate::{
 };
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 
 pub struct NameplatePlugin;
 

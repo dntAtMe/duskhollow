@@ -2,7 +2,7 @@
 looking at its upright props: canopies (trees, pines) and walls cast shade, a hut's eaves are
 deep shelter, a campfire is a rest cairn.
 
-Usage (from repo root):  python -I tools/artgen/covergen.py [custom_glade]
+Usage (from repo root):  python -I tools/artgen/covergen.py [glade]
 
 Cover chars: `.` open sky, `s` shade, `S` deep shelter, `C` rest cairn (cell centre).
 """
@@ -90,7 +90,7 @@ def build(size, upright):
 
 
 def main():
-    name = sys.argv[1] if len(sys.argv) > 1 else "custom_glade"
+    name = sys.argv[1] if len(sys.argv) > 1 else "glade"
     size, upright = read_map(MAPS / f"{name}.map")
     grid = build(size, upright)
     out = MAPS / f"{name}.cover"

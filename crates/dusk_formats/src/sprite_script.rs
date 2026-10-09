@@ -1,4 +1,4 @@
-//! `scripts/npc/*.txt`, `scripts/player/{male,female}/*.txt` — 8-directional
+//! `scripts/npc/*.txt`, `scripts/player/*.txt` — 8-directional
 //! sprite-sheet animations for units and paper-doll gear.
 //!
 //! ```text

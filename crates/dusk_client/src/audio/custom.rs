@@ -9,7 +9,7 @@
 //!   `.cover` sidecar;
 //! - player footsteps.
 //!
-//! Sounds come from `tools/sfxgen` (`custom_assets/content/custom/sfx/`).
+//! Sounds come from `tools/sfxgen` (`custom_assets/content/sfx/`).
 
 use super::{AudioSettings, ProximityGroup, Rng, SfxAt, SfxVoice};
 use crate::{
@@ -22,7 +22,7 @@ use bevy::audio::{AudioSinkPlayback, Volume};
 use bevy::prelude::*;
 use dusk_formats::{
     FileIndex,
-    custom::CoverGrid,
+    content::sidecars::CoverGrid,
     map::MapFile,
     sound::{SoundTables, SpriteSound, resolve_sound, voice_lines},
 };
@@ -466,20 +466,20 @@ mod tests {
     #[test]
     fn bare_names() {
         let mut index = FileIndex::default();
-        index.insert("gaze_open.wav", "content/custom/sfx/gaze_open.wav");
-        assert_eq!(resolve_sfx(&index, "gaze_open"), Some("content/custom/sfx/gaze_open.wav"));
-        assert_eq!(resolve_sfx(&index, "gaze_open.wav"), Some("content/custom/sfx/gaze_open.wav"));
+        index.insert("gaze_open.wav", "content/sfx/gaze_open.wav");
+        assert_eq!(resolve_sfx(&index, "gaze_open"), Some("content/sfx/gaze_open.wav"));
+        assert_eq!(resolve_sfx(&index, "gaze_open.wav"), Some("content/sfx/gaze_open.wav"));
         assert_eq!(resolve_sfx(&index, "gaze_close"), None);
     }
 
     #[test]
     fn sprite_sounds_and_cairns() {
         use dusk_formats::map::{Cell, TileLayer};
-        let s = dusk_formats::sound::parse_sprite_sounds("custom_cairn* loop_cairn_fire 6\nbrazier fire.ogg 3\n");
+        let s = dusk_formats::sound::parse_sprite_sounds("cv_cairn* loop_cairn_fire 6\nbrazier fire.ogg 3\n");
         let layer = |t| Some(TileLayer { texture: t, param: 0 });
         let map = MapFile {
             size: 13,
-            textures: vec!["grass.png".into(), "custom_cairn_01.png".into()],
+            textures: vec!["grass.png".into(), "cv_cairn_01.png".into()],
             cells: vec![
                 Cell { x: 2, y: 3, flags: 0, layers: [layer(0), None, layer(1)] },
                 Cell { x: 5, y: 5, flags: 0, layers: [layer(0), None, None] },

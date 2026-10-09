@@ -34,7 +34,7 @@ pub struct SpriteLight {
 /// `particles <sprite> <name> <x> <y>` (alias `psi`; a `.psi` suffix is dropped) and
 /// `light <sprite> <rrggbbaa hex> <x> <y> <ground 0/1> <top 0/1> <scale>`; `#` comments.
 /// Returns (lowercase sprite name, effect) pairs.
-pub fn parse_custom_fx(text: &str) -> (Vec<(String, SpritePsi)>, Vec<(String, SpriteLight)>) {
+pub fn parse_sprite_fx(text: &str) -> (Vec<(String, SpritePsi)>, Vec<(String, SpriteLight)>) {
     let (mut psi, mut lights) = (Vec::new(), Vec::new());
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         let v: Vec<&str> = line.split_whitespace().collect();
@@ -68,12 +68,12 @@ pub fn parse_custom_fx(text: &str) -> (Vec<(String, SpritePsi)>, Vec<(String, Sp
 }
 
 #[cfg(test)]
-mod custom_tests {
+mod tests {
     use super::*;
 
     #[test]
-    fn parses_custom_fx() {
-        let (p, l) = parse_custom_fx(
+    fn parses_sprite_fx() {
+        let (p, l) = parse_sprite_fx(
             "# c\nparticles A.png campfire 20 8\npsi f.psi Fireflies.psi 0 -32\nlight A.png e25822c8 0 16 1 0 1.0\nbogus\n",
         );
         assert_eq!(p[0], ("a.png".into(), SpritePsi { psi: "campfire".into(), x: 20, y: 8 }));

@@ -1,13 +1,13 @@
 # Spell visuals (dusk_formats::content::visuals, docs/visuals.md).
 #
 # [kit <name>]: one effect.
-#   anim anim_x anim_y anim_color anim_blend    .sa flipbook (scripts/override/animation); x = canvas
+#   anim anim_x anim_y anim_color anim_blend    .sa flipbook (scripts/animation); x = canvas
 #                                               left edge from the feet (+ = left), y = canvas bottom
 #                                               from the feet (+ = down, may use `height`);
 #                                               color = rrggbbaa tint; blend 0 = over everything
 #   anim2 anim2_x anim2_y anim2_color anim2_blend   optional second flipbook
 #   particles particles_x particles_y           particle system of data/particles.txt + offset
-#   sound                                       bare sound name (content/custom/sfx/<name>.wav)
+#   sound                                       bare sound name (content/sfx/<name>.wav)
 #   unit_glow ground_glow                       rrggbbaa; unit_glow colours a projectile orb
 #
 # [spell <entry>]: which kit plays when (every spell of data/spells.txt has one).

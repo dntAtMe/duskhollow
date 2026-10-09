@@ -169,7 +169,7 @@ mod tests {
     /// Every shipped system parses with known keys only, emits, and stays bounded and finite.
     #[test]
     fn shipped_particles_parse_and_simulate() {
-        let root = crate::content_root();
+        let root = crate::assets_root();
         let s = sections::load(&root.join("data/particles.txt")).unwrap();
         assert_eq!(sections::unknown_keys(&s, PARTICLE_KEYS), Vec::<String>::new());
         let all = parse(&s).unwrap();

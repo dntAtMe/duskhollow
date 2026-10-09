@@ -13,7 +13,7 @@ Worktrees have no legacy `assets/`: point `DUSK_LEGACY` at `E:/Github projects/d
 | Query | Feeds | Custom content actually needs |
 |---|---|---|
 | `db.rs::maps` | server world, client map list/music/menu | only 13 legacy maps; custom maps get ids 10000 (duskhollow), 10001 (glade) |
-| `db.rs::npc_models/npc_templates` | templates, models | `custom_glade.spawns` uses legacy entries 2 (Antling, antlion_small, neutral), 8 (Spiderite, spider, neutral), 13 (Crazed One, goblin_charger, hostile), 14 (Venomous One, goblin, hostile); custom sprite scripts exist for all 4 |
+| `db.rs::npc_models/npc_templates` | templates, models | `glade.spawns` uses legacy entries 2 (Antling, antlion_small, neutral), 8 (Spiderite, spider, neutral), 13 (Crazed One, goblin_charger, hostile), 14 (Venomous One, goblin, hostile); custom sprite scripts exist for all 4 |
 | `db.rs::npc_spawns` | legacy maps | none (server still loads all legacy maps) |
 | `db.rs::class_stats` | server stats, menu level-1 stats | all; linear: hp/mana = base × level (×1.5 at 25); attributes constant; bases c1 75/30, c2 40/70, c3 60/45, c4 45/65 |
 | `db.rs::exp_levels` | XP, cap, kill XP | all 25 rows |
@@ -22,7 +22,7 @@ Worktrees have no legacy `assets/`: point `DUSK_LEGACY` at `E:/Github projects/d
 | `spell.rs::spells` | spell tables | 81 Melee Swing, 82 Ranged Attack (auto attacks), 89 Minor Life Potion, 95 Minor Mana Potion (item spells), NPC spells 229 Rend (Alpha), 67 Harrowing Strike + 275 War Stomp (Corvin); starting spells 13/10/9, 31/27/29, 60/46/43, 69/79/77, 245 Sleep, 273 Pick Lock |
 | `spell.rs::class_spells` | starting spellbook | 28 rows |
 | `spell.rs::spell_visual_kits/spell_visuals` | client visuals | 24 kits used: 6,15,18,47,55,61,78,88,98,101,103,104,105,119,122,126,129,132,140,153,158,179,198,199 → 10 flipbooks (slash_001, slash_002b, slash_002c, water_001, wind_003a, wind_003b, earth_002a, effect_003, effect_004, light_003), 5 particle systems, 19 sounds |
-| `sprite_fx.rs::sprite_psi/lights` | map emitters | `green_firefly.psi` in custom_glade |
+| `sprite_fx.rs::sprite_psi/lights` | map emitters | `green_firefly.psi` in glade |
 | `sprite_fx.rs::zone_night_pct` | darkness | none (dungeon will want darkness) |
 | `sound.rs::sound_tables` | music/ambience/voices/proximity | `npc_sounds` for the 4 glade models (~11 files) |
 | `item.rs::items` (17,179) | items | starting items 1, 7 (potions ×5), 13-16 cloth set, 17 buckler, 18 blade, 19 shortbow, 20 dagger, 23 staff, 25 mace; quest reward `EMBER_DRAUGHT = 1`; gear drops from a generated grid (128 bases × 5 qualities × 25 levels, 65 models, 155 icons) |
@@ -32,15 +32,15 @@ Worktrees have no legacy `assets/`: point `DUSK_LEGACY` at `E:/Github projects/d
 - Fonts `Friz Quadrata Regular/Bold.ttf` (combat_ui.rs load_font, director_ui.rs:148, menu/widgets.rs:46) — not redistributable.
 - `light_source.png` (lights.rs every sprite_fx light), `shader_light.png` (darkness cut-outs).
 - Particles `scripts/particles/*.psi` (binary HGE): campfire, small_light_embers, casting_fire, scorch, cheapshot, entangleshot, green_firefly, disarm. Particle texture already overridden (`content/override/fx/particles.png`).
-- Flipbooks: all 104 `.sa` already overridden (`scripts/override/animation`, frames in `content/custom/spellfx`).
+- Flipbooks: all 104 `.sa` already overridden (`scripts/animation`, frames in `content/spellfx`).
 - Sounds (~50): 20 builtin names in `dusk_formats::sound::builtin` (attack_hit_var01..05.wav, attack_sword_normal_{s,m,m2,h}.ogg, dodge_default.wav, swishverb4.ogg, attack_metal_case.ogg, e3_attack_hardhit01..03.ogg, vdamage3_mlb_4.ogg, alert_levelup_a.ogg, button_click_a.ogg, window_target_open_a.ogg, window_open_a.ogg, window_close_a.ogg); 19 kit sounds; ~11 glade NPC voices.
-- Icons: item icons all overridden (`override/icons/items`); 113 spell icons overridden with legacy spell-name filenames; our skills use `content/custom/icons/spells/skill_*.png`.
+- Icons: item icons all overridden (`override/icons/items`); 113 spell icons overridden with legacy spell-name filenames; our skills use `content/icons/spells/skill_*.png`.
 - UI: all overridden/custom. Cursors are system cursors.
 - Text: `scripts/text/help.txt` (chat /help), `scripts/sprite/portrait_offset.txt` (legacy portraits only), `config.ini` (optional).
-- Sprite scripts: all custom (`scripts/player/custom`, `scripts/npc/custom`).
+- Sprite scripts: all custom (`scripts/player`, `scripts/npc`).
 
 ### Legacy-only code
-`crates/dusk_extract` + `zip`; `rusqlite` (db.rs, `impl GameDb` in item.rs/spell.rs/sound.rs/sprite_fx.rs); `assets_root()`/`custom_assets_root()`/`FileIndex::load(file_index.txt)`; `custom.rs::install` (mirrors custom_assets into assets at start), `CUSTOM_MAP_PREFIX`, `CUSTOM_NPC_FIRST/CUSTOM_SPELL_FIRST`, `CustomVisual`, `merge_spells`; `--art`/`DUSK_ART`/`custom_art`/Settings custom_art + legacy_maps toggles and all branches on `custom_art` (data.rs, unit.rs, paper_doll.rs, hud.rs, audio.rs, audio/custom.rs); override mechanism (`content/override/**`, `scripts/override/animation`); legacy paper-doll lists (`paper_doll.rs BODY`, `unit.rs PAPER_DOLL`); mp3→ogg sound fallback; `RegionGrid` zone/area music; legacy tests (real_assets.rs except `custom_maps_parse_and_resolve`, tests/sounds.rs, audio.rs `referenced_sounds_decode`, server tests gated on game.db); tools reading game.db (`icons.py`, `spellfx_measure.py`; keep `spellfx_layout.json` as our data; `mapgen.py` writes legacy glade entries); docs with RE notes (formats.md, combat.md, ui.md, audio.md) and Ghidra/`FUN_`/0x comments in ~30 source files.
+`crates/dusk_extract` + `zip`; `rusqlite` (db.rs, `impl GameDb` in item.rs/spell.rs/sound.rs/sprite_fx.rs); `assets_root()`/`custom_assets_root()`/`FileIndex::load(file_index.txt)`; `custom.rs::install` (mirrors custom_assets into assets at start), `CUSTOM_MAP_PREFIX`, `CUSTOM_NPC_FIRST/CUSTOM_SPELL_FIRST`, `CustomVisual`, `merge_spells`; `--art`/`DUSK_ART`/`custom_art`/Settings custom_art + legacy_maps toggles and all branches on `custom_art` (data.rs, unit.rs, paper_doll.rs, hud.rs, audio.rs, audio/custom.rs); override mechanism (`content/override/**`, `scripts/animation`); legacy paper-doll lists (`paper_doll.rs BODY`, `unit.rs PAPER_DOLL`); mp3→ogg sound fallback; `RegionGrid` zone/area music; legacy tests (real_assets.rs except `custom_maps_parse_and_resolve`, tests/sounds.rs, audio.rs `referenced_sounds_decode`, server tests gated on game.db); tools reading game.db (`icons.py`, `spellfx_measure.py`; keep `spellfx_layout.json` as our data; `mapgen.py` writes legacy glade entries); docs with RE notes (formats.md, combat.md, ui.md, audio.md) and Ghidra/`FUN_`/0x comments in ~30 source files.
 
 ## 2. Target design
 
@@ -134,28 +134,28 @@ Owns: `content/{rules,npcs,spells,items,maps}.rs` bodies; `dusk_formats/src/{db.
 Tasks: author all data files above (read legacy rows once read-only to re-author faithfully: spells 81, 82, 89, 95, 229, 67, 275, starter items); `items::generate_grid` with level-band tiers; `maps::load` from maps.txt only, server starts on `default=1` map; glade spawns → 50020-50023; replacement class skills; remove every GameDb call from server/item.rs/spell.rs; tests (no unknown keys, formulas evaluate, all spell/start_item/junk/loot/NPC-spell refs resolve, grid entry round-trips, skill_tests and loot test run without legacy).
 
 ### Stream B: visuals
-Owns: `content/{visuals,particles,sprite_fx}.rs`; `dusk_formats/src/{psi.rs,sprite_fx.rs,sprite_anim.rs}`; client `{particles.rs,spell_particles.rs,spell_fx.rs,lights.rs,env_light.rs,map_render.rs}`; `custom_assets/data/{spell_visuals.txt,particles.txt}`; `custom_assets/content/custom/fx/**`; env/vale sprite_fx lines in `enviro.py`/`vale.py`; `tools/artgen/{spellfx.py,lightfx.py}`; delete `spellfx_measure.py`; new `docs/visuals.md`.
+Owns: `content/{visuals,particles,sprite_fx}.rs`; `dusk_formats/src/{psi.rs,sprite_fx.rs,sprite_anim.rs}`; client `{particles.rs,spell_particles.rs,spell_fx.rs,lights.rs,env_light.rs,map_render.rs}`; `custom_assets/data/{spell_visuals.txt,particles.txt}`; `custom_assets/content/fx/**`; env/vale sprite_fx lines in `enviro.py`/`vale.py`; `tools/artgen/{spellfx.py,lightfx.py}`; delete `spellfx_measure.py`; new `docs/visuals.md`.
 Named kits (read exact numbers from `spell_visual_kit` while legacy exists): melee_hit (slash_001 47,30), arrow_flight, arrow_hit (slash_001 47,25), bow_draw, item_use, heavy_slash (slash_002c 47,23), bleed_hit (slash_002b 47,25 blend 3 glow ff00007f), skull_crack (water_001 50,30), stun_ring (wind_003b 13,-height+20), dash (wind_003a 23,5 glow), rundown_hit (slash_001 47,25 glow), ground_slam (earth_002a 93,33), knife_flight (particles knife_trail 0,-20), knife_hit (slash_001 50,25), fire_cast (particles fire_cast 0,-height), ember_trail (particles ember_trail 0,-25), ember_burst (effect_004 48,18 glow), hook_flight (particles hook_trail 0,-20), hook_hit (slash_001 50,25), ember_warmth (light_003 23,-5 glow), veil (effect_003 23,-height/10), warden_sweep (slash_001 ×2 45,19), warden_wind_up.
 Spell mappings: 50001 impact heavy_slash; 50002 impact bleed_hit; 50003 impact skull_crack, aura stun_ring; 50004 go dash, impact rundown_hit; 50005 go ground_slam; 50006 traveling knife_flight, impact knife_hit; 50007 casting fire_cast, traveling ember_trail, impact ember_burst, cast_anim cast; 50008 casting bow_draw, traveling hook_flight, impact hook_hit, anims shoot; 50009 casting fire_cast, impact ember_warmth; 50010 impact veil; 50100 impact melee_hit; 50101 casting bow_draw, traveling arrow_flight, impact arrow_hit, cast_anim shoot; 50110/50111 impact item_use, go_anim block; 51001 impact bleed_hit; 51002 impact warden_sweep; 51003 casting warden_wind_up, go ground_slam, aura stun_ring. Keep today's resolved go_anim values. Plus visuals for Stream A's new class skills.
 Also: particles text format + 7 defs, remove binary .psi parser; glade fireflies via env sprite_fx (`.psi`-named map sprites spawn effects without a file); `lightfx.py` light textures; lights.rs darkness = `1 - MapInfo.darkness`, zone_night removed; atlas → `fx_particles.png`; remove `CustomVisual`; tests (kits resolve .sa/particles/sound; particles parse + simulate).
 
 ### Stream C: audio
-Owns: `content/sounds.rs`; `dusk_formats/src/sound.rs`; `dusk_formats/tests/sounds.rs` (rewrite); client `audio.rs`, `audio/custom.rs`; `tools/sfxgen/**`; `custom_assets/content/custom/sfx/**`; `custom_assets/data/sprite_sounds.txt`; `docs/audio.md`.
+Owns: `content/sounds.rs`; `dusk_formats/src/sound.rs`; `dusk_formats/tests/sounds.rs` (rewrite); client `audio.rs`, `audio/custom.rs`; `tools/sfxgen/**`; `custom_assets/content/sfx/**`; `custom_assets/data/sprite_sounds.txt`; `docs/audio.md`.
 Tasks: generate the 26 builtin + 19 kit + 12 voice sounds; point `builtin` constants at our names (keep identifiers); kit sounds via `resolve_sfx` (bare names, .wav implied); NPC voices custom only; proximity loops from sprite_sounds.txt only; music from `MapInfo.music` or the whole soundtrack; drop RegionGrid zone/area playlists, `custom_playlist` gating, `CUSTOM_MAP_PREFIX` checks (footsteps everywhere), config.ini reading, mp3→ogg fallback; test that every referenced sound exists and decodes.
 
 ### Stream D: client presentation and front end
-Owns: client `{main.rs,data.rs,settings.rs,menu/**,hud.rs,unit.rs,paper_doll.rs,items_ui.rs,chat.rs,combat_ui.rs,director_ui.rs,windows.rs,nameplates.rs,minimap.rs,journal.rs,spells_ui.rs,dialogue.rs}`; `tools/artgen/{icons.py,iconlib.py,icon_items.py,icon_spells.py,ui.py,portraits.py}`; `custom_assets/content/custom/fonts/**`; `custom_assets/data/help.txt`; `docs/ui.md`.
+Owns: client `{main.rs,data.rs,settings.rs,menu/**,hud.rs,unit.rs,paper_doll.rs,items_ui.rs,chat.rs,combat_ui.rs,director_ui.rs,windows.rs,nameplates.rs,minimap.rs,journal.rs,spells_ui.rs,dialogue.rs}`; `tools/artgen/{icons.py,iconlib.py,icon_items.py,icon_spells.py,ui.py,portraits.py}`; `custom_assets/content/fonts/**`; `custom_assets/data/help.txt`; `docs/ui.md`.
 Tasks: fonts + license + constants; remove `--art`, `DUSK_ART`, `custom_art` (GameData, Settings, Options toggle, restart notice) and `legacy_maps`; always our paper doll/NPC scripts/portraits, delete legacy BODY/PAPER_DOLL lists and portrait_offset.txt; overrides indexed unconditionally; menu map list from maps.txt with the default first; `/help` from data/help.txt; `icons.py` reads our data and generates missing icons (final run after A merges); screenshot every window/menu with the new font and fix overflows.
 
 ### Stream E: cleanup (after A-D merged, no other worktrees active)
 1. Move the local legacy folder out of the repo first (`mv assets ../duskhollow-legacy`).
-2. `git mv custom_assets assets` and flatten: `content/custom/*` → `content/*` (sheets → `content/sprites/`), `override/ui` → `content/ui`, `override/icons` + `custom/icons` → `content/icons/{items,spells}`, `scripts/override/animation` → `scripts/animation`, `scripts/npc/custom` → `scripts/npc`, `scripts/player/custom` → `scripts/player` (update unit.rs/paper_doll.rs); update .gitignore.
+2. `git mv custom_assets assets` and flatten: `content/custom/*` → `content/*` (sheets → `content/sprites/`), `override/ui` → `content/ui`, `override/icons` + `custom/icons` → `content/icons/{items,spells}`, `scripts/animation` → `scripts/animation`, `scripts/npc` → `scripts/npc`, `scripts/player` → `scripts/player` (update unit.rs/paper_doll.rs); update .gitignore.
 3. `assets_root()` per §2; delete content_root/legacy_root/custom_assets_root, `legacy://`, `DUSK_LEGACY_LOG`; `FileIndex::scan` + duplicate check; drop `DUSK_CUSTOM_ASSETS` from MENU_SAFE_VARS.
 4. Delete `crates/dusk_extract`, rusqlite, zip, GameDb + all `impl GameDb`, `db.rs` → `content/types.rs`, `custom::install`, `CUSTOM_MAP_PREFIX`, `CUSTOM_*_FIRST`, legacy tests, config.ini reading.
 5. Tools: `tools/artgen/paths.py` (`ASSETS = ROOT/"assets"`); repoint every generator (~20 `custom_assets` refs in artgen + sfxgen).
 6. Docs: `docs/formats.md` → `docs/content.md` (only our formats + "how to add a map / NPC / spell / item / sound / effect" checklist for the dungeon); strip Ghidra/`FUN_`/0x refs from docs and code comments (keep enum tables as our enums); README (no extraction step, no dusk_extract).
 7. Global test `dusk_formats/tests/content.rs`: every reference resolves (map textures, spawns, NPC/item sprite scripts + `image=` sheets, portraits, icons, kits → .sa/particles/sounds, sprite_fx, sprite_sounds, fonts, music).
-8. Rename maps `custom_duskhollow` → `duskhollow`, `custom_glade` → `glade` (settings DEFAULT_MAP, menu VISTA_MAP, director TITLE_MAP, server tests, docs; old settings fall back to the first map).
+8. Rename maps `duskhollow` → `duskhollow`, `glade` → `glade` (settings DEFAULT_MAP, menu VISTA_MAP, director TITLE_MAP, server tests, docs; old settings fall back to the first map).
 
 ### Verification (end of E)
 Fresh clone with no legacy folder and no `DUSK_ASSETS`/`DUSK_LEGACY`: `cargo build --workspace && cargo test --workspace`; `cargo run -p dusk_server` + `cargo run -p dusk_protocol --example quest_bot -- 127.0.0.1:16383 300` exits 0; client Play works; screenshots of duskhollow and glade with no missing sprite/sheet/texture/sound warnings (`DUSK_AUDIO_LOG=1`); `cargo run -p dusk_protocol --example bot`; `cargo tree | grep -E "rusqlite|zip"` empty; grep for `game\.db|dusk_extract|--art|custom_art|legacy_maps|Ghidra|FUN_00` clean; `git status --ignored` shows only target/, assets/preview/, __pycache__.
@@ -166,7 +166,7 @@ Legacy maps gone (default server start → Duskhollow); legacy class skills gone
 ## Runtime legacy inventory (Stream 0)
 
 Recorded with `DUSK_LEGACY_LOG=1` (each distinct legacy access printed once as `[legacy] kind: what` on
-stderr) on `custom_duskhollow` and `custom_glade` with `--art custom`: arrival, `DUSK_AUTOPLAY=1` fights
+stderr) on `duskhollow` and `glade` with `--art custom`: arrival, `DUSK_AUTOPLAY=1` fights
 (autoplay also casts the action bar) for classes 1-4 on both maps, `DUSK_DIALOGUE_TEST=50010` (Lowshade,
 cairn fire), `DUSK_BOSS_TEST=1`, `DUSK_OPEN=character,inventory,abilities,journal`, `DUSK_OPEN_BOOK=1`,
 plus the quest bot against a standalone server. Re-run the same set after each stream; whatever a
@@ -197,10 +197,10 @@ legacy `maps/*.map` (server).
 | Sounds, glade NPC voices | shulack_ranger_attack_01/02, shulack_ranger_damage_01, shulack_wizard_damage_01/02, ratman_voice_05_damage, starcrab_voice_02_idle/03_damage/04_die, e3_frillfaimam_die |
 
 No legacy sprite scripts, sheets, portraits, icons, UI art or `.sa` scripts were read with `--art custom`
-(flipbooks now always come from `scripts/override/animation` first).
+(flipbooks now always come from `scripts/animation` first).
 
 ### Final contract (as implemented)
-Every loader takes our content root (`dusk_formats::content_root()`); legacy access stays inside the
+Every loader takes our content root (`dusk_formats::assets_root()`); legacy access stays inside the
 bodies (`content::legacy_db()`, `legacy_root()`).
 ```rust
 // dusk_formats (lib.rs)

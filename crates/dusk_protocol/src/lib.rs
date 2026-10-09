@@ -2,7 +2,7 @@
 //! `u32` little-endian length prefix + postcard-encoded message, over TCP.
 //!
 //! Positions are in map cell units, orientation is cell-space radians
-//! (`atan2(dy, dx)`, same as `npc.orientation` in game.db).
+//! (`atan2(dy, dx)`, same as the orientation column of `.spawns`).
 
 pub mod net;
 

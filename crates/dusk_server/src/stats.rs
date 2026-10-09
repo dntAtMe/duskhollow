@@ -5,7 +5,7 @@
 //! everything marked DESIGN is our own choice where the data gives no answer.
 
 use bevy::prelude::*;
-use dusk_formats::db::{ClassStats, NpcTemplate};
+use dusk_formats::content::types::{ClassStats, NpcTemplate};
 use dusk_formats::item::{ItemStats, stat};
 use dusk_protocol::{Attributes, HitResult};
 

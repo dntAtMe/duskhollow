@@ -2,8 +2,8 @@
 //! melee, spells, NPC voices, level-up and UI, plus looping sounds next to map sprites
 //! (`data/sprite_sounds.txt`). See `docs/audio.md`.
 //!
-//! Every sound is one of our files (`tools/sfxgen`, the soundtrack); names that only exist in
-//! the legacy data pack never resolve ([`resolve_sound`]).
+//! Every sound is one of our files (`tools/sfxgen`, the soundtrack), resolved by bare name
+//! ([`resolve_sound`]).
 //! Other modules can trigger a sound by writing a [`PlaySfx`] message.
 //! Keys: `M` toggles music + ambience, `N` toggles sound effects.
 //! `DUSK_AUDIO_LOG=1` logs every sound that starts (at `info` level) and every missing one.
@@ -850,7 +850,7 @@ mod tests {
     #[test]
     fn referenced_sounds_decode() {
         use bevy::audio::{AudioSource, Decodable};
-        let root = dusk_formats::content_root();
+        let root = dusk_formats::assets_root();
         let index = dusk_formats::content::sounds::index(&root);
         let refs = dusk_formats::content::sounds::referenced(&root, &index).unwrap();
         let mut names: Vec<&str> = refs.iter().map(|(_, n)| n.as_str()).collect();

@@ -6,7 +6,7 @@ server, procedurally generated oldschool pre-rendered art and an original soundt
 The engine reads a legacy data pack (`game.db`, `.map` files, sprite archives; formats in
 [docs/formats.md](docs/formats.md)) that is **not** distributed here. Everything under
 `custom_assets/` (sprites, portraits, tiles, icons, UI skin, spell effects, music, the
-`custom_glade` and `custom_duskhollow` maps, the UI font pair DejaVu Serif under its own free
+`glade` and `duskhollow` maps, the UI font pair DejaVu Serif under its own free
 licence) is original and always used; the remaining legacy data is being replaced.
 
 ![Duskhollow title over the gorge](docs/screenshots/title.jpg)
@@ -21,7 +21,7 @@ to rest at the Glare Gate while the Eye opens wide.
 
 ```bash
 cargo run -p dusk_client            # main menu: Play starts the vale offline
-cargo run -p dusk_client -- custom_duskhollow   # or straight in
+cargo run -p dusk_client -- duskhollow   # or straight in
 ```
 
 | | |

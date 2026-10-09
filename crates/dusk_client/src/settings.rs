@@ -19,7 +19,7 @@
 //! [player]
 //! name = Wanderer
 //! class = 1
-//! map = custom_duskhollow
+//! map = duskhollow
 //! servers = 127.0.0.1:16383   ; recently joined, newest first
 //! ```
 //!
@@ -36,7 +36,7 @@ pub const RESOLUTIONS: [(u32, u32); 6] =
     [(1280, 720), (1366, 768), (1600, 900), (1920, 1080), (2560, 1440), (1024, 768)];
 pub const UI_SCALES: [f32; 5] = [0.75, 1.0, 1.25, 1.5, 2.0];
 pub const MAX_SERVERS: usize = 5;
-pub const DEFAULT_MAP: &str = "custom_duskhollow";
+pub const DEFAULT_MAP: &str = "duskhollow";
 
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub struct Settings {

@@ -1,8 +1,7 @@
-# Looping sounds next to our own map sprites (crates/dusk_client/src/audio/custom.rs).
+# Looping sounds next to map sprites (crates/dusk_client/src/audio/custom.rs).
 # sprite sound radius
 #   sprite: file stem (extension optional, case-insensitive); a trailing * matches a prefix
 #   sound:  bare file name (".wav" is implied when there is no extension)
 #   radius: cells; the loop fades linearly from the nearest such sprite to silence at radius
 # Cairn fire also plays at every `C` cell of a map's .cover sidecar (radius 6).
-custom_cairn* loop_cairn_fire 6
-custom_brazier* loop_cairn_fire 4
+cg_campfire* loop_cairn_fire 5

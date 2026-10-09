@@ -3,7 +3,7 @@
 Usage (from repo root):  python -I tools/artgen/creatures.py
 
 Each creature replaces an original NPC model when the client runs with `--art custom`:
-it is written to `custom_assets/scripts/npc/custom/<model>.txt` (+ sheet `custom_npc_<model>.png`),
+it is written to `custom_assets/scripts/npc/<model>.txt` (+ sheet `custom_npc_<model>.png`),
 and the client prefers that over `scripts/npc/<model>.txt`.
 """
 

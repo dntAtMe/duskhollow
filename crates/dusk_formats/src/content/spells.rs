@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn shipped_spells_are_valid() {
-        let root = crate::content_root();
+        let root = crate::assets_root();
         let s = sections::load(&root.join("data/spells.txt")).unwrap();
         let keys = keys();
         let keys: Vec<&str> = keys.iter().map(String::as_str).collect();

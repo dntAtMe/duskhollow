@@ -1,7 +1,7 @@
 # Hand-made items (dusk_formats::content::items). Section id = item entry.
 #   1-99 consumables and quest items, 10-19 starter gear, 100-199 junk, 1000-9999 named items.
 #   Random gear is generated from data/item_bases.txt (entries 100000+).
-# Keys: name icon model (paper-doll script, scripts/player/custom) equip_type (head neck chest
+# Keys: name icon model (paper-doll script, scripts/player) equip_type (head neck chest
 #   belt legs feet hands ring weapon shield ranged) weapon_type (axe bow mace sword staff dagger
 #   wand) armor_type (1 cloth, 2-4 leather, 5-8 mail, 9-11 plate, 12-15 robe; shields 4-8)
 #   material (weapon tier: 1-7 metals, 8-14 woods) quality (junk common green blue gold purple)

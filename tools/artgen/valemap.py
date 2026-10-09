@@ -1,14 +1,14 @@
-"""Builds the "First Gaze" demo map `custom_duskhollow` (docs/demo-plan.md) from the crimson vale
+"""Builds the "First Gaze" demo map `duskhollow` (docs/demo-plan.md) from the crimson vale
 art in `vale.py`.
 
 Usage (from repo root):  python -I tools/artgen/valemap.py [--preview-only]
 
 Writes:
-- `custom_assets/content/custom/vale/*.png` + `hotspots.txt` + `sprite_fx.txt` (tiles, cliffs, props)
-- `custom_assets/maps/custom_duskhollow.map` (original `.map` format, docs/formats.md)
+- `custom_assets/content/vale/*.png` + `hotspots.txt` + `sprite_fx.txt` (tiles, cliffs, props)
+- `custom_assets/maps/duskhollow.map` (original `.map` format, docs/formats.md)
 - `.spawns` (`entry x y orientation wander`), `.cover` (`W H` + rows of `.`/`s`/`S`/`C`),
   `.markers` (`name x y radius`)
-- `custom_assets/preview/custom_duskhollow.png`: whole-map overview (painter's order, like the client)
+- `custom_assets/preview/duskhollow.png`: whole-map overview (painter's order, like the client)
 
 Layout (cell x grows screen right-down, y grows left-down; "north" = screen up = small x + y):
 - south: the gorge mouth at the bottom corner, arrival under open sky
@@ -42,7 +42,7 @@ from enviro import PERIOD, TILE_H, TILE_W, diamond_coords, periodic_noise  # noq
 
 ROOT = Path(__file__).resolve().parents[2]
 CA = ROOT / "custom_assets"
-NAME = "custom_duskhollow"
+NAME = "duskhollow"
 SIZE = 64
 FLAG_UNWALKABLE, FLAG_BLOCK = 0x20, 0x40
 KINDS = vale.GROUND_KINDS

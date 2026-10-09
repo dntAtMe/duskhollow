@@ -6,7 +6,7 @@
   (4, 4) size 188x8, see `GAZE_FILL` in `crates/dusk_client/src/gaze.rs`).
 - `gaze_strain_fill.png` (188x8), `gaze_corruption_fill.png` (188x3): bar fills.
 
-Output: `custom_assets/content/custom/ui/` (our own names, always available).
+Output: `custom_assets/content/ui/` (our own names, always available).
 
     python -I tools/artgen/gaze_ui.py
 """

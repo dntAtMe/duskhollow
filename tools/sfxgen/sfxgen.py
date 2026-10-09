@@ -5,7 +5,7 @@
     python -I tools/sfxgen/sfxgen.py --check         # analyse existing files only
     python -I tools/sfxgen/sfxgen.py --preview       # also write spectrograms
 
-Writes 16-bit PCM mono WAVs at 44.1 kHz to custom_assets/content/custom/sfx/ and
+Writes 16-bit PCM mono WAVs at 44.1 kHz to custom_assets/content/sfx/ and
 spectrograms to custom_assets/preview/sfx/ (gitignored). Designs live in sounds.py (ambience, gaze, story cues,
 footsteps, Duskhollow voices) and sounds_game.py (combat, UI, spell kits, glade creatures).
 """
@@ -28,7 +28,7 @@ MAX_LEN.update(sounds_game.MAX_LEN)
 TARGETS.update(sounds_game.TARGETS)
 
 ROOT = HERE.parent.parent
-OUT = ROOT / "custom_assets/content/custom/sfx"
+OUT = ROOT / "custom_assets/content/sfx"
 PREVIEW = ROOT / "custom_assets/preview/sfx"
 BUDGET = 16 * 1024 * 1024
 

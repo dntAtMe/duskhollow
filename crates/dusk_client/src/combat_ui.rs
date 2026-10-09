@@ -10,7 +10,7 @@ use crate::{
 };
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use dusk_protocol::{ClientMsg, EntityId};
 
 pub struct CombatUiPlugin;
@@ -33,9 +33,8 @@ impl Plugin for CombatUiPlugin {
     }
 }
 
-/// UI font pair (DejaVu Serif, free to redistribute; licence in `content/custom/fonts/LICENSE_DEJAVU`).
-pub const UI_FONT: &str = "DejaVuSerif.ttf";
-pub const UI_FONT_BOLD: &str = "DejaVuSerif-Bold.ttf";
+/// UI font pair (`dusk_formats::content::UI_FONT`, `UI_FONT_BOLD`).
+pub use dusk_formats::content::{UI_FONT, UI_FONT_BOLD};
 
 /// The regular UI face, used by every HUD, window and menu text.
 #[derive(Resource)]

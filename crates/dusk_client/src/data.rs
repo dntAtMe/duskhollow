@@ -1,12 +1,11 @@
 //! Static game data loaded once at startup through the content seam (`dusk_formats::content`).
 //!
-//! Asset paths (`GameData::asset_path`) are relative to our content root (Bevy's default asset
-//! source) or `legacy://...` for files of the legacy data pack (a second asset source).
+//! Asset paths (`GameData::asset_path`) are relative to the asset root (Bevy's asset source).
 
 use bevy::prelude::*;
 use dusk_formats::{
     FileIndex, content,
-    db::{MapInfo, NpcModel, NpcTemplate},
+    content::types::{MapInfo, NpcModel, NpcTemplate},
     psi::ParticleSystemInfo,
     spell::{SpellTemplate, SpellVisual},
     sprite_anim::SpriteAnim,
@@ -19,7 +18,7 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Resource)]
 pub struct GameData {
-    /// Our content root (`dusk_formats::content_root`).
+    /// The asset root (`dusk_formats::assets_root`).
     pub root: PathBuf,
     pub index: FileIndex,
     pub maps: Vec<MapInfo>,
@@ -40,33 +39,11 @@ pub struct GameData {
     scripts: Mutex<HashMap<String, Option<Arc<SpriteScript>>>>,
 }
 
-/// Indexes every file under `<root>/content` by bare name over the legacy index (ours win).
-/// Files under `content/override/` keep the bare names the data refers to (icons, interface art).
-fn index_content(root: &Path, index: &mut FileIndex) {
-    let mut found = 0;
-    let mut stack = vec![root.join("content")];
-    while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
-        for e in entries.flatten() {
-            let path = e.path();
-            if path.is_dir() {
-                stack.push(path);
-                continue;
-            }
-            let Ok(rel) = path.strip_prefix(root) else { continue };
-            let rel = rel.to_string_lossy().replace('\\', "/");
-            found += 1;
-            index.insert(&e.file_name().to_string_lossy(), &rel);
-        }
-    }
-    info!("indexed {found} content files");
-}
-
 impl GameData {
-    /// `root`: our content root.
+    /// `root`: the asset root.
     pub fn load(root: &Path) -> anyhow::Result<Self> {
-        let mut index = FileIndex::load_legacy();
-        index_content(root, &mut index);
+        let index = FileIndex::scan(root)?;
+        info!("indexed {} content files", index.len());
         let npcs = content::npcs::load(root)?;
         let spells = content::spells::load(root)?;
         let spell_visuals = content::visuals::load(root, &spells)?;
@@ -90,16 +67,12 @@ impl GameData {
         })
     }
 
-    /// Filesystem path of an asset path from [`GameData::asset_path`] (`legacy://` included).
+    /// Filesystem path of an asset path from [`GameData::asset_path`].
     pub fn fs_path(&self, rel: &str) -> PathBuf {
-        match rel.strip_prefix(dusk_formats::LEGACY_SOURCE) {
-            Some(_) => dusk_formats::fs_path(rel),
-            None => self.root.join(rel),
-        }
+        self.root.join(rel)
     }
 
-    /// `rel` (e.g. `maps/x.map`, `scripts/npc/x.txt`) from our content root, else from the legacy
-    /// data (logged with `DUSK_LEGACY_LOG=1`).
+    /// `rel` (e.g. `maps/x.map`, `scripts/npc/x.txt`) under the asset root, if it exists.
     pub fn find_file(&self, rel: &str) -> Option<PathBuf> {
         dusk_formats::find_file(&self.root, rel)
     }
@@ -109,7 +82,7 @@ impl GameData {
         self.particles.get(&content::particles::key(name)).copied()
     }
 
-    /// Loads a `.sa` flipbook by name (`content::visuals::flipbook_path`: ours first), cached.
+    /// Loads a `.sa` flipbook by name (`content::visuals::flipbook_path`), cached.
     pub fn flipbook(&self, name: &str) -> Option<Arc<SpriteAnim>> {
         let mut cache = self.flipbooks.lock().unwrap();
         cache
@@ -122,7 +95,7 @@ impl GameData {
             .clone()
     }
 
-    /// Asset path for a bare file name: relative to our content root, or `legacy://...`.
+    /// Asset path for a bare file name, relative to the asset root.
     pub fn asset_path(&self, name: &str) -> Option<String> {
         self.index.resolve(name).map(str::to_string)
     }
@@ -145,8 +118,7 @@ impl GameData {
         })
     }
 
-    /// Pivot of a map sprite: `sprite_hotspot` (plus `hotspots.txt` files shipped with our own
-    /// art), else the original client's default `(w / 2, h / 1.25)` (`Sprite::renderScript`).
+    /// Pivot of a map sprite: `hotspots.txt` next to the art, else `(w / 2, h / 1.25)`.
     pub fn hotspot(&self, name: &str) -> Option<Vec2> {
         if let Some(&(x, y)) = self.hotspots.get(&name.to_lowercase()) {
             return Some(Vec2::new(x as f32, y as f32));

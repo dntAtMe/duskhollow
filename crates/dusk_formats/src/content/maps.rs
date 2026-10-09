@@ -6,13 +6,13 @@
 //! start point is its `arrival` marker (`maps/<name>.markers`).
 
 use super::sections::{self, Section};
-use crate::custom::{parse_markers, parse_spawns};
-use crate::db::{MapInfo, NpcSpawn};
+use super::sidecars::{parse_markers, parse_spawns};
+use super::types::{MapInfo, NpcSpawn};
 use anyhow::{Context, bail};
 use std::path::{Path, PathBuf};
 
-/// Id of the first of our maps.
-pub const CUSTOM_MAP_FIRST: i64 = 10_000;
+/// Id of the first map (map ids are 10000+).
+pub const FIRST_MAP: i64 = 10_000;
 
 pub const KEYS: &[&str] = &["id", "title", "default", "music", "ambience", "darkness"];
 
@@ -79,13 +79,13 @@ mod tests {
 
     #[test]
     fn shipped_maps_are_valid() {
-        let root = crate::content_root();
+        let root = crate::assets_root();
         let s = sections::load(&root.join("data/maps.txt")).unwrap();
         assert!(sections::unknown_keys(&s, KEYS).is_empty());
         let maps = load(&root).unwrap();
         let npcs = super::super::npcs::load(&root).unwrap();
         let d = default_map(&maps).unwrap();
-        assert_eq!((d.name.as_str(), d.id), ("custom_duskhollow", CUSTOM_MAP_FIRST));
+        assert_eq!((d.name.as_str(), d.id), ("duskhollow", FIRST_MAP));
         assert!(d.start != (0.0, 0.0), "the default map needs an arrival marker");
         for m in &maps {
             assert!(map_file(&root, &m.name, "map").is_some(), "{}", m.name);

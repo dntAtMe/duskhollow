@@ -15,7 +15,7 @@ use crate::{
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use dusk_formats::db::faction;
+use dusk_formats::content::types::faction;
 use std::collections::HashMap;
 
 pub struct HudPlugin;
@@ -98,14 +98,13 @@ impl Portraits {
         }
     }
 
-    /// Portrait for an NPC: our close-up of its model (`portrait_custom_<model>.png`), else
-    /// `portrait_<npc_template.portrait>.png`, else the faction placeholder. Only our own files.
+    /// Portrait for an NPC: the close-up of its model (`portrait_custom_<model>.png`), else
+    /// `portrait_<template portrait>.png`, else the faction placeholder.
     pub fn npc(&mut self, data: &GameData, assets: &AssetServer, entry: i64) -> Option<Handle<Image>> {
         let tpl = data.npc_templates.get(&entry)?;
         let model = data.npc_models.get(&tpl.model_id).map(|m| m.name.as_str()).unwrap_or("");
         let candidates = [format!("portrait_custom_{model}.png"), format!("portrait_{}.png", tpl.portrait)];
-        let own = |n: &String| data.asset_path(n).is_some_and(|p| !p.starts_with(dusk_formats::LEGACY_SOURCE));
-        let named = candidates.into_iter().find(|n| n != "portrait_.png" && own(n));
+        let named = candidates.into_iter().find(|n| n != "portrait_.png" && data.asset_path(n).is_some());
         let name = named.unwrap_or_else(|| {
             match tpl.faction {
                 faction::FRIENDLY => "portrait_friendly.png",

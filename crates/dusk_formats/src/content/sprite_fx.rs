@@ -1,6 +1,6 @@
 //! Per-sprite data of map art: particle emitters, lights, pivots (hotspots) and roofs.
 
-use crate::sprite_fx::{SpriteLight, SpritePsi, parse_custom_fx};
+use crate::sprite_fx::{SpriteLight, SpritePsi, parse_sprite_fx};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -19,7 +19,7 @@ pub struct SpriteFx {
 /// Every `sprite_fx.txt`, `hotspots.txt` and `roofs.txt` under `content/`.
 pub fn load(root: &Path) -> anyhow::Result<SpriteFx> {
     let mut fx = SpriteFx::default();
-    let (psi, lights) = parse_custom_fx(&metadata(root, "sprite_fx.txt"));
+    let (psi, lights) = parse_sprite_fx(&metadata(root, "sprite_fx.txt"));
     for (k, v) in psi {
         fx.psi.entry(k).or_default().push(v);
     }
@@ -84,7 +84,7 @@ mod tests {
     /// Every shipped emitter names a particle system of `data/particles.txt`.
     #[test]
     fn shipped_emitters_resolve() {
-        let root = crate::content_root();
+        let root = crate::assets_root();
         let fx = load(&root).unwrap();
         let particles = super::super::particles::load(&root).unwrap();
         assert!(fx.psi.contains_key("green_firefly.psi"), "glade fireflies");

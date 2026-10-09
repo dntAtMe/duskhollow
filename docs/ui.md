@@ -18,7 +18,7 @@ original targets 1920x1080; at our default 1280x720 the pieces are placed so the
 ## Fonts
 
 Every UI text uses DejaVu Serif (`combat_ui::UI_FONT`, resource `UiFont`) and DejaVu Serif Bold
-for titles (`UI_FONT_BOLD`, `UiFontBold`), shipped in `content/custom/fonts/` with their licence
+for titles (`UI_FONT_BOLD`, `UiFontBold`), shipped in `content/fonts/` with their licence
 (`LICENSE_DEJAVU`: Bitstream Vera licence + public-domain DejaVu changes; free to redistribute,
 renamed derivatives only). DejaVu runs wider than the condensed MMO faces, so fixed-width labels
 are sized for it.
@@ -35,7 +35,7 @@ command-line launch (map / `--connect` / `--name` / `--class`, or a `DUSK_*` deb
   despawned (map tiles, audio and `menu::KeepOnMenu` roots excepted), `Net` / `PlayerState` /
   `OfflineServer` (the embedded server, stopped on drop) are removed, and gameplay resources are
   reset with `state::reset` on the next `OnEnter(Connecting)`.
-- The menu backdrop is the real `custom_duskhollow` map around Lowshade's cairn: the camera drifts,
+- The menu backdrop is the real `duskhollow` map around Lowshade's cairn: the camera drifts,
   the Eye's openness breathes (`GazeView`, so the crimson grade and lit sprites follow), embers rise,
   a dithered vignette darkens edges and scrims the title / buttons. The custom soundtrack plays
   because the audio listener falls back to the camera when there is no player.
@@ -74,7 +74,7 @@ Target mana: the server doesn't send NPC mana; the bar is shown full for casters
 
 ### Portraits
 
-Portraits are our close-ups (`content/custom/portraits/portrait_custom_<model>.png`,
+Portraits are our close-ups (`content/portraits/portrait_custom_<model>.png`,
 `tools/artgen/portraits.py`) plus 80x80 faction placeholders
 (`portrait_{hostile,friendly,grey}.png`). The client bakes a round 78 px thumbnail on the CPU
 (80x80 images whole, larger cards: a 130 px square around y=115).

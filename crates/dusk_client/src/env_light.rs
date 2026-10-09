@@ -12,7 +12,7 @@ use crate::{
     unit::{Unit, UnitLayer},
 };
 use bevy::prelude::*;
-use dusk_formats::custom::{Cover, CoverGrid};
+use dusk_formats::content::sidecars::{Cover, CoverGrid};
 
 pub struct EnvLightPlugin;
 

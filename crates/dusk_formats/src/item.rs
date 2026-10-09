@@ -514,7 +514,7 @@ pub struct LootRow {
     pub chance: f32,
     pub count_min: i64,
     pub count_max: i64,
-    /// Gated by quest/state conditions (legacy tables only; ours have none).
+    /// Gated by quest/state conditions (none of `data/loot.txt` are).
     pub conditional: bool,
 }
 

@@ -26,7 +26,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, Extent3d, ShaderType, TextureDimension, TextureFormat};
 use bevy::shader::ShaderRef;
 use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin};
-use dusk_formats::custom::{Cover, CoverGrid};
+use dusk_formats::content::sidecars::{Cover, CoverGrid};
 use dusk_protocol::ServerMsg;
 
 pub struct GazePlugin;
