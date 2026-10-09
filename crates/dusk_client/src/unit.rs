@@ -18,6 +18,23 @@ impl Plugin for UnitPlugin {
 /// Default visual height (px) of a player character, for bars and floating text.
 const PLAYER_HEIGHT: f32 = 75.0;
 
+/// Melee attack variants in our generated art (tools/artgen: horizontal slash, overhead chop,
+/// thrust); a `swing` request picks one the unit has, never the same three times running.
+const SWING_VARIANTS: [&str; 3] = ["swing", "swing2", "swing3"];
+/// Variant weights; units with a heavy two-handed weapon favour the overhead chop.
+const SWING_WEIGHTS: [u32; 3] = [3, 2, 2];
+const SWING_WEIGHTS_HEAVY: [u32; 3] = [2, 4, 1];
+/// Weapon smear layers (`<model>_smear` scripts, tools/artgen/smear.py) over attacking units.
+pub const SMEAR: bool = true;
+/// Attackers lunge toward their target on the strike (screen px at scale 1, on top of the
+/// sprite's own step-in), after a slight pull-back during the wind-up.
+pub const LUNGE: bool = true;
+const LUNGE_PX: f32 = 6.0;
+/// Struck units are knocked back a little (px) for `FLINCH_SECS`.
+pub const FLINCH: bool = true;
+const FLINCH_PX: f32 = 4.0;
+const FLINCH_SECS: f32 = 0.22;
+
 /// A unit standing on the map, in cell coordinates.
 #[derive(Component, Debug)]
 pub struct Unit {
@@ -34,11 +51,36 @@ pub struct Unit {
     /// Seconds the animation stays frozen (hit-stop, see `feel`).
     pub hitstop: f32,
     body: Option<Arc<SpriteScript>>,
+    /// One-shot animation waiting to start (e.g. the flinch when the blow actually lands).
+    pending: Option<(&'static str, f32)>,
+    /// Last two swing variants (indices into `SWING_VARIANTS`).
+    swings: [u8; 2],
+    rng: u32,
+    /// Wields a heavy two-handed weapon (set from the paper doll).
+    pub heavy_weapon: bool,
+    /// Knock-back: screen direction and seconds left.
+    push: (Vec2, f32),
 }
 
 impl Unit {
     pub fn new(pos: Vec2, dir: u8, scale: f32, height: f32) -> Self {
-        Self { pos, dir, anim: "stance", elapsed_ms: 0.0, action: None, scale, height, hitstop: 0.0, body: None }
+        let rng = (pos.x.to_bits() ^ pos.y.to_bits().rotate_left(13)) | 1;
+        Self {
+            pos,
+            dir,
+            anim: "stance",
+            elapsed_ms: 0.0,
+            action: None,
+            scale,
+            height,
+            hitstop: 0.0,
+            body: None,
+            pending: None,
+            swings: [u8::MAX; 2],
+            rng,
+            heavy_weapon: false,
+            push: (Vec2::ZERO, 0.0),
+        }
     }
 
     pub fn set_anim(&mut self, anim: &'static str) {
@@ -49,7 +91,9 @@ impl Unit {
     }
 
     /// Plays a one-shot animation if the unit has it; the base animation resumes after.
+    /// `swing` picks one of the unit's attack variants.
     pub fn play_action(&mut self, anim: &'static str) {
+        let anim = if anim == "swing" { self.pick_swing() } else { anim };
         let len = self.body.as_ref().and_then(|b| b.animations.get(anim)).map(|a| a.duration_ms as f32);
         if let Some(len) = len {
             self.action = Some((anim, 0.0, len.max(100.0)));
@@ -58,6 +102,93 @@ impl Unit {
 
     pub fn has_anim(&self, anim: &str) -> bool {
         self.body.as_ref().is_some_and(|b| b.animations.contains_key(anim))
+    }
+
+    /// [`Self::play_action`] after `secs` (immediately if `secs` <= 0).
+    pub fn play_action_after(&mut self, anim: &'static str, secs: f32) {
+        if secs <= 0.0 {
+            self.play_action(anim);
+        } else {
+            self.pending = Some((anim, secs));
+        }
+    }
+
+    /// Seconds until the current attack's blow lands (`hit=` in the sprite script), 0 when not
+    /// attacking, already past it, or the animation has no hit time (original art).
+    pub fn impact_in(&self) -> f32 {
+        let Some((name, t, _)) = self.action else { return 0.0 };
+        self.hit_ms(name).map_or(0.0, |h| ((h - t) / 1000.0).max(0.0))
+    }
+
+    /// Pushes the unit back along `screen_dir` for a moment (see `FLINCH`).
+    pub fn flinch(&mut self, screen_dir: Vec2) {
+        if FLINCH {
+            self.push = (screen_dir.normalize_or_zero(), FLINCH_SECS);
+        }
+    }
+
+    fn hit_ms(&self, anim: &str) -> Option<f32> {
+        self.body.as_ref()?.animations.get(anim)?.hit_ms.map(|h| h as f32)
+    }
+
+    fn next_random(&mut self) -> u32 {
+        // xorshift32
+        let mut x = self.rng;
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        self.rng = x;
+        x
+    }
+
+    fn pick_swing(&mut self) -> &'static str {
+        let Some(body) = self.body.clone() else { return "swing" };
+        let weights = if self.heavy_weapon { SWING_WEIGHTS_HEAVY } else { SWING_WEIGHTS };
+        // Never a third time in a row.
+        let repeated = (self.swings[0] == self.swings[1]).then_some(self.swings[0]);
+        let options: Vec<(usize, u32)> = (0..SWING_VARIANTS.len())
+            .filter(|&i| body.animations.contains_key(SWING_VARIANTS[i]) && repeated != Some(i as u8))
+            .map(|i| (i, weights[i]))
+            .collect();
+        let total: u32 = options.iter().map(|o| o.1).sum();
+        if total == 0 {
+            return "swing";
+        }
+        let mut roll = self.next_random() % total;
+        let mut pick = options[0].0;
+        for (i, w) in &options {
+            if roll < *w {
+                pick = *i;
+                break;
+            }
+            roll -= w;
+        }
+        self.swings = [self.swings[1], pick as u8];
+        SWING_VARIANTS[pick]
+    }
+
+    /// Screen offset of the lunge (attacks) and knock-back (flinch), in px.
+    fn motion_offset(&self) -> Vec2 {
+        let mut off = Vec2::ZERO;
+        if let Some((name, t, len)) = self.action.filter(|_| LUNGE) {
+            if let Some(hit) = self.hit_ms(name).filter(|h| *h > 0.0) {
+                let k = if t < hit {
+                    let x = t / hit;
+                    -0.35 * x * x + 1.35 * x.powi(6)
+                } else {
+                    let rest = ((t - hit) / (len - hit).max(1.0)).min(1.0);
+                    (-(t - hit) / 140.0).exp() * (1.0 - rest)
+                };
+                off += facing_screen(self.dir) * k * LUNGE_PX;
+            }
+        }
+        if self.push.1 > 0.0 {
+            // Snap out, ease back.
+            let k = 1.0 - self.push.1 / FLINCH_SECS;
+            let shape = if k < 0.2 { k / 0.2 } else { 1.0 - (k - 0.2) / 0.8 };
+            off += self.push.0 * FLINCH_PX * shape;
+        }
+        off * self.scale
     }
 
     pub fn is_acting(&self) -> bool {
@@ -187,7 +318,13 @@ pub fn spawn_npc(
     let scale = if template.model_scale > 0 { template.model_scale as f32 / 100.0 } else { 1.0 };
     let height = if model.height > 0 { model.height as f32 } else { 60.0 };
     let unit = Unit::new(pos, iso::direction_from_orientation(orientation), scale, height);
-    let e = spawn_unit(commands, data, assets, unit, &[(npc_script_dir(data, &model.name), &model.name)])?;
+    let dir = npc_script_dir(data, &model.name);
+    let smear = format!("{}_smear", model.name);
+    let mut layers = vec![(dir, model.name.as_str())];
+    if SMEAR && data.sprite_script(dir, &smear).is_some() {
+        layers.push((dir, smear.as_str()));
+    }
+    let e = spawn_unit(commands, data, assets, unit, &layers)?;
     commands.entity(e).insert((Npc { entry }, Name::new(template.name.clone())));
     Some(e)
 }
@@ -202,7 +339,11 @@ pub fn spawn_paper_doll(
     orientation: f32,
 ) -> Option<Entity> {
     let layers: Vec<_> = if data.custom_art {
-        vec![("player/custom", "adventurer")]
+        let mut l = vec![("player/custom", "adventurer")];
+        if SMEAR {
+            l.push(("player/custom", "adventurer_smear"));
+        }
+        l
     } else {
         PAPER_DOLL.iter().map(|n| ("player/male", *n)).collect()
     };
@@ -212,9 +353,27 @@ pub fn spawn_paper_doll(
     Some(e)
 }
 
+/// Unit screen-space vector of a sheet direction (0=W .. 4=E .. 7=SW, see `iso`).
+pub fn facing_screen(dir: u8) -> Vec2 {
+    let k = (dir as usize + 3) % 8; // inverse of `iso::direction_from_orientation`'s table
+    let a = k as f32 * std::f32::consts::FRAC_PI_4;
+    (iso::to_screen(Vec2::new(a.cos(), a.sin())) - iso::to_screen(Vec2::ZERO)).normalize_or_zero()
+}
+
 fn tick_units(time: Res<Time>, mut units: Query<&mut Unit>) {
     let dt = time.delta_secs() * 1000.0;
     for mut u in &mut units {
+        if u.push.1 > 0.0 {
+            u.push.1 = (u.push.1 - dt / 1000.0).max(0.0);
+        }
+        if let Some((anim, left)) = &mut u.pending {
+            *left -= dt / 1000.0;
+            if *left <= 0.0 {
+                let anim = *anim;
+                u.pending = None;
+                u.play_action(anim);
+            }
+        }
         if u.hitstop > 0.0 {
             u.hitstop -= dt / 1000.0;
             continue;
@@ -231,7 +390,7 @@ fn tick_units(time: Res<Time>, mut units: Query<&mut Unit>) {
 
 fn sync_unit_transforms(mut units: Query<(&Unit, &mut Transform), Changed<Unit>>) {
     for (u, mut t) in &mut units {
-        let s = iso::to_screen(u.pos);
+        let s = iso::to_screen(u.pos) + u.motion_offset();
         t.translation = Vec3::new(s.x, s.y, iso::depth(u.pos));
     }
 }

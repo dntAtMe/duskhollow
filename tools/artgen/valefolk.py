@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import math
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +30,9 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 import creatures  # noqa: E402,F401  (registers its ramps first, so ids stay stable)
 import sheet  # noqa: E402
+import smear  # noqa: E402
 import vox  # noqa: E402
+from keyframes import keyed, retime  # noqa: E402
 from vox import Bone, Model, Prim, rot_x, rot_y, rot_z  # noqa: E402
 
 R = math.radians
@@ -328,20 +331,43 @@ def wolf_anims():
         rot["tail"] = rot_y(R(-15)) @ rot_z(R(10 * math.sin(p)))
         return rot, (0, 0, 0.03 * abs(math.sin(2 * p)) - 0.02), None
 
-    def bite(t):
-        k = math.sin(min(t / 0.6, 1.0) * math.pi / 2) if t < 0.6 else 1 - (t - 0.6) / 0.4
-        snap = 1.0 if t < 0.45 else max(0.0, 1 - (t - 0.45) / 0.15)
-        rot = wolf_legs({}, 0, 0, 0)
-        rot["body"] = rot_y(R(-6 * k))
-        rot["neck"] = rot_y(R(14 - 30 * k))
-        rot["head"] = rot_y(R(10 * k))
-        rot["jaw"] = rot_y(R(40 * snap * k))
-        rot["fu_l"] = rot_y(R(-35 * k))
-        rot["fu_r"] = rot_y(R(-20 * k))
-        rot["hu_l"] = rot_y(R(20 * k))
-        rot["hu_r"] = rot_y(R(25 * k))
-        rot["tail"] = rot_y(R(-25 * k))
-        return rot, (0.18 * k, 0, 0.04 * k), None
+    base = {"body": (0, 2, 0), "neck": (0, 14, 0), "head": (0, -6, 0), "jaw": (0, 8, 0), "tail": (0, 0, 0),
+            **{f"{leg}_{s}": (0, 0, 0) for leg in ("fu", "fd", "hu", "hd") for s in "lr"}, "root": (0, 0, 0)}
+    # Snapping bite: haunches drop and the head pulls back low with the lips peeled (hold), then
+    # the whole body springs forward and the jaws slam shut on frame 2, a savage head shake, back off.
+    bite = keyed(7, base, [
+        (0, {"body": (0, 6, 0), "neck": (0, 30, 0), "head": (0, -14, 0), "jaw": (0, 22, 0), "tail": (0, -20, 0),
+             "hu_l": (0, 20, 0), "hu_r": (0, 22, 0), "hd_l": (0, -16, 0), "hd_r": (0, -18, 0),
+             "fu_l": (0, 8, 0), "fu_r": (0, 8, 0), "root": (-0.08, 0, -0.04)}, "lin"),
+        (1, {"neck": (0, 36, 0), "jaw": (0, 42, 0), "root": (-0.1, 0, -0.05), "body": (0, 8, 0)}, "out"),
+        (2, {"body": (0, -6, 0), "neck": (0, -18, 0), "head": (0, 12, 0), "jaw": (0, 2, 0), "tail": (0, -30, 0),
+             "fu_l": (0, -40, 0), "fu_r": (0, -22, 0), "fd_l": (0, 20, 0), "hu_l": (0, 28, 0), "hu_r": (0, 30, 0),
+             "hd_l": (0, 0, 0), "hd_r": (0, 0, 0), "root": (0.26, 0, 0.03)}, "in3"),
+        (3, {"neck": (12, -14, 18), "head": (10, 10, 0), "root": (0.24, 0, 0.0)}, "out"),
+        (4, {"neck": (-10, -10, -16), "head": (-8, 8, 0)}, "io"),
+        (6, {**base, "neck": (0, 18, 0)}, "io"),
+    ])
+
+    # Pounce: a low crouch with the hindquarters wound up, a leap with the forepaws reaching and
+    # the jaws wide, landing on the target with paws and teeth, then a hop back.
+    pounce = keyed(8, base, [
+        (0, {"body": (0, 4, 0), "neck": (0, 26, 0), "head": (0, -10, 0), "jaw": (0, 14, 0), "tail": (0, 10, 0),
+             "fu_l": (0, 22, 0), "fu_r": (0, 18, 0), "fd_l": (0, -30, 0), "fd_r": (0, -28, 0),
+             "hu_l": (0, 30, 0), "hu_r": (0, 30, 0), "hd_l": (0, -30, 0), "hd_r": (0, -30, 0),
+             "root": (-0.06, 0, -0.12)}, "lin"),
+        (1, {"body": (0, 6, 0), "tail": (0, 20, 0), "root": (-0.09, 0, -0.15)}, "out"),
+        (2, {"body": (0, -18, 0), "neck": (0, -6, 0), "head": (0, 0, 0), "jaw": (0, 46, 0), "tail": (0, -25, 0),
+             "fu_l": (0, -75, 0), "fu_r": (0, -65, 0), "fd_l": (0, 30, 0), "fd_r": (0, 26, 0),
+             "hu_l": (0, 45, 0), "hu_r": (0, 50, 0), "hd_l": (0, 10, 0), "hd_r": (0, 10, 0),
+             "root": (0.22, 0, 0.2)}, "in"),
+        (3, {"body": (0, 12, 0), "neck": (0, 4, 0), "head": (0, 16, 0), "jaw": (0, 2, 0),
+             "fu_l": (0, -40, 0), "fu_r": (0, -30, 0), "fd_l": (0, 10, 0), "fd_r": (0, 10, 0),
+             "hu_l": (0, 10, 0), "hu_r": (0, 12, 0), "hd_l": (0, -10, 0), "hd_r": (0, -10, 0),
+             "root": (0.4, 0, -0.04)}, "in"),
+        (4, {"body": (0, 10, 0), "neck": (8, 6, 14), "root": (0.38, 0, -0.06)}, "out"),
+        (5, {"neck": (-6, 8, -10)}, "io"),
+        (7, {**base, "neck": (0, 18, 0)}, "io"),
+    ])
 
     def hit(t):
         k = math.sin(t * math.pi)
@@ -368,9 +394,10 @@ def wolf_anims():
     return [
         ("stance", stance, 4, 1000, "back_forth"),
         ("run", run, 8, 560, "looped"),
-        ("swing", bite, 6, 500, "play_once"),
-        ("cast", bite, 6, 500, "play_once"),
-        ("shoot", bite, 6, 500, "play_once"),
+        ("swing", bite, 7, 560, "play_once"),
+        ("swing2", pounce, 8, 720, "play_once"),
+        ("cast", bite, 7, 560, "play_once"),
+        ("shoot", bite, 7, 560, "play_once"),
         ("hit", hit, 2, 300, "play_once"),
         ("block", hit, 2, 300, "play_once"),
         ("die", die, 6, 900, "play_once"),
@@ -500,12 +527,15 @@ def stooped_anims():
         drop = legs_pose(rot, ST_KNEE + 30 * buckle * (1 - k))
         return rot, (0, 0, drop * (1 - k) + lift), rr
 
+    # hold the sickle cocked high, rip it down and across in one frame
+    hook = retime(swing, 7, [(0, 0.25), (1, 0.45), (2, 0.68), (3, 0.78), (6, 1.0)])
+
     return [
         ("stance", stance, 4, 1400, "back_forth"),
         ("run", run, 8, 1100, "looped"),
-        ("swing", swing, 6, 800, "play_once"),
-        ("cast", swing, 6, 800, "play_once"),
-        ("shoot", swing, 6, 800, "play_once"),
+        ("swing", hook, 7, 700, "play_once"),
+        ("cast", hook, 7, 700, "play_once"),
+        ("shoot", hook, 7, 700, "play_once"),
         ("hit", hit, 2, 300, "play_once"),
         ("block", hit, 2, 300, "play_once"),
         ("die", die, 7, 1100, "play_once"),
@@ -632,13 +662,20 @@ def warden_anims():
         else:
             k = (t - 0.65) / 0.35
             up, fore, phi, lean, knee, head = -52, -35, 100, 35 - 8 * k, 30 - 6 * k, -10
+            # wrench the blade free and come back up to the post
+            r = max(0.0, (t - 0.8) / 0.2)
+            r = r * r * (3 - 2 * r)
+            up, fore, phi, lean, knee, head = (
+                a + (b - a) * r for a, b in zip((up, fore, phi, lean, knee, head), (-12, -70, 0, 0, 4, -26))
+            )
         rot = {}
         warden_base(rot, lean=lean, head_up=head)
         arm(rot, -1, up, fore, phi=phi, lean=lean)
         arm(rot, 1, up, fore, spread=-18)
         drop = legs_pose(rot, knee)
         rot["thigh_l"] = rot_y(R(-knee - 20))
-        return rot, (0.08 * min(t / 0.65, 1.0), 0, drop), None
+        back = min(max((t - 0.8) / 0.2, 0.0), 1.0)
+        return rot, (0.08 * min(t / 0.65, 1.0) * (1 - back), 0, drop), None
 
     def hit(t):
         k = math.sin(t * math.pi)
@@ -660,12 +697,17 @@ def warden_anims():
             rot[f"shin_{s}"] = rot_y(R(95 * kneel))
         return rot, (0, 0, -0.44 * kneel * (1 - k) + lift), rr
 
+    # Corvin telegraphs: a slow climb to the wind-up, a held beat, then the blow lands in one frame.
+    sweep9 = retime(sweep, 9, [(0, 0.15), (1, 0.32), (2, 0.4), (3, 0.62), (4, 0.7), (5, 0.76), (8, 1.0)])
+    slam9 = retime(slam, 9, [(0, 0.2), (1, 0.38), (2, 0.45), (3, 0.65), (4, 0.75), (8, 1.0)])
+
     return [
         ("stance", stance, 4, 1600, "back_forth"),
         ("run", run, 8, 900, "looped"),
-        ("swing", sweep, 7, 900, "play_once"),
-        ("cast", slam, 7, 900, "play_once"),
-        ("shoot", slam, 7, 900, "play_once"),
+        ("swing", sweep9, 9, 900, "play_once"),
+        ("swing2", slam9, 9, 900, "play_once"),
+        ("cast", slam9, 9, 900, "play_once"),
+        ("shoot", slam9, 9, 900, "play_once"),
         ("hit", hit, 2, 300, "play_once"),
         ("block", hit, 2, 300, "play_once"),
         ("die", die, 8, 1400, "play_once"),
@@ -954,12 +996,14 @@ def guard_anims():
         drop = legs_pose(rot, 3 + 25 * k)
         return rot, (0, 0, drop * (1 - k) + lift), rr
 
+    jab = retime(thrust, 6, [(0, 0.2), (1, 0.35), (2, 0.58), (3, 0.65), (5, 1.0)])
+
     return [
         ("stance", stance, 4, 1800, "back_forth"),
         ("run", run, 8, 680, "looped"),
-        ("swing", thrust, 6, 600, "play_once"),
-        ("cast", thrust, 6, 600, "play_once"),
-        ("shoot", thrust, 6, 600, "play_once"),
+        ("swing", jab, 6, 600, "play_once"),
+        ("cast", jab, 6, 600, "play_once"),
+        ("shoot", jab, 6, 600, "play_once"),
         ("hit", hit, 2, 300, "play_once"),
         ("block", hit, 2, 300, "play_once"),
         ("die", die, 6, 1000, "play_once"),
@@ -974,6 +1018,19 @@ vox.RAMP_TABLE = np.stack([vox.RAMP_RGB[k] for k in vox.RAMPS])
 # The player renders at 0.85 in a 160 px frame; people match that, Corvin stands ~1.3x taller.
 HUMAN = 0.85
 # model -> (builder, anims, render scale, frame size, foot)
+# Attack frame where the blow lands (`hit=` in the script, see sheet.export).
+HITS = {
+    "glarewolf": {"swing": 2, "swing2": 3, "cast": 2, "shoot": 2},
+    "stooped": {"swing": 2, "cast": 2, "shoot": 2},
+    "hollowed_warden": {"swing": 3, "swing2": 3, "cast": 3, "shoot": 3},
+    "lowshade_guard": {"swing": 2, "cast": 2, "shoot": 2},
+}
+# Weapon smear layers: model -> (bone, base, tip) in rest pose (None = lowest voxel of the bone).
+SMEARS = {
+    "stooped": ("sword", None),
+    "hollowed_warden": ("sword", ((0.03, -0.28, HAND_Z + 0.55), (0.27, -0.28, HAND_Z + 1.08))),
+}
+
 FOLK = {
     "glarewolf": (glarewolf, wolf_anims, 1.0, 128, (64, 92)),
     "stooped": (stooped, stooped_anims, HUMAN, 160, (80, 112)),
@@ -984,16 +1041,32 @@ FOLK = {
 }
 
 
+def job(name: str) -> str:
+    """Renders and exports one model (+ its smear layer); runs in a worker process."""
+    build, anims_fn, scale, frame, foot = FOLK[name]
+    model = build()
+    anims = anims_fn()
+    renders = sheet.render_all(model, anims, frame, foot, scale)
+    hits = HITS.get(name)
+    script_dir = sheet.OUT / "scripts" / "npc" / "custom"
+    sheet.export(renders, anims, foot, f"custom_npc_{name}.png", script_dir / f"{name}.txt", hits=hits)
+    sheet.preview(renders, anims, frame, f"npc_{name}")
+    if name in SMEARS:
+        bone, blade = SMEARS[name]
+        base, tip = blade or smear.blade_from_part(model, bone, base_frac=0.4)
+        attacks = [a for a in ("swing", "swing2") if any(r[0] == a for r in anims)]
+        trail = smear.render_layer(model, anims, frame, foot, scale, base, tip, hits, bone, attacks)
+        rows = smear.anims_for(anims, trail)
+        sheet.export(trail, rows, foot, f"custom_npc_{name}_smear.png", script_dir / f"{name}_smear.txt", 512)
+        sheet.preview(trail, rows, frame, f"npc_{name}_smear")
+    return f"{name}: {sum(len(p[0]) for p in model.parts.values())} voxels"
+
+
 def main(only: list[str]):
-    for name, (build, anims_fn, scale, frame, foot) in FOLK.items():
-        if only and name not in only:
-            continue
-        model = build()
-        anims = anims_fn()
-        print(f"{name}: {sum(len(p[0]) for p in model.parts.values())} voxels")
-        renders = sheet.render_all(model, anims, frame, foot, scale)
-        sheet.export(renders, anims, foot, f"custom_npc_{name}.png", sheet.OUT / "scripts" / "npc" / "custom" / f"{name}.txt")
-        sheet.preview(renders, anims, frame, f"npc_{name}")
+    names = [n for n in FOLK if not only or n in only]
+    with ProcessPoolExecutor(max_workers=6) as pool:
+        for line in pool.map(job, names):
+            print(line, flush=True)
 
 
 if __name__ == "__main__":

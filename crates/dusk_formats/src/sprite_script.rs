@@ -39,6 +39,8 @@ pub struct FrameRect {
 pub struct Animation {
     pub duration_ms: u32,
     pub mode: PlayMode,
+    /// `hit=` (our generated attack animations): ms into the animation where the blow lands.
+    pub hit_ms: Option<u32>,
     /// `frames[frame][direction]`
     pub frames: Vec<[FrameRect; DIRECTIONS]>,
 }
@@ -98,6 +100,7 @@ impl SpriteScript {
             match key {
                 "frames" => {} // derived from frame= lines
                 "duration" => anim.duration_ms = parse_duration_ms(value)?,
+                "hit" => anim.hit_ms = Some(parse_duration_ms(value)?),
                 "type" => {
                     anim.mode = match value {
                         "looped" => PlayMode::Looped,
@@ -157,5 +160,12 @@ mod tests {
         assert_eq!(run.frames[0][0].pivot_x, -5);
         let seq: Vec<_> = (0..5).map(|i| run.frame_at(i * 100)).collect();
         assert_eq!(seq, [0, 1, 2, 1, 0]);
+        assert_eq!(run.hit_ms, None);
+    }
+
+    #[test]
+    fn parses_hit_time() {
+        let s = SpriteScript::parse("image=a.png\n[swing]\nduration=640ms\ntype=play_once\nhit=160ms\n").unwrap();
+        assert_eq!(s.animations["swing"].hit_ms, Some(160));
     }
 }

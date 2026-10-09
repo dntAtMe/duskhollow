@@ -44,18 +44,24 @@ def trim(img: np.ndarray):
     return img[y0:y1, x0:x1], (x0, y0)
 
 
-def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width: int = 1024):
+def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width: int = 1024, hits=None):
     """Shelf-pack trimmed frames into one sheet (custom_assets/content/custom/<image_name>)
-    and write the sprite script to `script_path`."""
+    and write the sprite script to `script_path`. Identical frames (holds, empty smear frames)
+    share one rect. `hits`: {anim: frame} where the blow lands -> `hit=<ms>` in the script."""
     entries = []
     for name, *_ in anims:
         for f, dirs in enumerate(renders[name]):
             for d, img in enumerate(dirs):
                 cropped, (x0, y0) = trim(img)
                 entries.append((name, f, d, cropped, (foot[0] - x0, foot[1] - y0)))
+    unique, alias = {}, {}
+    for name, f, d, img, pivot in entries:
+        key = (img.shape, img.tobytes(), pivot)
+        alias[(name, f, d)] = unique.setdefault(key, (name, f, d))
+    firsts = {v for v in unique.values()}
     x = y = row_h = 0
     placed = []
-    for e in sorted(entries, key=lambda e: -e[3].shape[0]):
+    for e in sorted((e for e in entries if e[:3] in firsts), key=lambda e: -e[3].shape[0]):
         h, w = e[3].shape[:2]
         if x + w > sheet_width:
             x, y, row_h = 0, y + row_h + 1, 0
@@ -68,6 +74,8 @@ def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width
         h, w = img.shape[:2]
         sheet[py : py + h, px : px + w] = img
         rects[(name, f, d)] = (px, py, w, h, pivot)
+    for k, first in alias.items():
+        rects[k] = rects[first]
 
     img_dir = OUT / "content" / "custom"
     img_dir.mkdir(parents=True, exist_ok=True)
@@ -77,6 +85,8 @@ def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width
     lines = [f"image={image_name}", ""]
     for name, _, frames, duration, kind in anims:
         lines += [f"[{name}]", f"frames={frames}", f"duration={duration}ms", f"type={kind}"]
+        if hits and name in hits:
+            lines.append(f"hit={hits[name] * duration // frames}ms")
         for f in range(frames):
             for d in range(8):
                 px, py, w, h, (pvx, pvy) = rects[(name, f, d)]
@@ -97,3 +107,24 @@ def preview(renders, anims, frame: int, name: str):
             for d, img in enumerate(dirs):
                 strip.alpha_composite(Image.fromarray(img), (f * frame, d * frame))
         strip.save(pdir / f"{name}_{anim}.png")
+
+
+def load(script_path: Path, frame: int, foot):
+    """Inverse of `export`: {anim: [[rgba frame x frame per dir] per frame]} from a written
+    script + sheet (to re-render only some animations of a layer)."""
+    renders, image = {}, None
+    cur = None
+    for line in script_path.read_text().splitlines():
+        if line.startswith("image="):
+            image = np.array(Image.open(OUT / "content" / "custom" / line[6:]).convert("RGBA"))
+        elif line.startswith("[") and line.endswith("]"):
+            cur = renders.setdefault(line[1:-1], [])
+        elif line.startswith("frame=") and cur is not None:
+            f, d, x, y, w, h, px, py = (int(v) for v in line[6:].split(","))
+            while len(cur) <= f:
+                cur.append([np.zeros((frame, frame, 4), np.uint8) for _ in range(8)])
+            x0, y0 = foot[0] - px, foot[1] - py
+            crop = image[y : y + h, x : x + w]
+            if crop[:, :, 3].any():
+                cur[f][d][y0 : y0 + h, x0 : x0 + w] = crop
+    return renders
