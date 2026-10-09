@@ -440,8 +440,7 @@ fn on_map_loaded(
     let info = data.maps.iter().find(|m| m.name == current.name);
     music.map_music = info.map(|i| split_playlist(&i.music.join(","))).unwrap_or_default();
     music.map_ambience = info.map(|i| split_playlist(&i.ambience)).unwrap_or_default();
-    let custom_map = current.name.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX);
-    music.custom_playlist = (custom_map || data.custom_art).then(|| custom_soundtrack(&data)).filter(|t| !t.is_empty());
+    music.custom_playlist = Some(custom_soundtrack(&data)).filter(|t| !t.is_empty());
     music.dirty = true;
 
     for g in proximity.groups.drain(..) {

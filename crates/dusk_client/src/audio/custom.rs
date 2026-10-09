@@ -15,7 +15,6 @@ use super::{AudioSettings, ProximityGroup, Rng, SfxAt, SfxVoice};
 use crate::{
     data::GameData,
     gaze::{CoverKind, EyeState, GazeView},
-    map_render::CurrentMap,
     player::Player,
     unit::{Npc, Targeted, Unit},
 };
@@ -395,26 +394,23 @@ fn strain_cues(
 
 // ---------------------------------------------------------------- footsteps + greets
 
-/// Player footsteps on custom maps / with custom art: stone under deep shelter (roofed
-/// lanes, the cairn), dirt elsewhere.
+/// Player footsteps: stone under deep shelter (roofed lanes, the cairn), dirt elsewhere.
 #[allow(clippy::too_many_arguments)]
 fn footsteps(
     mut commands: Commands,
     data: Res<GameData>,
     assets: Res<AssetServer>,
     settings: Res<AudioSettings>,
-    current: Res<CurrentMap>,
     view: Res<GazeView>,
     mut rng: ResMut<Rng>,
     player: Query<&Unit, With<Player>>,
     mut walked: Local<(Option<Vec2>, f32)>,
 ) {
-    let custom = data.custom_art || current.name.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX);
     let Ok(unit) = player.single() else { return };
     let (last, dist) = &mut *walked;
     let moved = last.map_or(0.0, |l| l.distance(unit.pos));
     *last = Some(unit.pos);
-    if !custom || unit.anim != "run" || moved > 3.0 {
+    if unit.anim != "run" || moved > 3.0 {
         *dist = STEP_CELLS * 0.6; // first step comes quickly after starting to run
         return;
     }

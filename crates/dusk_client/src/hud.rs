@@ -1,5 +1,5 @@
 //! Unit frames on the original art (player top-left, target next to it), the XP bar,
-//! circular portraits and the `config.ini` HUD options.
+//! circular portraits and the HUD options.
 //!
 //! Frame geometry comes from `UnitFrame::setFrameStyle` (`FUN_0052f460`): style 1 is the
 //! player frame (`unit_frame.png`), style 2 the mirrored target frame (`unit_frame_reverse.png`).
@@ -23,7 +23,7 @@ pub struct HudPlugin;
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Portraits>()
-            .add_systems(PreStartup, load_config)
+            .init_resource::<HudConfig>()
             .add_systems(OnEnter(crate::state::AppState::InGame), spawn_hud)
             .add_systems(
                 Update,
@@ -36,8 +36,7 @@ impl Plugin for HudPlugin {
 
 // ---------------------------------------------------------------- config
 
-/// HUD options from the original `config.ini` (`[System]` / `[UI]`), defaults as shipped.
-/// Read from `<assets>/config.ini` when present.
+/// HUD options (name plates, names, minimap zoom).
 #[derive(Resource, Debug, Clone)]
 pub struct HudConfig {
     /// Health bars over hostile/neutral NPCs.
@@ -68,54 +67,20 @@ impl Default for HudConfig {
     }
 }
 
-impl HudConfig {
-    /// Applies `Key=Value` lines of an ini file over the defaults (sections are ignored).
-    pub fn parse(text: &str) -> Self {
-        let mut c = Self::default();
-        for line in text.lines() {
-            let Some((k, v)) = line.split_once('=') else { continue };
-            let v = v.trim().trim_matches('"');
-            let flag = v != "0";
-            match k.trim() {
-                "EnemyNameplateTick" => c.enemy_nameplates = flag,
-                "FriendlyNameplateTick" => c.friendly_nameplates = flag,
-                "YourNameTick" => c.your_name = flag,
-                "YourNameplateTick" => c.your_nameplate = flag,
-                "ShowPlayerNameTick" => c.show_player_names = flag,
-                "ShowNpcNameTick" => c.show_npc_names = flag,
-                "MinimapZoom" => c.minimap_zoom = v.parse().unwrap_or(c.minimap_zoom),
-                _ => {}
-            }
-        }
-        c
-    }
-}
-
-fn load_config(mut commands: Commands, data: Res<GameData>) {
-    let config = data
-        .find_file("config.ini")
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .map(|t| HudConfig::parse(&t))
-        .unwrap_or_default();
-    commands.insert_resource(config);
-}
-
 // ---------------------------------------------------------------- portraits
 
 /// Portrait diameter inside the frame circle.
 const PORTRAIT: u32 = 78;
 
-/// Circular portrait thumbnails baked on the CPU from the original portrait cards
-/// (210x330, or 80x80 faction placeholders).
+/// Circular portrait thumbnails baked on the CPU from our portrait cards
+/// (`tools/artgen/portraits.py`, 210x330) or the 80x80 faction placeholders.
 #[derive(Resource, Default)]
 pub struct Portraits {
     entries: HashMap<String, PortraitEntry>,
-    /// `scripts/sprite/portrait_offset.txt`: face height in player portraits.
-    offsets: Option<HashMap<String, u32>>,
 }
 
 enum PortraitEntry {
-    Loading { source: Handle<Image>, centre_y: Option<u32> },
+    Loading { source: Handle<Image> },
     Ready(Handle<Image>),
     Failed,
 }
@@ -123,19 +88,8 @@ enum PortraitEntry {
 impl Portraits {
     /// Baked portrait for a bare file name like `portrait_goblin.png`; `None` while loading.
     pub fn get(&mut self, data: &GameData, assets: &AssetServer, name: &str) -> Option<Handle<Image>> {
-        let offsets = self.offsets.get_or_insert_with(|| {
-            data.find_file("scripts/sprite/portrait_offset.txt")
-                .and_then(|p| std::fs::read_to_string(p).ok())
-                .unwrap_or_default()
-                .lines()
-                .filter_map(|l| l.split_once('='))
-                .filter_map(|(k, v)| Some((k.trim().to_lowercase(), v.trim().parse().ok()?)))
-                .collect()
-        });
-        let key = name.to_lowercase();
-        let centre_y = offsets.get(&key).copied();
-        let entry = self.entries.entry(key).or_insert_with(|| match data.asset_path(name) {
-            Some(path) => PortraitEntry::Loading { source: assets.load(path), centre_y },
+        let entry = self.entries.entry(name.to_lowercase()).or_insert_with(|| match data.asset_path(name) {
+            Some(path) => PortraitEntry::Loading { source: assets.load(path) },
             None => PortraitEntry::Failed,
         });
         match entry {
@@ -144,16 +98,14 @@ impl Portraits {
         }
     }
 
-    /// Portrait for an NPC: `npc_template.portrait`, else one named after its model, else the
-    /// faction placeholder.
+    /// Portrait for an NPC: our close-up of its model (`portrait_custom_<model>.png`), else
+    /// `portrait_<npc_template.portrait>.png`, else the faction placeholder. Only our own files.
     pub fn npc(&mut self, data: &GameData, assets: &AssetServer, entry: i64) -> Option<Handle<Image>> {
         let tpl = data.npc_templates.get(&entry)?;
         let model = data.npc_models.get(&tpl.model_id).map(|m| m.name.as_str()).unwrap_or("");
-        // `--art custom`: our generated close-up (tools/artgen/portraits.py) when one exists.
-        let custom = data.custom_art.then(|| format!("portrait_custom_{model}.png"));
-        let candidates =
-            custom.into_iter().chain([format!("portrait_{}.png", tpl.portrait), format!("portrait_{model}.png")]);
-        let named = candidates.into_iter().find(|n| n != "portrait_.png" && data.asset_path(n).is_some());
+        let candidates = [format!("portrait_custom_{model}.png"), format!("portrait_{}.png", tpl.portrait)];
+        let own = |n: &String| data.asset_path(n).is_some_and(|p| !p.starts_with(dusk_formats::LEGACY_SOURCE));
+        let named = candidates.into_iter().find(|n| n != "portrait_.png" && own(n));
         let name = named.unwrap_or_else(|| {
             match tpl.faction {
                 faction::FRIENDLY => "portrait_friendly.png",
@@ -166,16 +118,14 @@ impl Portraits {
     }
 }
 
-/// The local player's portrait: the default male card, or our adventurer with `--art custom`.
-fn player_portrait(data: &GameData) -> &'static str {
-    if data.custom_art { "portrait_custom_adventurer.png" } else { "portrait_male (90).png" }
-}
+/// The local player's portrait.
+const PLAYER_PORTRAIT: &str = "portrait_custom_adventurer.png";
 
 fn bake_portraits(mut portraits: ResMut<Portraits>, mut images: ResMut<Assets<Image>>) {
     for entry in portraits.entries.values_mut() {
-        let PortraitEntry::Loading { source, centre_y } = entry else { continue };
+        let PortraitEntry::Loading { source } = entry else { continue };
         let Some(src) = images.get(&*source) else { continue };
-        *entry = match bake(src, *centre_y) {
+        *entry = match bake(src) {
             Some(img) => PortraitEntry::Ready(images.add(img)),
             None => PortraitEntry::Failed,
         };
@@ -183,14 +133,14 @@ fn bake_portraits(mut portraits: ResMut<Portraits>, mut images: ResMut<Assets<Im
 }
 
 /// Crops a square around the face, scales it to [`PORTRAIT`] and cuts a soft-edged circle.
-fn bake(src: &Image, centre_y: Option<u32>) -> Option<Image> {
+fn bake(src: &Image) -> Option<Image> {
     let (w, h) = (src.width() as f32, src.height() as f32);
     // Small images (faction placeholders) are used whole; cards are cropped around the face.
     let (side, cx, cy) = if w <= 100.0 {
         (w.min(h), w / 2.0, h / 2.0)
     } else {
         let side = 130.0f32.min(w);
-        let cy = centre_y.map(|c| c as f32 + 10.0).unwrap_or(115.0).clamp(side / 2.0, h - side / 2.0);
+        let cy = 115.0f32.clamp(side / 2.0, h - side / 2.0);
         (side, w / 2.0, cy)
     };
     let mut out = Image::new_fill(
@@ -489,7 +439,7 @@ fn update_player_frame(
     // The portrait may finish baking after the last state change.
     for (mut node, mut vis, p) in &mut portrait {
         if p.0 == Which::Player && *vis == Visibility::Hidden {
-            if let Some(h) = portraits.get(&data, &assets, player_portrait(&data)) {
+            if let Some(h) = portraits.get(&data, &assets, PLAYER_PORTRAIT) {
                 node.image = h;
                 *vis = Visibility::Inherited;
             }
@@ -660,19 +610,5 @@ fn update_xp_bar(
     }
     if let Ok(mut t) = text.single_mut() {
         t.0 = format!("Experience {} / {}", state.xp, state.xp_next);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn config_overrides_defaults() {
-        let c = HudConfig::parse("[System]\nEnemyNameplateTick=0\nShowNpcNameTick=1\n[UI]\nMinimapZoom=3\n");
-        assert!(!c.enemy_nameplates);
-        assert!(c.show_npc_names);
-        assert!(!c.friendly_nameplates);
-        assert_eq!(c.minimap_zoom, 3);
     }
 }

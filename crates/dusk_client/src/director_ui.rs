@@ -143,9 +143,9 @@ struct EndHint;
 #[derive(Component)]
 struct EndRule;
 
-fn spawn_ui(mut commands: Commands, font: Res<UiFont>, data: Res<GameData>, assets: Res<AssetServer>) {
+fn spawn_ui(mut commands: Commands, font: Res<UiFont>, bold: Res<crate::combat_ui::UiFontBold>) {
     let f = |size: f32| TextFont { font: font.0.clone().into(), font_size: size.into(), ..default() };
-    let title_font = data.asset_path("Friz Quadrata Bold.ttf").map(|p| assets.load(p)).unwrap_or(font.0.clone());
+    let title_font = bold.0.clone();
     let tf = |size: f32| TextFont { font: title_font.clone().into(), font_size: size.into(), ..default() };
 
     // Quest tracker, under the minimap (minimap frame is 241x293 at the top-right).

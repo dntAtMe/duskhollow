@@ -5,9 +5,11 @@
    rod_purple, greatbow_orange, kite shield ...) -> a weapon / shield builder;
 2. armour icons `icon_item_<rb|lt|ch|pl>_<glove|head|pants|shoes|torso>_*` -> cloth / leather /
    chain / plate builders of that slot;
-3. keywords of the icon file name and the item name (potion_hp / mp, serum, ring, necklace, belt,
+3. our data (`by_data`): drink names, weapon models by substring or `weapon_type`, armour slot and
+   family from the model / name words, `equip_type` and `armor_type`, junk keywords;
+4. keywords of the icon file name and the item name (potion_hp / mp, serum, ring, necklace, belt,
    gem names, crystalball = enchant orbs, scrolls, food dishes, bones, teeth, claws, ores ...);
-4. a generic sack of loot.
+5. a generic sack of loot.
 
 Quality (2 plain .. 6 purple) picks the accents: trim metal (bronze, silver, steel, gold, gold),
 inset gem (none, emerald, sapphire, ruby, amethyst) and cloth colour, so tiers of the same base item
@@ -885,6 +887,118 @@ ARMOUR_RE = re.compile(r"icon_item_(rb|lt|ch|pl)_(glove|head|pants|shoes|torso)_
 POTION_RE = re.compile(r"potion_(hp|mp)0(\d)_(\d)")
 
 
+# --- our data ----------------------------------------------------------------------------------------
+
+EQUIP_NAMES = {"head": 1, "neck": 2, "chest": 3, "belt": 4, "legs": 5, "feet": 6, "hands": 7, "ring": 8,
+               "weapon": 9, "shield": 10, "offhand": 10, "ranged": 11}
+WEAPON_NAMES = {"axe": 1, "bow": 2, "mace": 3, "sword": 4, "staff": 5, "dagger": 6, "wand": 7}
+WEAPON_TYPE_MODEL = {1: "hand_axe", 2: "shortbow", 3: "mace", 4: "longsword", 5: "staff", 6: "dagger", 7: "wand"}
+EQUIP_SLOT = {1: "head", 3: "torso", 5: "pants", 6: "shoes", 7: "glove"}
+SLOT_WORDS = [
+    ("torso", r"shirt|chest|cuirass|vest|robe|tunic|jerkin|hauberk|coat|brigandine|mail\b"),
+    ("pants", r"pants|greaves|skirt|leggings|trousers|breeches|legguards"),
+    ("shoes", r"sandals|boots|shoes|sabatons|treads"),
+    ("glove", r"gloves|gauntlets|sleeves|wraps|bracers|mitts"),
+    ("head", r"hood|coif|helm|\bcap\b|\bhat\b|cowl|circlet"),
+]
+FAMILY_WORDS = [("rb", r"cloth|mage|robe|linen|silk"), ("lt", r"leather|hide"), ("ch", r"chain|mail|ring"),
+                ("pl", r"plate|iron|steel")]
+
+
+def _enum(v, names: dict) -> int:
+    v = str(v or "").strip().lower()
+    if v.lstrip("-").isdigit():
+        return int(v)
+    return names.get(v, 0)
+
+
+def armour_family(armor_type, text: str) -> str:
+    """rb / lt / ch / pl from `armor_type` (1 and 12-15 cloth, 2-4 leather, 5-8 chain, 9-11 plate)."""
+    t = str(armor_type or "").strip().lower()
+    if t.isdigit() and int(t) > 0:
+        n = int(t)
+        return "rb" if n <= 1 or n >= 12 else "lt" if n <= 4 else "ch" if n <= 8 else "pl"
+    for fam, pat in FAMILY_WORDS:
+        if re.search(pat, f"{t} {text}"):
+            return fam
+    return "rb"
+
+
+def by_data(info: dict, q: int, text: str):
+    """(prims, rot, fit) from our item data, or None."""
+    equip = _enum(info.get("equip_type"), EQUIP_NAMES)
+    wtype = _enum(info.get("weapon_type"), WEAPON_NAMES)
+    model = (info.get("model") or "").lower()
+    if not equip and re.search(r"draught|potion|tonic|elixir|philter|brew|vial|flask", text):
+        liquid = "sapphire" if re.search(r"mana|lamp|tonic|blue|clear", text) else "ruby"
+        return flask(liquid, 3, tall="tonic" in text)
+    if model:
+        for m in sorted(WEAPON_MODELS, key=len, reverse=True):
+            if m in model:
+                return WEAPON_MODELS[m](q)
+    if equip in (9, 11) and wtype in WEAPON_TYPE_MODEL:
+        return WEAPON_MODELS[WEAPON_TYPE_MODEL[wtype]](q)
+    if equip == 10:
+        return shield(q, "buckler" if "buckler" in text else "kite")
+    if equip == 2:
+        return necklace(q, "choker" if "choker" in text else "pendant")
+    if equip == 4:
+        return belt(q, sash="sash" in text)
+    if equip == 8:
+        return ring(q)
+    slot = next((s for s, pat in SLOT_WORDS if re.search(pat, f"{model} {text}")), None) or EQUIP_SLOT.get(equip)
+    if slot and (equip in EQUIP_SLOT or not equip):
+        return ARMOUR[slot](armour_family(info.get("armor_type"), f"{model} {text}"), q)
+    if equip == 11:
+        return bow(q, "shortbow")
+    if equip == 9:
+        return sword(q)
+    if equip:
+        return None
+    seed = sum(map(ord, text)) % 50
+    if re.search(r"fang|tooth|claw|talon|mandible|pincer|horn", text):
+        return curved_spike("bone", 1.6, 0.22, 0.6), view(diag=20, tilt=5), 0.82
+    if re.search(r"skull", text):
+        return skull()
+    if re.search(r"bone|rib", text):
+        return bone(1 + seed % 3)
+    if re.search(r"pelt|hide|fur|mane", text):
+        return hide("fur", seed=seed % 5)
+    if re.search(r"rag|cloth|scrap|wrap|tatter", text):
+        return hide("leather", seed=seed % 5)
+    if re.search(r"carapace|shell|chitin|plate of", text):
+        return carapace()
+    if re.search(r"\bleg\b|limb", text):
+        return insect_leg()
+    if re.search(r"scale", text):
+        return scale_item()
+    if re.search(r"\beye\b|brain|gland|heart|sac\b|ichor", text):
+        return brain()
+    if re.search(r"feather|plume", text):
+        return feather("linen")
+    if re.search(r"ring|band|trinket|charm|locket", text):
+        return broken_ring()
+    if re.search(r"lamp|lantern|wick", text):
+        return lamp()
+    if re.search(r"key\b", text):
+        return key("copper")
+    if re.search(r"letter|note|writ|page", text):
+        return letter()
+    if re.search(r"coin|copper|silver", text):
+        return coins(3, "copper", seed)
+    if re.search(r"herb|flower|moss|root|petal|mushroom|cap\b", text):
+        return flower()
+    if re.search(r"meat|bread|ration|jerky|haunch", text):
+        return food("ration")
+    if re.search(r"ember|cinder|ash|coal|soot", text):
+        return mineral("stone", "topaz", seed)
+    if re.search(r"stone|rock|shard|pebble|ore|slag", text):
+        return mineral("stone", None, seed)
+    if re.search(r"nail|buckle|rivet|chain|hook|blade|iron|scrap", text):
+        return junk_metal(seed)
+    return None
+
+
 def item_icon(stem: str, info: dict):
     """(prims, rotation, fit) for an item icon; `info` = {quality, model, name, equip_type}."""
     q = info.get("quality") or 2
@@ -901,6 +1015,9 @@ def item_icon(stem: str, info: dict):
     if m:
         liquid = "ruby" if m.group(1) == "hp" else "sapphire"
         return flask(liquid, int(m.group(3)), tall=m.group(2) == "3")
+    r = by_data(info, q, f"{s.replace('_', ' ')} {name}")
+    if r:
+        return r
     if "flask" in s or "elixir" in name:
         return flask("topaz", 4, square=True)
     if "blood" in s:

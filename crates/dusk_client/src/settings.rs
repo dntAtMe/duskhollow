@@ -16,12 +16,10 @@
 //! [game]
 //! screen_shake = 1
 //! hit_stop = 1
-//! custom_art = 1        ; read at start-up (restart to apply)
 //! [player]
 //! name = Wanderer
 //! class = 1
 //! map = custom_duskhollow
-//! legacy_maps = 0       ; list the legacy maps in the start-map picker
 //! servers = 127.0.0.1:16383   ; recently joined, newest first
 //! ```
 //!
@@ -53,11 +51,9 @@ pub struct Settings {
     pub show_fps: bool,
     pub screen_shake: bool,
     pub hit_stop: bool,
-    pub custom_art: bool,
     pub name: String,
     pub class: u8,
     pub map: String,
-    pub legacy_maps: bool,
     pub servers: Vec<String>,
     /// The audio volumes came from the file (else they are taken from the audio defaults).
     pub audio_from_file: bool,
@@ -76,11 +72,9 @@ impl Default for Settings {
             show_fps: false,
             screen_shake: true,
             hit_stop: true,
-            custom_art: true,
             name: String::new(),
             class: 1,
             map: DEFAULT_MAP.into(),
-            legacy_maps: false,
             servers: Vec::new(),
             audio_from_file: false,
         }
@@ -154,11 +148,9 @@ impl Settings {
                 ("display", "show_fps") => s.show_fps = flag(s.show_fps),
                 ("game", "screen_shake") => s.screen_shake = flag(s.screen_shake),
                 ("game", "hit_stop") => s.hit_stop = flag(s.hit_stop),
-                ("game", "custom_art") => s.custom_art = flag(s.custom_art),
                 ("player", "name") => s.name = clean_name(v),
                 ("player", "class") => s.class = v.parse::<u8>().ok().filter(|c| (1..=4).contains(c)).unwrap_or(1),
                 ("player", "map") if !v.is_empty() => s.map = v.to_string(),
-                ("player", "legacy_maps") => s.legacy_maps = flag(s.legacy_maps),
                 ("player", "servers") => {
                     s.servers = v
                         .split(',')
@@ -180,8 +172,8 @@ impl Settings {
             "; Duskhollow settings (written by the Options menu)\n\
              [audio]\nmaster = {}\nmusic = {}\neffects = {}\n\n\
              [display]\nfullscreen = {}\nresolution = {}x{}\nvsync = {}\nui_scale = {:.2}\nshow_fps = {}\n\n\
-             [game]\nscreen_shake = {}\nhit_stop = {}\ncustom_art = {}\n\n\
-             [player]\nname = {}\nclass = {}\nmap = {}\nlegacy_maps = {}\nservers = {}\n",
+             [game]\nscreen_shake = {}\nhit_stop = {}\n\n\
+             [player]\nname = {}\nclass = {}\nmap = {}\nservers = {}\n",
             self.master,
             self.music,
             self.effects,
@@ -193,11 +185,9 @@ impl Settings {
             b(self.show_fps),
             b(self.screen_shake),
             b(self.hit_stop),
-            b(self.custom_art),
             self.name,
             self.class,
             self.map,
-            b(self.legacy_maps),
             self.servers.join(", "),
         )
     }

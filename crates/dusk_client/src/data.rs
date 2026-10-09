@@ -27,9 +27,6 @@ pub struct GameData {
     pub npc_templates: HashMap<i64, NpcTemplate>,
     pub hotspots: HashMap<String, (i32, i32)>,
     pub spells: HashMap<i64, SpellTemplate>,
-    /// `--art custom`: render players (and NPC models that have one) with our own `tools/artgen`
-    /// sprites instead of the original art.
-    pub custom_art: bool,
     /// Roof sprites from `roofs.txt`: (lowercase name prefix, cells roofed beyond the back cell).
     pub roofs: Vec<(String, IVec2)>,
     pub spell_visuals: HashMap<i64, SpellVisual>,
@@ -45,14 +42,10 @@ pub struct GameData {
     scripts: Mutex<HashMap<String, Option<Arc<SpriteScript>>>>,
 }
 
-/// Indexes every file under `<root>/content` by bare name over the legacy index. Returns whether
-/// any of our content exists.
-///
-/// Files under `content/override/` carry ORIGINAL file names (icons, interface art...) and
-/// replace those originals in the index only when `overrides` is set (`--art custom`);
-/// everything else has our own names and is always indexed.
-fn index_content(root: &Path, index: &mut FileIndex, overrides: bool) -> bool {
-    let (mut found, mut replaced) = (0, 0);
+/// Indexes every file under `<root>/content` by bare name over the legacy index (ours win).
+/// Files under `content/override/` keep the bare names the data refers to (icons, interface art).
+fn index_content(root: &Path, index: &mut FileIndex) {
+    let mut found = 0;
     let mut stack = vec![root.join("content")];
     while let Some(dir) = stack.pop() {
         let Ok(entries) = std::fs::read_dir(&dir) else { continue };
@@ -65,29 +58,17 @@ fn index_content(root: &Path, index: &mut FileIndex, overrides: bool) -> bool {
             let Ok(rel) = path.strip_prefix(root) else { continue };
             let rel = rel.to_string_lossy().replace('\\', "/");
             found += 1;
-            let is_override = rel.starts_with("content/override/");
-            if !is_override || overrides {
-                index.insert(&e.file_name().to_string_lossy(), &rel);
-                replaced += is_override as usize;
-            }
+            index.insert(&e.file_name().to_string_lossy(), &rel);
         }
     }
-    if replaced > 0 {
-        info!("custom art replaces {replaced} original files");
-    }
-    found > 0
+    info!("indexed {found} content files");
 }
 
 impl GameData {
-    /// `root`: our content root. `custom_art`: the menu's "custom art" setting, used when
-    /// neither `--art` nor `DUSK_ART` is given (`None`: off, as for command-line launches).
-    pub fn load_with(root: &Path, custom_art: Option<bool>) -> anyhow::Result<Self> {
+    /// `root`: our content root.
+    pub fn load(root: &Path) -> anyhow::Result<Self> {
         let mut index = FileIndex::load_legacy();
-        let args: Vec<String> = std::env::args().collect();
-        let art_arg = args.windows(2).find(|w| w[0] == "--art").map(|w| w[1] == "custom");
-        let art_env = std::env::var("DUSK_ART").ok().map(|v| v == "custom");
-        let art_requested = art_arg.or(art_env).or(custom_art).unwrap_or(false);
-        let custom = index_content(root, &mut index, art_requested);
+        index_content(root, &mut index);
         let npcs = content::npcs::load(root)?;
         let spells = content::spells::load(root)?;
         let spell_visuals = content::visuals::load(root, &spells)?;
@@ -100,7 +81,6 @@ impl GameData {
             npc_templates: npcs.templates,
             hotspots: fx.hotspots,
             spells,
-            custom_art: custom && art_requested,
             roofs: fx.roofs.into_iter().map(|(name, (x, y))| (name, IVec2::new(x, y))).collect(),
             spell_visuals,
             sprite_psi: fx.psi,

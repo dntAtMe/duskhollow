@@ -292,14 +292,14 @@ fn spawn_windows(mut commands: Commands, data: Res<GameData>, assets: Res<AssetS
             }
             w.spawn((
                 Node { position_type: PositionType::Absolute, left: Val::Px(52.0), top: Val::Px(400.0), ..default() },
-                Text::new("0 Gold Pieces"),
-                f(14.0),
+                Text::new("0 Gold"),
+                f(13.0),
                 TextColor(GOLD),
                 GoldText,
             ));
             w.spawn((
                 Node { position_type: PositionType::Absolute, right: Val::Px(22.0), top: Val::Px(403.0), ..default() },
-                Text::new("Click: equip / use   Shift+Right: destroy"),
+                Text::new("Shift + right-click: destroy"),
                 f(10.0),
                 TextColor(GREY.with_alpha(0.7)),
             ));
@@ -725,7 +725,7 @@ fn refresh_slots(
         text.0 = slot_item(&state, s.0).filter(|it| it.count > 1).map(|it| it.count.to_string()).unwrap_or_default();
     }
     if let Ok(mut t) = gold.single_mut() {
-        t.0 = format!("{} Gold Pieces", state.gold);
+        t.0 = format!("{} Gold", state.gold);
     }
 }
 

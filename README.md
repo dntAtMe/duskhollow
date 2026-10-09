@@ -6,8 +6,8 @@ server, procedurally generated oldschool pre-rendered art and an original soundt
 The engine reads a legacy data pack (`game.db`, `.map` files, sprite archives; formats in
 [docs/formats.md](docs/formats.md)) that is **not** distributed here. Everything under
 `custom_assets/` (sprites, portraits, tiles, icons, UI skin, spell effects, music, the
-`custom_glade` and `custom_duskhollow` maps) is original and progressively replaces legacy
-visuals with `--art custom`.
+`custom_glade` and `custom_duskhollow` maps, the UI font pair DejaVu Serif under its own free
+licence) is original and always used; the remaining legacy data is being replaced.
 
 ![Duskhollow title over the gorge](docs/screenshots/title.jpg)
 
@@ -21,7 +21,7 @@ to rest at the Glare Gate while the Eye opens wide.
 
 ```bash
 cargo run -p dusk_client            # main menu: Play starts the vale offline
-cargo run -p dusk_client -- custom_duskhollow --art custom   # or straight in
+cargo run -p dusk_client -- custom_duskhollow   # or straight in
 ```
 
 | | |
@@ -59,7 +59,7 @@ Controls: `WASD` move, left-click an enemy to target it (spells land on it, no w
 
 Menus: arrows / `Tab` move, `Left` / `Right` adjust, `Enter` picks, `Esc` goes back; the mouse works too.
 
-Settings (Options menu: volumes, fullscreen / window size, VSync, interface scale, FPS counter, screen shake, hit-stop, custom art, plus the last name / class / map / servers) live in `settings.ini`: `%APPDATA%\Duskhollow\` on Windows, `$XDG_CONFIG_HOME/duskhollow/` or `~/.config/duskhollow/` elsewhere, or `DUSK_SETTINGS=<file>`. A menu launch applies them at start-up; command-line and debug launches ignore them until changed in game. Custom art takes effect after a restart (the menu launch defaults it to on; `--art` / `DUSK_ART` override).
+Settings (Options menu: volumes, fullscreen / window size, VSync, interface scale, FPS counter, screen shake, hit-stop, plus the last name / class / map / servers) live in `settings.ini`: `%APPDATA%\Duskhollow\` on Windows, `$XDG_CONFIG_HOME/duskhollow/` or `~/.config/duskhollow/` elsewhere, or `DUSK_SETTINGS=<file>`. A menu launch applies them at start-up; command-line and debug launches ignore them until changed in game.
 
 Our content (`custom_assets/`) is the default asset source; files of the legacy data pack load through a second source, `legacy://` (`DUSK_LEGACY`, else `DUSK_ASSETS`, else `./assets`). `DUSK_LEGACY_LOG=1` prints each distinct legacy access once (`[legacy] ...` on stderr).
 
@@ -75,7 +75,7 @@ Debug aids (env vars; any of them except the `DUSK_MENU*` ones skips the menu): 
 | `dusk_protocol` | Client/server messages, framing, TCP transport |
 | `dusk_server` | Authoritative server (lib + bin): maps, NPC AI (wander/aggro/chase/leash), melee combat, XP, respawn |
 
-Own art: `tools/artgen` generates oldschool pre-rendered sprites (`cargo run -p dusk_client -- --art custom`), see [tools/artgen/README.md](tools/artgen/README.md).
+Own art: `tools/artgen` generates oldschool pre-rendered sprites, see [tools/artgen/README.md](tools/artgen/README.md).
 
 File format notes: [docs/formats.md](docs/formats.md). Combat rules and recovered enums: [docs/combat.md](docs/combat.md). Music, ambience and sound effects: [docs/audio.md](docs/audio.md). HUD layout (unit frames, chat, name plates, minimap): [docs/ui.md](docs/ui.md).
 

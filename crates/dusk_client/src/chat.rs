@@ -48,6 +48,8 @@ pub struct ChatSystemLine(pub String);
 
 /// Scrollback lines kept.
 const MAX_LINES: usize = 200;
+/// `/help` text, relative to our content root.
+const HELP_FILE: &str = "data/help.txt";
 /// Lines shown at once (wrapped lines take more room; the top is clipped).
 const VISIBLE: usize = 14;
 /// Longest message the input accepts.
@@ -277,11 +279,8 @@ fn submit(text: &str, log: &mut ChatLog, net: &Net, data: &GameData) {
             }
         }
         "help" | "?" => {
-            let help = data
-                .find_file("scripts/text/help.txt")
-                .and_then(|p| std::fs::read_to_string(p).ok())
-                .unwrap_or_default();
-            for line in help.lines().filter(|l| !l.trim().is_empty()) {
+            let help = std::fs::read_to_string(data.root.join(HELP_FILE)).unwrap_or_default();
+            for line in help.lines().filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#')) {
                 log.system(line.trim(), SYSTEM);
             }
         }
@@ -423,12 +422,13 @@ fn render_input(
     log.dirty = false;
 }
 
-/// Debug aid (`DUSK_CHAT=text`): says `text` after 2 s, then opens the input with it typed.
-fn debug_chat(time: Res<Time>, net: Res<Net>, mut log: ResMut<ChatLog>, mut step: Local<u8>) {
+/// Debug aid (`DUSK_CHAT=text`): submits `text` after 2 s (as typed: plain text is said, `/help`
+/// runs), then opens the input with it typed.
+fn debug_chat(time: Res<Time>, net: Res<Net>, data: Res<GameData>, mut log: ResMut<ChatLog>, mut step: Local<u8>) {
     let text = std::env::var("DUSK_CHAT").unwrap_or_default();
     let t = time.elapsed_secs();
     if *step == 0 && t > 2.0 {
-        net.send(ClientMsg::Chat { text: text.clone() });
+        submit(&text, &mut log, &net, &data);
         *step = 1;
     } else if *step == 1 && t > 3.0 {
         log.input = Some(text);

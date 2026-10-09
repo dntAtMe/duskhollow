@@ -80,8 +80,6 @@ pub enum ToggleKey {
     ShowFps,
     Shake,
     HitStop,
-    CustomArt,
-    LegacyMaps,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,7 +105,7 @@ const CLASSES: [(&str, &str, &str); 4] = [
 
 const OPTION_TABS: [&str; 4] = ["Sound", "Display", "Game", "Controls"];
 
-const BINDINGS: [(&str, &str); 18] = [
+const BINDINGS: [(&str, &str); 19] = [
     ("W A S D", "Move"),
     ("Left click", "Select a target / talk / loot"),
     ("Right click", "Walk up and attack"),
@@ -117,6 +115,7 @@ const BINDINGS: [(&str, &str); 18] = [
     ("P", "Abilities"),
     ("I", "Inventory"),
     ("C", "Character"),
+    ("J", "Journal"),
     ("Enter", "Chat (Enter sends)"),
     ("1 - 4", "Dialogue replies"),
     ("Esc", "Cancel cast / clear target / game menu"),
@@ -267,10 +266,11 @@ fn setup(
     data: Res<GameData>,
     assets: Res<AssetServer>,
     font: Res<UiFont>,
+    bold: Res<crate::combat_ui::UiFontBold>,
     settings: Res<Settings>,
     mut model: ResMut<MenuModel>,
 ) {
-    commands.insert_resource(Skin::load(&data, &assets, font.0.clone()));
+    commands.insert_resource(Skin::load(&data, &assets, font.0.clone(), bold.0.clone()));
     let stats: Vec<_> = dusk_formats::content::rules::load(&data.root)
         .map(|r| r.class_stats.into_values().collect())
         .unwrap_or_default();
@@ -294,36 +294,27 @@ fn setup(
     if let Some(addr) = settings.servers.first() {
         model.addr = addr.clone();
     }
-    model.maps = start_maps(&data, settings.legacy_maps);
+    model.maps = start_maps(&data);
     model.map = model.maps.iter().position(|(m, _)| *m == settings.map).unwrap_or(0);
 }
 
-/// Custom maps first (`custom_duskhollow` leading), then the legacy ones if asked for.
-fn start_maps(data: &GameData, legacy: bool) -> Vec<(String, String)> {
-    let is_custom = |n: &str| n.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX);
-    let mut custom: Vec<String> = data.maps.iter().filter(|m| is_custom(&m.name)).map(|m| m.name.clone()).collect();
-    custom.sort_by_key(|n| (n != settings::DEFAULT_MAP, n.clone()));
+/// Start maps from the map data (`content::maps`): the default map first, then the rest by
+/// name. Labels are the map titles, else the name in words.
+fn start_maps(data: &GameData) -> Vec<(String, String)> {
+    let default = dusk_formats::content::maps::default_map(&data.maps).map(|m| m.name.clone());
+    let mut maps: Vec<&dusk_formats::db::MapInfo> = data.maps.iter().collect();
+    maps.sort_by_key(|m| (Some(&m.name) != default.as_ref(), m.name.clone()));
     let label = |n: &str| {
-        let base = n.strip_prefix(dusk_formats::custom::CUSTOM_MAP_PREFIX).unwrap_or(n);
-        let mut words: Vec<String> = base
-            .split('_')
+        let base = n.strip_prefix("custom_").unwrap_or(n);
+        base.split('_')
             .map(|w| {
                 let mut c = w.chars();
-                c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+                c.next().map(|f| f.to_uppercase().chain(c).collect::<String>()).unwrap_or_default()
             })
-            .collect();
-        if n == settings::DEFAULT_MAP {
-            words.push("(the vale)".into());
-        }
-        words.join(" ")
+            .collect::<Vec<_>>()
+            .join(" ")
     };
-    let mut out: Vec<(String, String)> = custom.iter().map(|n| (n.clone(), label(n))).collect();
-    if legacy || out.is_empty() {
-        let mut names: Vec<&str> = data.maps.iter().map(|m| m.name.as_str()).filter(|n| !is_custom(n)).collect();
-        names.sort();
-        out.extend(names.into_iter().map(|n| (n.to_string(), format!("{n} (legacy)"))));
-    }
-    out
+    maps.into_iter().map(|m| (m.name.clone(), label(&m.name))).collect()
 }
 
 /// Leaves `Boot` for the menu, or straight for the game (command-line launch).
@@ -683,9 +674,6 @@ fn rebuild(
                     }
                 } else {
                     row(p, &skin, "Start in", |r| cycler(r, &skin, CycleKey::Map, next(), 320.0));
-                    row(p, &skin, "Legacy maps", |r| {
-                        toggle(r, &skin, ToggleKey::LegacyMaps, next(), Some("list the legacy data pack's maps too"))
-                    });
                 }
                 error_line(p, &skin);
                 footer(p, |f| {
@@ -747,15 +735,6 @@ fn rebuild(
                         row(c, &skin, "Screen shake", |r| toggle(r, &skin, ToggleKey::Shake, next(), None));
                         row(c, &skin, "Hit-stop", |r| {
                             toggle(r, &skin, ToggleKey::HitStop, next(), Some("the brief freeze on heavy blows"))
-                        });
-                        row(c, &skin, "Custom art", |r| {
-                            toggle(
-                                r,
-                                &skin,
-                                ToggleKey::CustomArt,
-                                next(),
-                                Some("our own sprites and skin; takes effect after a restart"),
-                            )
                         });
                     }
                     _ => {
@@ -1082,7 +1061,7 @@ impl Ctx<'_> {
                 let v = slider_value(s, *k);
                 set_slider(s, *k, (v as i32 + dir * 5).clamp(0, 100) as u32);
             }
-            Widget::Toggle(k) => toggle_value(s, m, &self.data, *k),
+            Widget::Toggle(k) => toggle_value(s, *k),
             Widget::Cycle(CycleKey::Resolution) => {
                 let i = RESOLUTIONS.iter().position(|r| *r == s.resolution).unwrap_or(0) as i32;
                 s.resolution = RESOLUTIONS[(i + dir).rem_euclid(RESOLUTIONS.len() as i32) as usize];
@@ -1136,25 +1115,16 @@ fn toggle_state(s: &Settings, k: ToggleKey) -> bool {
         ToggleKey::ShowFps => s.show_fps,
         ToggleKey::Shake => s.screen_shake,
         ToggleKey::HitStop => s.hit_stop,
-        ToggleKey::CustomArt => s.custom_art,
-        ToggleKey::LegacyMaps => s.legacy_maps,
     }
 }
 
-fn toggle_value(s: &mut Settings, m: &mut MenuModel, data: &GameData, k: ToggleKey) {
+fn toggle_value(s: &mut Settings, k: ToggleKey) {
     match k {
         ToggleKey::Fullscreen => s.fullscreen = !s.fullscreen,
         ToggleKey::Vsync => s.vsync = !s.vsync,
         ToggleKey::ShowFps => s.show_fps = !s.show_fps,
         ToggleKey::Shake => s.screen_shake = !s.screen_shake,
         ToggleKey::HitStop => s.hit_stop = !s.hit_stop,
-        ToggleKey::CustomArt => s.custom_art = !s.custom_art,
-        ToggleKey::LegacyMaps => {
-            s.legacy_maps = !s.legacy_maps;
-            let current = m.maps.get(m.map).map(|(n, _)| n.clone());
-            m.maps = start_maps(data, s.legacy_maps);
-            m.map = current.and_then(|c| m.maps.iter().position(|(n, _)| *n == c)).unwrap_or(0);
-        }
     }
 }
 
@@ -1402,7 +1372,6 @@ fn refresh(
     time: Res<Time>,
     model: Res<MenuModel>,
     settings: Res<Settings>,
-    data: Res<GameData>,
     skin: Option<Res<Skin>>,
     mut widgets: Query<(Entity, &Widget, &Focus, &Interaction, Option<&mut ImageNode>, Has<SelectedTab>)>,
     children: Query<&Children>,
@@ -1416,7 +1385,6 @@ fn refresh(
         Query<&mut Text, (With<StatusLine>, Without<ValueText>)>,
         Query<&mut Text, (With<ConnectDots>, Without<ValueText>)>,
         Query<(&mut Text, &ClassPart), Without<ValueText>>,
-        Query<(&mut Text, &mut TextColor, &ToggleNote), Without<ValueText>>,
         Query<(&mut Text, &SliderValue), Without<ValueText>>,
         Query<&mut Text, (With<FieldText>, Without<ValueText>)>,
     )>,
@@ -1461,7 +1429,7 @@ fn refresh(
                     FieldKey::Address => &model.addr,
                 };
                 for c in children.iter_descendants(e) {
-                    if let Ok(mut t) = lines.p6().get_mut(c) {
+                    if let Ok(mut t) = lines.p5().get_mut(c) {
                         let s = format!("{v}{}", if focused && caret { "|" } else { " " });
                         if t.0 != s {
                             t.0 = s;
@@ -1559,17 +1527,7 @@ fn refresh(
             }
         }
     }
-    for (mut t, mut col, note) in &mut lines.p4() {
-        if note.0 == ToggleKey::CustomArt {
-            let pending = settings.custom_art != data.custom_art;
-            let v = if pending { "takes effect after a restart" } else { "our own sprites and skin" };
-            if t.0 != v {
-                t.0 = v.into();
-            }
-            col.0 = if pending { GOLD } else { FAINT };
-        }
-    }
-    for (mut t, sv) in &mut lines.p5() {
+    for (mut t, sv) in &mut lines.p4() {
         let v = format!("{}", slider_value(&settings, sv.0));
         if t.0 != v {
             t.0 = v;
