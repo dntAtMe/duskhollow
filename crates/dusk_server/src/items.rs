@@ -129,7 +129,7 @@ impl Inventory {
         self.clone().add(*item, max_stack).is_none()
     }
 
-    /// Equipped `item_template.entry` per slot (0 = empty), for `ServerMsg::Appearance`.
+    /// Equipped item entry per slot (0 = empty), for `ServerMsg::Appearance`.
     pub fn appearance(&self) -> Vec<u32> {
         self.equipment.iter().map(|s| s.map_or(0, |i| i.entry)).collect()
     }

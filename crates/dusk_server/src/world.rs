@@ -132,7 +132,7 @@ pub struct Npc {
     pub entry: i64,
 }
 
-/// `npc_template.faction` (see `dusk_formats::db::faction`); players use PLAYER_DEFAULT.
+/// NPC template `faction` (see `dusk_formats::db::faction`); players use PLAYER_DEFAULT.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub struct Faction(pub i64);
 
@@ -222,7 +222,7 @@ impl Outbox {
     }
 }
 
-/// Default leash distance (cells) when `npc_template.leash_range` is unset. DESIGN.
+/// Default leash distance (cells) when a template's `leash_range` is unset. DESIGN.
 pub const DEFAULT_LEASH: f32 = 20.0;
 
 pub fn spawn_npcs(

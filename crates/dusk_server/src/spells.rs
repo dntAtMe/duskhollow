@@ -173,7 +173,7 @@ struct Pending {
     targets: Vec<Entity>,
 }
 
-/// Per-NPC spell timers from `npc_template.spell_N_*`.
+/// Per-NPC spell timers from the template's `spellN=` slots.
 #[derive(Component)]
 pub struct NpcSpells(pub Vec<NpcSpellState>);
 
