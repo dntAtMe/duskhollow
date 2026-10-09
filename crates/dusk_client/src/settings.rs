@@ -143,10 +143,10 @@ impl Settings {
                 }
                 ("display", "fullscreen") => s.fullscreen = flag(s.fullscreen),
                 ("display", "resolution") => {
-                    if let Some((w, h)) = v.split_once('x') {
-                        if let (Ok(w), Ok(h)) = (w.trim().parse::<u32>(), h.trim().parse::<u32>()) {
-                            s.resolution = (w.clamp(640, 7680), h.clamp(480, 4320));
-                        }
+                    if let Some((w, h)) = v.split_once('x')
+                        && let (Ok(w), Ok(h)) = (w.trim().parse::<u32>(), h.trim().parse::<u32>())
+                    {
+                        s.resolution = (w.clamp(640, 7680), h.clamp(480, 4320));
                     }
                 }
                 ("display", "vsync") => s.vsync = flag(s.vsync),
@@ -259,7 +259,7 @@ fn apply(
     }
     let prev = last.replace(settings.clone());
     let settings = &*settings;
-    let changed = |f: fn(&Settings) -> bool| prev.as_ref().is_none_or(|p| f(p) != f(&settings));
+    let changed = |f: fn(&Settings) -> bool| prev.as_ref().is_none_or(|p| f(p) != f(settings));
 
     audio.master_volume = settings.master as f32 / 100.0;
     audio.music_volume = settings.music as f32 / 100.0;

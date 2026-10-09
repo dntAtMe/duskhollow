@@ -12,6 +12,31 @@ original targets 1920x1080; at our default 1280x720 the pieces are placed so the
 | `ui_input.rs` | `UiInputCaptured`: shared "the UI owns the keyboard / pointer" flags |
 | `combat_ui.rs` | Floating combat text, death notice, click targeting (unchanged rules) |
 
+## Front end (`state.rs`, `menu/`, `settings.rs`)
+
+App states: `Boot` -> `Menu` -> `Connecting` -> `InGame`, back to `Menu` on Quit to Menu, a lost
+connection or a refused/failed join (the reason shows on the panel the player came from). A
+command-line launch (map / `--connect` / `--name` / `--class`, or a `DUSK_*` debug variable) goes
+`Boot` -> `Connecting` directly and quits on disconnect, as before the menu.
+
+- Gameplay systems run only `InGame` (`state::in_game`); HUD pieces spawn on `OnEnter(InGame)`.
+  When a session ends, every root entity with a `Transform` / `Node` created since it started is
+  despawned (map tiles, audio and `menu::KeepOnMenu` roots excepted), `Net` / `PlayerState` /
+  `OfflineServer` (the embedded server, stopped on drop) are removed, and gameplay resources are
+  reset with `state::reset` on the next `OnEnter(Connecting)`.
+- The menu backdrop is the real `custom_duskhollow` map around Lowshade's cairn: the camera drifts,
+  the Eye's openness breathes (`GazeView`, so the crimson grade and lit sprites follow), embers rise,
+  a dithered vignette darkens edges and scrims the title / buttons. The custom soundtrack plays
+  because the audio listener falls back to the camera when there is no player.
+- Screens: main (Play, Join Server, Options, Quit), Play / Join (name, class medallions with
+  role and level-1 stats from `player_class_stats`, start map / server address + recent servers),
+  Connecting (cancel), Options (Sound, Display, Game, Controls tabs) and the in-game game menu.
+- Game menu: Esc opens it only when nothing else wants Esc (`menu::EscProbe::esc_free`: chat input,
+  dialogue / end card, own cast, loot window, selected target). It is an overlay: the world keeps
+  running; while open it takes the keyboard (`ButtonInput` reset, `KeyboardInput` drained before chat)
+  and the pointer (`CapturesPointer`).
+- `settings.ini`: see `settings.rs` for the keys and location (`DUSK_SETTINGS` overrides).
+
 ## Unit frames
 
 `UnitFrame::setFrameStyle` (`FUN_0052f460`, `UnitFrame.cpp`) hard-codes

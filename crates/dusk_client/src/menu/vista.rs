@@ -126,7 +126,7 @@ pub(super) fn manage(
                         y: 0.35 + rng(&mut seed) * 0.75,
                         speed: 0.012 + rng(&mut seed) * 0.03,
                         sway: 4.0 + rng(&mut seed) * 14.0,
-                        phase: rng(&mut seed) * 6.28,
+                        phase: rng(&mut seed) * std::f32::consts::TAU,
                         life,
                         age: rng(&mut seed) * life,
                         size: [2.0, 2.0, 3.0, 4.0][(rng(&mut seed) * 3.99) as usize],

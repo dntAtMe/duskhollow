@@ -223,6 +223,8 @@ struct PendingConnect {
     rx: Receiver<Result<(ClientConnection, Option<dusk_server::EmbeddedServer>), String>>,
     name: String,
     class: u8,
+    /// Server address (online), remembered once the connection opens.
+    addr: Option<String>,
 }
 
 /// Seconds since `Hello` was sent, waiting for `Welcome`.
@@ -268,7 +270,7 @@ impl Plugin for MenuPlugin {
             .add_systems(OnEnter(AppState::InGame), enter_game)
             .add_systems(
                 PreUpdate,
-                (collect_input, block_game_input).chain().after(InputSystems).before(crate::chat::type_chat),
+                (debug_esc, collect_input, block_game_input).chain().after(InputSystems).before(crate::chat::type_chat),
             )
             .add_systems(PreUpdate, hold_capture.after(crate::chat::type_chat))
             .add_systems(
@@ -378,10 +380,13 @@ fn boot(
 fn enter_menu(mut model: ResMut<MenuModel>, mut notice: ResMut<MenuNotice>, mut sfx: MessageWriter<PlaySfx>) {
     info!("main menu");
     model.vista = true;
+    // A failed or cancelled connection goes back to its panel; leaving a game, to the title.
+    let returning = matches!(model.screen, Screen::Connecting | Screen::Play | Screen::Join);
     model.error = notice.0.take();
-    let screen = if model.error.is_some() { model.connect_from } else { Screen::Main };
+    let screen = if model.error.is_some() || returning { model.connect_from } else { Screen::Main };
     model.go(screen);
-    if let Some(screen) = debug_screen() {
+    let first = !model.sting_played;
+    if let Some(screen) = debug_screen().filter(|_| first) {
         model.go(screen);
         model.options_tab = debug_tab();
     }
@@ -481,9 +486,14 @@ fn debug_cycle(mut commands: Commands, time: Res<Time>, mut ctx: Ctx, mut phase:
             ctx.exit.write(AppExit::Success);
             return;
         }
-        info!("menu cycle test: Play #{}", *cycles + 1);
-        ctx.model.connect_from = Screen::Play;
-        ctx.start(&mut commands, false);
+        // `DUSK_MENU_JOIN=HOST:PORT`: join that server instead of playing offline.
+        let join = std::env::var("DUSK_MENU_JOIN").ok();
+        info!("menu cycle test: {} #{}", if join.is_some() { "Join" } else { "Play" }, *cycles + 1);
+        ctx.model.connect_from = if join.is_some() { Screen::Join } else { Screen::Play };
+        if let Some(addr) = &join {
+            ctx.model.addr = addr.clone();
+        }
+        ctx.start(&mut commands, join.is_some());
     } else {
         *cycles += 1;
         info!("menu cycle test: Quit to Menu");
@@ -492,6 +502,18 @@ fn debug_cycle(mut commands: Commands, time: Res<Time>, mut ctx: Ctx, mut phase:
 }
 
 // ---------------------------------------------------------------- input
+
+/// `DUSK_MENU_ESC=6,8.5`: presses Esc at those seconds (tests the Esc priority chain).
+fn debug_esc(time: Res<Time>, mut keys: ResMut<ButtonInput<KeyCode>>, mut pressed: Local<usize>) {
+    let Ok(list) = std::env::var("DUSK_MENU_ESC") else { return };
+    keys.release(KeyCode::Escape);
+    let times: Vec<f32> = list.split(',').filter_map(|t| t.trim().parse().ok()).collect();
+    if times.get(*pressed).is_some_and(|t| time.elapsed_secs() >= *t) {
+        *pressed += 1;
+        info!("debug: Esc");
+        keys.press(KeyCode::Escape);
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 fn collect_input(
@@ -508,6 +530,7 @@ fn collect_input(
     if *state.get() == AppState::InGame && model.screen == Screen::None {
         // Esc opens the game menu only when nothing else wants it.
         if keys.just_pressed(KeyCode::Escape) && probe.esc_free() {
+            info!("game menu");
             model.go(Screen::GameMenu);
             sfx.write(PlaySfx::ui(builtin::WINDOW_OPEN));
         }
@@ -1064,7 +1087,6 @@ impl Ctx<'_> {
                 addr = format!("{addr}:{}", dusk_protocol::DEFAULT_PORT);
             }
             m.addr = addr.clone();
-            self.settings.remember_server(&addr);
             m.status = format!("Knocking at {addr}");
             Target::Online(addr)
         } else {
@@ -1075,7 +1097,8 @@ impl Ctx<'_> {
         };
         self.settings.save();
         let rx = connect_in_background(self.data.root.clone(), target);
-        commands.insert_resource(PendingConnect { rx, name, class });
+        let addr = online.then(|| m.addr.clone());
+        commands.insert_resource(PendingConnect { rx, name, class, addr });
         m.go(Screen::Connecting);
         self.next.set(AppState::Connecting);
         self.sfx.write(PlaySfx::ui("quest_accept.wav"));
@@ -1200,7 +1223,14 @@ fn connect_in_background(root: std::path::PathBuf, target: Target) -> Receiver<C
                                         .map(|c| (c, None))
                                         .map_err(|e| e.to_string());
                                 }
-                                Err(e) => last = format!("Nobody answers at {addr} ({e})"),
+                                Err(e) => {
+                                    let why = match e.kind() {
+                                        std::io::ErrorKind::ConnectionRefused => "refused".to_string(),
+                                        std::io::ErrorKind::TimedOut => "no answer".to_string(),
+                                        _ => e.to_string(),
+                                    };
+                                    last = format!("Nobody answers at {addr} ({why}).");
+                                }
                             }
                         }
                         Err(last)
@@ -1218,6 +1248,8 @@ fn poll_connect(
     mut commands: Commands,
     pending: Option<Res<PendingConnect>>,
     mut model: ResMut<MenuModel>,
+    mut notice: ResMut<MenuNotice>,
+    mut settings: ResMut<Settings>,
     mut next: ResMut<NextState<AppState>>,
 ) {
     let Some(p) = pending else { return };
@@ -1228,6 +1260,10 @@ fn poll_connect(
         }
         Ok(Ok((conn, server))) => {
             net::begin_session(&mut commands, conn, &p.name, p.class);
+            if let Some(addr) = &p.addr {
+                settings.remember_server(addr);
+                settings.save();
+            }
             if let Some(server) = server {
                 commands.insert_resource(OfflineServer(server));
             }
@@ -1238,9 +1274,7 @@ fn poll_connect(
         Ok(Err(why)) => {
             warn!("connection failed: {why}");
             commands.remove_resource::<PendingConnect>();
-            model.error = Some(why);
-            let to = model.connect_from;
-            model.go(to);
+            notice.0 = Some(why);
             next.set(AppState::Menu);
         }
     }
@@ -1345,11 +1379,11 @@ fn pointer(
         }
     }
     for (i, w, rel) in &held {
-        if *i == Interaction::Pressed {
-            if let (Widget::Slider(k), Some(n)) = (w, rel.normalized) {
-                let v = ((n.x + 0.5).clamp(0.0, 1.0) * 100.0).round() as u32;
-                set_slider(&mut ctx.settings, *k, v);
-            }
+        if *i == Interaction::Pressed
+            && let (Widget::Slider(k), Some(n)) = (w, rel.normalized)
+        {
+            let v = ((n.x + 0.5).clamp(0.0, 1.0) * 100.0).round() as u32;
+            set_slider(&mut ctx.settings, *k, v);
         }
     }
     for (i, card) in &cards {
@@ -1421,7 +1455,7 @@ fn refresh(
     if model.screen == Screen::None {
         return;
     }
-    let caret = (time.elapsed_secs() * 2.0) as u32 % 2 == 0;
+    let caret = ((time.elapsed_secs() * 2.0) as u32).is_multiple_of(2);
     for (e, w, f, i, image, tab) in &mut widgets {
         let focused = f.0 == model.focus;
         let pressed = *i == Interaction::Pressed;

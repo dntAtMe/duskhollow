@@ -104,7 +104,7 @@ fn parse_args() -> Args {
 }
 
 /// Environment variables that do not mean "start the game directly".
-const MENU_SAFE_VARS: [&str; 11] = [
+const MENU_SAFE_VARS: [&str; 12] = [
     "DUSK_ASSETS",
     "DUSK_CUSTOM_ASSETS",
     "DUSK_ART",
@@ -115,6 +115,7 @@ const MENU_SAFE_VARS: [&str; 11] = [
     "DUSK_MENU_AT",
     "DUSK_MENU_TAB",
     "DUSK_MENU_CYCLES",
+    "DUSK_MENU_JOIN",
     "DUSK_MENU",
 ];
 
