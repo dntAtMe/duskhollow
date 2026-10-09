@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -348,28 +349,27 @@ GEAR = {
 }
 
 
-def render_layers(body_model: Model, layers: dict[str, Model]):
-    """{layer: {anim: [[rgba per dir] per frame]}}, layer "custom_body" included."""
-    out = {name: {} for name in ["custom_body", *layers]}
-    for anim, fn, frames, _, kind in character.ANIMS:
-        for name in out:
-            out[name][anim] = []
+def render_layer(body_model: Model, layer: Model | None, anims=None):
+    """{anim: [[rgba per dir] per frame]} of one layer (`None` = the body itself), depth-tested
+    against the body so only gear in front of it shows."""
+    out = {}
+    for anim, fn, frames, _, kind in anims or character.ANIMS:
+        out[anim] = []
         for f in range(frames):
             t = f / frames if kind == "looped" else f / max(frames - 1, 1)
             rot, off, root_rot = fn(t * 0.999)
             body_world = body_model.pose(rot, off, root_rot)
-            per = {name: [] for name in out}
+            per = []
             for d in range(8):
-                facing = sheet.DIR_TO_ORIENTATION[d]
-                args = (facing, character.FRAME, character.FOOT, character.SCALE)
+                args = (sheet.DIR_TO_ORIENTATION[d], character.FRAME, character.FOOT, character.SCALE)
                 bz, bs, br = body_model.raster(body_world, *args)
-                per["custom_body"].append(compose(bs, br, br >= 0))
-                for name, m in layers.items():
-                    gz, gs, gr = m.raster(m.pose(rot, off, root_rot), *args)
-                    visible = (gr >= 0) & ((br < 0) | (gz >= bz - DEPTH_EPS))
-                    per[name].append(compose(gs, gr, visible))
-            for name in out:
-                out[name][anim].append(per[name])
+                if layer is None:
+                    per.append(compose(bs, br, br >= 0))
+                    continue
+                gz, gs, gr = layer.raster(layer.pose(rot, off, root_rot), *args)
+                visible = (gr >= 0) & ((br < 0) | (gz >= bz - DEPTH_EPS))
+                per.append(compose(gs, gr, visible))
+            out[anim].append(per)
     return out
 
 
@@ -378,35 +378,44 @@ def swung(name: str, m: Model) -> bool:
     return "sword" in m.parts and "bow" not in name
 
 
-def main(only: list[str]):
-    names = only or list(GEAR)
-    layers = {n: GEAR[n]() for n in names}
-    print(f"rendering body + {len(layers)} gear layers ...")
+def job(name: str, only_anims: list[str] | None) -> str:
+    """Renders and exports one layer (+ its smear); runs in a worker process."""
     base_body = body()
-    renders = render_layers(base_body, layers)
+    layer = None if name == "custom_body" else GEAR[name]()
     script_dir = sheet.OUT / "scripts" / "player" / "custom"
-    for name, r in renders.items():
-        if only and name == "custom_body" and "custom_body" not in only:
-            continue
-        sheet.export(
-            r,
-            character.ANIMS,
-            character.FOOT,
-            f"custom_gear_{name}.png",
-            script_dir / f"{name}.txt",
-            sheet_width=512,
-            hits=character.HITS,
-        )
-    sheet.preview(renders["custom_body"], character.ANIMS, character.FRAME, "gear_body")
-    # Smear layers (`<model>_smear`): the arc of this weapon's own blade, hidden behind the body.
-    for name, m in layers.items():
-        if not swung(name, m):
-            continue
-        base, tip = smear.blade_from_part(m)
+    script = script_dir / f"{name}.txt"
+    anims = [a for a in character.ANIMS if not only_anims or a[0] in only_anims]
+    renders = render_layer(base_body, layer, anims)
+    if only_anims:  # keep the other animations from the current sheet
+        renders = {**sheet.load(script, character.FRAME, character.FOOT), **renders}
+    sheet.export(renders, character.ANIMS, character.FOOT, f"custom_gear_{name}.png", script, 512, hits=character.HITS)
+    if name == "custom_body":
+        sheet.preview(renders, character.ANIMS, character.FRAME, "gear_body")
+    if layer is not None and swung(name, layer):
+        base, tip = smear.blade_from_part(layer)
         args = (character.FRAME, character.FOOT, character.SCALE, base, tip, character.HITS)
-        trail = smear.render_layer(m, character.ANIMS, *args, depth_model=base_body)
+        trail = smear.render_layer(layer, character.ANIMS, *args, depth_model=base_body)
         rows = smear.anims_for(character.ANIMS, trail)
         sheet.export(trail, rows, character.FOOT, f"custom_gear_{name}_smear.png", script_dir / f"{name}_smear.txt", 512)
+    return name
+
+
+def main(argv: list[str]):
+    """gear.py [model ...] [--anims a,b] [--jobs n]: all layers (and custom_body) by default."""
+    only_anims, workers, names = None, 6, []
+    it = iter(argv)
+    for a in it:
+        if a == "--anims":
+            only_anims = next(it).split(",")
+        elif a == "--jobs":
+            workers = int(next(it))
+        else:
+            names.append(a)
+    names = names or ["custom_body", *GEAR]
+    print(f"rendering {len(names)} layers on {workers} processes ...")
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for done in pool.map(job, names, [only_anims] * len(names)):
+            print(f"  {done}", flush=True)
 
 
 if __name__ == "__main__":

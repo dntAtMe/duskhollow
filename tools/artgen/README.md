@@ -8,7 +8,8 @@ ordered dithering and a dark outline.
 
 ```bash
 python -I tools/artgen/character.py            # player sprite (+ previews)
-python -I tools/artgen/gear.py                 # paper-doll body + ~40 gear layers (cloth/leather/chain/plate/mage, weapons, shields)
+python -I tools/artgen/gear.py                 # paper-doll body + ~60 gear layers + weapon smears, 6 processes
+python -I tools/artgen/gear.py dagger --anims swing,swing2   # re-render only some layers / animations
 python -I tools/artgen/creatures.py            # monsters (replace original NPC models with --art custom)
 python -I tools/artgen/valefolk.py             # Duskhollow creatures + people (glarewolf, stooped, hollowed_warden, ...)
 python -I tools/artgen/portraits.py            # unit-frame portraits of the above (optionally: model names)

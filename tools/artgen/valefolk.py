@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import math
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -1040,26 +1041,32 @@ FOLK = {
 }
 
 
+def job(name: str) -> str:
+    """Renders and exports one model (+ its smear layer); runs in a worker process."""
+    build, anims_fn, scale, frame, foot = FOLK[name]
+    model = build()
+    anims = anims_fn()
+    renders = sheet.render_all(model, anims, frame, foot, scale)
+    hits = HITS.get(name)
+    script_dir = sheet.OUT / "scripts" / "npc" / "custom"
+    sheet.export(renders, anims, foot, f"custom_npc_{name}.png", script_dir / f"{name}.txt", hits=hits)
+    sheet.preview(renders, anims, frame, f"npc_{name}")
+    if name in SMEARS:
+        bone, blade = SMEARS[name]
+        base, tip = blade or smear.blade_from_part(model, bone, base_frac=0.4)
+        attacks = [a for a in ("swing", "swing2") if any(r[0] == a for r in anims)]
+        trail = smear.render_layer(model, anims, frame, foot, scale, base, tip, hits, bone, attacks)
+        rows = smear.anims_for(anims, trail)
+        sheet.export(trail, rows, foot, f"custom_npc_{name}_smear.png", script_dir / f"{name}_smear.txt", 512)
+        sheet.preview(trail, rows, frame, f"npc_{name}_smear")
+    return f"{name}: {sum(len(p[0]) for p in model.parts.values())} voxels"
+
+
 def main(only: list[str]):
-    for name, (build, anims_fn, scale, frame, foot) in FOLK.items():
-        if only and name not in only:
-            continue
-        model = build()
-        anims = anims_fn()
-        print(f"{name}: {sum(len(p[0]) for p in model.parts.values())} voxels")
-        renders = sheet.render_all(model, anims, frame, foot, scale)
-        hits = HITS.get(name)
-        script_dir = sheet.OUT / "scripts" / "npc" / "custom"
-        sheet.export(renders, anims, foot, f"custom_npc_{name}.png", script_dir / f"{name}.txt", hits=hits)
-        sheet.preview(renders, anims, frame, f"npc_{name}")
-        if name in SMEARS:
-            bone, blade = SMEARS[name]
-            base, tip = blade or smear.blade_from_part(model, bone, base_frac=0.4)
-            attacks = [a for a in ("swing", "swing2") if any(r[0] == a for r in anims)]
-            trail = smear.render_layer(model, anims, frame, foot, scale, base, tip, hits, bone, attacks)
-            rows = smear.anims_for(anims, trail)
-            sheet.export(trail, rows, foot, f"custom_npc_{name}_smear.png", script_dir / f"{name}_smear.txt", 512)
-            sheet.preview(trail, rows, frame, f"npc_{name}_smear")
+    names = [n for n in FOLK if not only or n in only]
+    with ProcessPoolExecutor(max_workers=6) as pool:
+        for line in pool.map(job, names):
+            print(line, flush=True)
 
 
 if __name__ == "__main__":
