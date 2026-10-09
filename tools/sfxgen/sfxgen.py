@@ -6,7 +6,8 @@
     python -I tools/sfxgen/sfxgen.py --preview       # also write spectrograms
 
 Writes 16-bit PCM mono WAVs at 44.1 kHz to custom_assets/content/custom/sfx/ and
-spectrograms to custom_assets/preview/sfx/ (gitignored). Designs live in sounds.py.
+spectrograms to custom_assets/preview/sfx/ (gitignored). Designs live in sounds.py (ambience, gaze, story cues,
+footsteps, Duskhollow voices) and sounds_game.py (combat, UI, spell kits, glade creatures).
 """
 
 import sys
@@ -18,12 +19,18 @@ sys.path.insert(0, str(HERE))
 import numpy as np  # noqa: E402
 
 from dsp import SR, active_rms_db, fade, hp, master, periodic_filter, read_wav, secs, trim_tail, write_wav  # noqa: E402
-from sounds import MAX_LEN, SOUNDS, target_for  # noqa: E402
+from sounds import MAX_LEN, SOUNDS, TARGETS, target_for  # noqa: E402
+import sounds_game  # noqa: E402
+
+# game sounds (combat, UI, spell kits, glade creatures) take precedence in the per-name tables
+SOUNDS.update(sounds_game.SOUNDS)
+MAX_LEN.update(sounds_game.MAX_LEN)
+TARGETS.update(sounds_game.TARGETS)
 
 ROOT = HERE.parent.parent
 OUT = ROOT / "custom_assets/content/custom/sfx"
 PREVIEW = ROOT / "custom_assets/preview/sfx"
-BUDGET = 12 * 1024 * 1024
+BUDGET = 16 * 1024 * 1024
 
 
 def analyse(name, x, loop):
@@ -153,7 +160,7 @@ def main(argv):
         if preview:
             spectrogram(name, x)
     total = sum(p.stat().st_size for p in OUT.glob("*.wav"))
-    print(f"\n{len(list(OUT.glob('*.wav')))} files, {total / 1024 / 1024:.2f} MB (budget 12 MB)")
+    print(f"\n{len(list(OUT.glob('*.wav')))} files, {total / 1024 / 1024:.2f} MB (budget 16 MB)")
     if total > BUDGET:
         failed.append("over the size budget")
     if failed:
