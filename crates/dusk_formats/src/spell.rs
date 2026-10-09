@@ -179,47 +179,7 @@ impl GameDb {
     }
 }
 
-/// One sprite animation of a visual kit (`spranim` / `spranim_2`).
-#[derive(Debug, Clone, Default)]
-pub struct KitAnim {
-    /// `.sa` script name, e.g. `fire_001.sa`.
-    pub sa: String,
-    /// Canvas left edge relative to the unit's feet (px, positive = left).
-    pub x: i64,
-    /// Canvas bottom relative to the feet (px, screen-down positive); may reference `height`.
-    pub y: String,
-    /// Packed RGBA tint (-1 / 0 = none).
-    pub color: i64,
-    pub blend: i64,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct VisualKit {
-    pub id: i64,
-    pub anims: Vec<KitAnim>,
-    /// Particle system (`.psi`; other names such as `0` or a stray `.sa` are ignored).
-    pub psystem: String,
-    /// Emitter offset from the kit's anchor (px, y down); `psystem_y` may reference `height`.
-    pub psystem_x: String,
-    pub psystem_y: String,
-    pub sound: String,
-    pub unit_glow: i64,
-    pub ground_glow: i64,
-}
-
-/// `spell_visual` row with its kits resolved.
-#[derive(Debug, Clone, Default)]
-pub struct SpellVisual {
-    pub traveling: Option<VisualKit>,
-    pub impact: Option<VisualKit>,
-    pub casting: Option<VisualKit>,
-    pub go: Option<VisualKit>,
-    /// Shown on a unit while the spell's aura is on it.
-    pub aura_ontop: Option<VisualKit>,
-    /// Unit animation ids (enum: 4 Die, 5 CritDie, 6 Cast, 7 Swing, 8 Hit, 9 Block, 10 CastAlt).
-    pub unit_go_animation: i64,
-    pub unit_cast_animation: i64,
-}
+pub use crate::content::visuals::{KitAnim, SpellVisual, VisualKit};
 
 impl GameDb {
     /// `spell_visual_kit` by id.

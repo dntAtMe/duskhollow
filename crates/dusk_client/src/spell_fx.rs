@@ -198,6 +198,32 @@ fn spawn_kit(
     }
 }
 
+/// `DUSK_LEGACY_LOG=1`: the legacy visual kits a spell plays.
+fn note_kits(spell: i64, visual: &dusk_formats::spell::SpellVisual) {
+    if !dusk_formats::legacy_log_enabled() {
+        return;
+    }
+    let slots = [
+        ("traveling", &visual.traveling),
+        ("impact", &visual.impact),
+        ("casting", &visual.casting),
+        ("go", &visual.go),
+        ("aura", &visual.aura_ontop),
+    ];
+    for (slot, kit) in slots {
+        if let Some(k) = kit {
+            let anims: Vec<&str> = k.anims.iter().map(|a| a.sa.as_str()).collect();
+            dusk_formats::legacy_note(
+                "kit",
+                format!(
+                    "{} (spell {spell} {slot}): anims {anims:?} psystem {:?} sound {:?} glow {}/{}",
+                    k.id, k.psystem, k.sound, k.unit_glow, k.ground_glow
+                ),
+            );
+        }
+    }
+}
+
 fn on_spell_events(
     mut commands: Commands,
     mut events: MessageReader<SpellNet>,
@@ -220,6 +246,7 @@ fn on_spell_events(
             }
             ServerMsg::SpellGo { caster, spell, targets, travel_ms } => {
                 let Some(visual) = data.spell_visuals.get(&(*spell as i64)) else { continue };
+                note_kits(*spell as i64, visual);
                 let caster_e = net.entities.get(caster).copied();
                 let target_es: Vec<Entity> = targets.iter().filter_map(|t| net.entities.get(t).copied()).collect();
                 let target_pos = target_es.first().and_then(|t| units.get(*t).ok()).map(|u| u.pos);

@@ -38,7 +38,8 @@ impl Plugin for CombatUiPlugin {
 pub struct UiFont(pub Handle<Font>);
 
 pub fn load_font(mut commands: Commands, data: Res<GameData>, assets: Res<AssetServer>) {
-    let path = data.asset_path("Friz Quadrata Regular.ttf").unwrap_or_else(|| "content/fonts/arial.ttf".into());
+    let path =
+        data.asset_path("Friz Quadrata Regular.ttf").unwrap_or_else(|| "legacy://content/fonts/arial.ttf".into());
     commands.insert_resource(UiFont(assets.load(path)));
 }
 

@@ -21,7 +21,6 @@ use crate::{
 use bevy::audio::{AudioSinkPlayback, PlaybackMode, Volume};
 use bevy::prelude::*;
 use dusk_formats::{
-    db::GameDb,
     map::MapFile,
     sound::{RegionGrid, RegionSound, SoundTables, builtin, resolve_sound, split_playlist},
 };
@@ -174,11 +173,11 @@ fn update_listener(
 }
 
 fn setup(mut commands: Commands, data: Res<GameData>, mut settings: ResMut<AudioSettings>) {
-    if let Ok(text) = std::fs::read_to_string(data.root.join("config.ini")) {
+    if let Some(text) = data.find_file("config.ini").and_then(|p| std::fs::read_to_string(p).ok()) {
         settings.apply_config(&text);
     }
     settings.apply_env();
-    let tables = GameDb::open(data.root.join("game.db")).and_then(|db| db.sound_tables()).unwrap_or_else(|e| {
+    let tables = dusk_formats::content::sounds::load(&data.root).unwrap_or_else(|e| {
         warn!("audio: cannot read sound tables: {e}");
         SoundTables::default()
     });
@@ -450,8 +449,8 @@ fn on_map_loaded(
             commands.entity(e).despawn();
         }
     }
-    let path = data.root.join("maps").join(format!("{}.map", current.name));
-    let Ok(map) = MapFile::load(&path) else {
+    let path = data.find_file(&format!("maps/{}.map", current.name));
+    let Some(Ok(map)) = path.map(MapFile::load) else {
         music.region = RegionGrid::default();
         return;
     };
@@ -949,8 +948,8 @@ mod tests {
     #[test]
     fn referenced_sounds_decode() {
         use bevy::audio::{AudioSource, Decodable};
-        let root = dusk_formats::assets_root();
-        let Ok(db) = GameDb::open(root.join("game.db")) else { return };
+        let root = dusk_formats::legacy_root();
+        let Ok(db) = dusk_formats::db::GameDb::open(root.join("game.db")) else { return };
         let index = dusk_formats::FileIndex::load(root.join("file_index.txt")).unwrap();
         let mut names: Vec<String> = db.referenced_sounds().unwrap().into_iter().map(|(_, n)| n).collect();
         names.extend(builtin::all().into_iter().map(str::to_string));

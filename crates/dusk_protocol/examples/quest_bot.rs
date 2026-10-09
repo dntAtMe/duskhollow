@@ -69,9 +69,10 @@ fn main() {
                     say(format!("welcome #{your_id} on {map} at ({:.1}, {:.1})", p.x, p.y));
                     me = Some(your_id);
                     pos = p;
-                    let root = dusk_formats::assets_root().join("maps");
-                    grid = Some(MapFile::load(root.join(format!("{map}.map"))).expect("needs assets").walk_grid());
-                    let markers = std::fs::read_to_string(root.join(format!("{map}.markers"))).unwrap_or_default();
+                    let root = dusk_formats::content_root();
+                    let file = |ext: &str| dusk_formats::content::maps::map_file(&root, &map, ext);
+                    grid = Some(MapFile::load(file("map").expect("needs the map")).expect("needs the map").walk_grid());
+                    let markers = file("markers").and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
                     gate = dusk_formats::custom::parse_markers(&markers)
                         .into_iter()
                         .find(|m| m.name == "glare_gate")

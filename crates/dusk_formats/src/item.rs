@@ -406,21 +406,23 @@ pub fn class_can_use(class: i64, t: &ItemTemplate, allowed_armor: &HashMap<i64, 
         return false;
     }
     match t.equip_type {
-        equip::WEAPON | equip::RANGED => {
-            let ok: &[i64] = match class {
-                1 => &[weapon::AXE, weapon::MACE, weapon::SWORD, weapon::DAGGER],
-                2 => &[weapon::STAFF, weapon::WAND],
-                3 => &[weapon::BOW, weapon::DAGGER],
-                4 => &[weapon::STAFF, weapon::MACE],
-                _ => return true,
-            };
-            ok.contains(&t.weapon_type)
-        }
+        equip::WEAPON | equip::RANGED => !(1..=4).contains(&class) || class_weapons(class).contains(&t.weapon_type),
         equip::SHIELD => matches!(class, 1 | 4),
         equip::HEAD | equip::CHEST | equip::LEGS | equip::FEET | equip::HANDS => {
             t.armor_type <= 1 || allowed_armor.get(&class).is_none_or(|v| v.contains(&t.armor_type))
         }
         _ => true,
+    }
+}
+
+/// Weapon types a class may wield (main hand and ranged); empty for unknown classes.
+pub fn class_weapons(class: i64) -> &'static [i64] {
+    match class {
+        1 => &[weapon::AXE, weapon::MACE, weapon::SWORD, weapon::DAGGER],
+        2 => &[weapon::STAFF, weapon::WAND],
+        3 => &[weapon::BOW, weapon::DAGGER],
+        4 => &[weapon::STAFF, weapon::MACE],
+        _ => &[],
     }
 }
 

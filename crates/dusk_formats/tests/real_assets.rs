@@ -4,7 +4,7 @@ use dusk_formats::{FileIndex, db::GameDb, map::MapFile, sprite_anim::SpriteAnim,
 use std::path::{Path, PathBuf};
 
 fn assets() -> Option<PathBuf> {
-    let p = dusk_formats::assets_root();
+    let p = dusk_formats::legacy_root();
     p.join("game.db").exists().then_some(p)
 }
 
@@ -25,7 +25,7 @@ fn files(dir: &Path, ext: &str) -> Vec<PathBuf> {
 fn all_maps_parse_and_textures_resolve() {
     let Some(root) = assets() else { return };
     let index = FileIndex::load(root.join("file_index.txt")).unwrap();
-    // Our own maps (mirrored from custom_assets) are checked by `custom_maps_parse_and_resolve`.
+    // Our own maps (older builds mirrored them in) are checked by `custom_maps_parse_and_resolve`.
     let originals = files(&root.join("maps"), "map")
         .into_iter()
         .filter(|f| !f.file_stem().unwrap().to_string_lossy().starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX));
@@ -44,7 +44,7 @@ fn all_sprite_scripts_parse() {
     let index = FileIndex::load(root.join("file_index.txt")).unwrap();
     let (mut total, mut missing) = (0, Vec::new());
     for dir in ["scripts/npc", "scripts/player"] {
-        // `custom/` holds our own scripts mirrored in by `custom::install`; their sheets aren't indexed.
+        // `custom/` may hold copies of our own scripts (older builds mirrored them in); skip them.
         for f in
             files(&root.join(dir), "txt").into_iter().filter(|f| !f.components().any(|c| c.as_os_str() == "custom"))
         {
@@ -120,10 +120,10 @@ fn spell_visuals_load_and_animations_exist() {
 #[test]
 fn custom_maps_parse_and_resolve() {
     use dusk_formats::custom::{CUSTOM_MAP_PREFIX, parse_spawns};
-    let dir = dusk_formats::custom_assets_root().join("maps");
+    let dir = dusk_formats::content_root().join("maps");
     let Ok(entries) = std::fs::read_dir(&dir) else { return };
     // Every PNG name under custom_assets/content, scanned once.
-    let pngs: std::collections::HashSet<String> = files(&dusk_formats::custom_assets_root().join("content"), "png")
+    let pngs: std::collections::HashSet<String> = files(&dusk_formats::content_root().join("content"), "png")
         .iter()
         .map(|f| f.file_name().unwrap().to_string_lossy().into_owned())
         .collect();

@@ -1,52 +1,12 @@
-//! Our own art and maps from `tools/artgen` (`custom_assets/`), installed next to the
-//! extracted original assets so the engine can load both from one root.
+//! Parsers of our own data files (`custom_assets/data`, map sidecars); see `crate::content`
+//! for the loaders that merge them with the legacy data.
 
 use crate::db::{NpcModel, NpcSpawn, NpcSpell, NpcTemplate};
-use crate::spell::{SpellEffect, SpellTemplate, SpellVisual, VisualKit};
-use std::collections::HashMap;
+use crate::spell::{SpellEffect, SpellTemplate};
 use std::path::Path;
 
-/// Prefix of map files that come from `custom_assets/maps` rather than the original game.
+/// Prefix of our maps (`custom_assets/maps`), as opposed to legacy ones.
 pub const CUSTOM_MAP_PREFIX: &str = "custom_";
-
-/// Mirrors `custom_assets/{content,scripts,maps}` into the same folders under `assets_root`
-/// (copying only files that are newer) and returns `(basename, relative path)` for every
-/// `content/` file so callers can add them to their [`crate::FileIndex`].
-/// Only our own names are written (`content/custom/...`, `scripts/player/custom/...`,
-/// `maps/custom_*`), never original files.
-pub fn install(custom_root: &Path, assets_root: &Path) -> std::io::Result<Vec<(String, String)>> {
-    let mut content = Vec::new();
-    if !custom_root.exists() {
-        return Ok(content);
-    }
-    let mut stack = vec![custom_root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        for e in std::fs::read_dir(&dir)?.flatten() {
-            let path = e.path();
-            let Ok(rel) = path.strip_prefix(custom_root) else { continue };
-            let top = rel.components().next().map(|c| c.as_os_str().to_string_lossy().into_owned());
-            if !matches!(top.as_deref(), Some("content" | "scripts" | "maps")) {
-                continue; // previews, manifests...
-            }
-            if path.is_dir() {
-                stack.push(path);
-                continue;
-            }
-            let dest = assets_root.join(rel);
-            let stale = std::fs::metadata(&dest)
-                .and_then(|d| Ok(d.modified()? < std::fs::metadata(&path)?.modified()?))
-                .unwrap_or(true);
-            if stale {
-                std::fs::create_dir_all(dest.parent().unwrap())?;
-                std::fs::copy(&path, &dest)?;
-            }
-            if top.as_deref() == Some("content") {
-                content.push((e.file_name().to_string_lossy().into_owned(), rel.to_string_lossy().replace('\\', "/")));
-            }
-        }
-    }
-    Ok(content)
-}
 
 /// Parses a `maps/<name>.spawns` sidecar: `entry x y orientation wander_distance` per line,
 /// `#` comments. Spawns get synthetic guids from `first_guid` and wander if the distance is > 0.
@@ -181,64 +141,6 @@ fn default_template(entry: i64) -> NpcTemplate {
 /// First `spell_template.entry` used by `custom_assets/data/spells.txt`.
 pub const CUSTOM_SPELL_FIRST: i64 = 50000;
 
-/// Visual of a custom spell: a legacy `spell_visual` row to start from (`visual=<spell entry>`)
-/// with per-kit overrides by `spell_visual_kit.id` (0 = none) and unit animations.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct CustomVisual {
-    pub base: Option<i64>,
-    pub traveling: Option<i64>,
-    pub impact: Option<i64>,
-    pub casting: Option<i64>,
-    pub go: Option<i64>,
-    pub aura: Option<i64>,
-    pub go_anim: Option<i64>,
-    pub cast_anim: Option<i64>,
-}
-
-impl CustomVisual {
-    /// Resolves kit ids against the legacy tables. Unknown kit ids (and 0) mean no kit.
-    pub fn resolve(&self, visuals: &HashMap<i64, SpellVisual>, kits: &HashMap<i64, VisualKit>) -> SpellVisual {
-        let mut v = self.base.and_then(|b| visuals.get(&b)).cloned().unwrap_or_default();
-        let kit = |id: Option<i64>, slot: &mut Option<VisualKit>| {
-            if let Some(id) = id {
-                *slot = kits.get(&id).cloned();
-            }
-        };
-        kit(self.traveling, &mut v.traveling);
-        kit(self.impact, &mut v.impact);
-        kit(self.casting, &mut v.casting);
-        kit(self.go, &mut v.go);
-        kit(self.aura, &mut v.aura_ontop);
-        if let Some(a) = self.go_anim {
-            v.unit_go_animation = a;
-        }
-        if let Some(a) = self.cast_anim {
-            v.unit_cast_animation = a;
-        }
-        v
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct CustomSpell {
-    pub template: SpellTemplate,
-    pub visual: CustomVisual,
-}
-
-/// Unit animation by name (`swing`, `cast`, `shoot`, `cast_alt`, `block`, `hit`) or number
-/// (enum: 2 Shoot, 6 Cast, 7 Swing, 8 Hit, 9 Block, 10 CastAlt).
-fn unit_anim_id(v: &str) -> i64 {
-    match v {
-        "shoot" => 2,
-        "cast" => 6,
-        "swing" => 7,
-        "hit" => 8,
-        "block" => 9,
-        "cast_alt" => 10,
-        _ => v.parse().unwrap_or(0),
-    }
-}
-
 fn effect_kind(v: &str) -> i64 {
     use crate::spell::effect::*;
     match v {
@@ -276,25 +178,20 @@ fn target_type(v: &str) -> i64 {
 /// Effects N = 1..=3: `effectN=kind` (number or `school_damage`, `weapon_damage`, `apply_aura`,
 /// `heal`, `heal_pct`, `charge`), `effectN_data=d1,d2,d3`, `effectN_target=` (number or `caster`,
 /// `hostile`, `friendly`, `area_src_hostile`, ...), `effectN_radius` (cells), `effectN_positive`,
-/// `effectN_formula`. Visual: `visual=<legacy spell entry>`, `traveling_kit`, `impact_kit`,
-/// `casting_kit`, `go_kit`, `aura_kit` (kit ids, 0 = none), `go_anim`, `cast_anim` (name or id).
-pub fn parse_spells(text: &str) -> Vec<CustomSpell> {
+/// `effectN_formula`. Visuals are in `data/spell_visuals.txt` (`crate::content::visuals`).
+pub fn parse_spells(text: &str) -> Vec<SpellTemplate> {
     let mut out = Vec::new();
-    let mut cur: Option<CustomSpell> = None;
+    let mut cur: Option<SpellTemplate> = None;
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         if let Some(entry) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
             out.extend(cur.take());
             let Ok(entry) = entry.trim().parse::<i64>() else { continue };
-            cur = Some(CustomSpell {
-                template: SpellTemplate { entry, abilities_tab: 1, school: 1, ..Default::default() },
-                visual: CustomVisual::default(),
-            });
+            cur = Some(SpellTemplate { entry, abilities_tab: 1, school: 1, ..Default::default() });
             continue;
         }
-        let (Some(c), Some((k, v))) = (cur.as_mut(), line.split_once('=')) else { continue };
+        let (Some(t), Some((k, v))) = (cur.as_mut(), line.split_once('=')) else { continue };
         let (k, v) = (k.trim(), v.trim());
         let n = || v.parse::<i64>().unwrap_or(0);
-        let (t, vis) = (&mut c.template, &mut c.visual);
         match k {
             "name" => t.name = v.into(),
             "icon" => t.icon = v.into(),
@@ -312,14 +209,6 @@ pub fn parse_spells(text: &str) -> Vec<CustomSpell> {
             "school" => t.school = n(),
             "attributes" => t.attributes = n(),
             "abilities_tab" => t.abilities_tab = n(),
-            "visual" => vis.base = Some(n()),
-            "traveling_kit" => vis.traveling = Some(n()),
-            "impact_kit" => vis.impact = Some(n()),
-            "casting_kit" => vis.casting = Some(n()),
-            "go_kit" => vis.go = Some(n()),
-            "aura_kit" => vis.aura = Some(n()),
-            "go_anim" => vis.go_anim = Some(unit_anim_id(v)),
-            "cast_anim" => vis.cast_anim = Some(unit_anim_id(v)),
             _ => {
                 let Some(rest) = k.strip_prefix("effect") else { continue };
                 let (i, field) = rest.split_once('_').unwrap_or((rest, ""));
@@ -347,13 +236,13 @@ pub fn parse_spells(text: &str) -> Vec<CustomSpell> {
     out.extend(cur);
     // Unset effect slots (e.g. only effect2 given) would read as kind 0: drop them.
     for s in &mut out {
-        s.template.effects.retain(|e| e.kind != 0);
+        s.effects.retain(|e| e.kind != 0);
     }
     out
 }
 
 /// Loads `<custom_root>/data/spells.txt` (empty if missing).
-pub fn load_spells(custom_root: &Path) -> Vec<CustomSpell> {
+pub fn load_spells(custom_root: &Path) -> Vec<SpellTemplate> {
     std::fs::read_to_string(custom_root.join("data/spells.txt")).map(|t| parse_spells(&t)).unwrap_or_default()
 }
 
@@ -374,27 +263,6 @@ pub fn load_class_spells(custom_root: &Path) -> Vec<(i64, i64)> {
     std::fs::read_to_string(custom_root.join("data/class_spells.txt"))
         .map(|t| parse_class_spells(&t))
         .unwrap_or_default()
-}
-
-/// Adds the custom spells (`spells.txt`) to a spell table and the custom class spells
-/// (`class_spells.txt`) after each class's legacy starting spells (duplicates skipped).
-/// Returns the custom spells so callers can resolve their visuals.
-pub fn merge_spells(
-    custom_root: &Path,
-    spells: &mut HashMap<i64, SpellTemplate>,
-    class_spells: &mut HashMap<i64, Vec<i64>>,
-) -> Vec<CustomSpell> {
-    let custom = load_spells(custom_root);
-    for s in &custom {
-        spells.insert(s.template.entry, s.template.clone());
-    }
-    for (class, spell) in load_class_spells(custom_root) {
-        let list = class_spells.entry(class).or_default();
-        if !list.contains(&spell) {
-            list.push(spell);
-        }
-    }
-    custom
 }
 
 /// A named point of a custom map (`maps/<name>.markers`: `name x y [radius]` per line, cells).
@@ -504,11 +372,10 @@ mod tests {
              mana=2+clvl\ncooldown=8000\nrange=130\nduration=9000\ninterval=3000\n\
              effect1=weapon_damage\neffect1_data=1,60,0\neffect1_target=hostile\n\
              effect2=apply_aura\neffect2_data=1,1,0\neffect2_target=14\neffect2_formula=4+clvl*3\n\
-             visual=229\nimpact_kit=17\ngo_anim=swing\n\
              [50002]\nname=Veil\nabilities_tab=0\neffect2=apply_aura\neffect2_target=caster\neffect2_positive=1\n",
         );
         assert_eq!(s.len(), 2);
-        let t = &s[0].template;
+        let t = &s[0];
         assert_eq!((t.entry, t.name.as_str(), t.icon.as_str()), (50001, "Open Vein", "skill_open_vein.png"));
         assert_eq!(
             (t.mana_formula.as_str(), t.cooldown_ms, t.range, t.duration_ms, t.interval_ms),
@@ -518,21 +385,12 @@ mod tests {
         assert_eq!(t.effects.len(), 2);
         assert_eq!((t.effects[0].kind, t.effects[0].data, t.effects[0].target), (14, [1, 60, 0], 14));
         assert_eq!((t.effects[1].kind, t.effects[1].formula.as_str()), (3, "4+clvl*3"));
-        let v = &s[0].visual;
-        assert_eq!((v.base, v.impact, v.go_anim, v.traveling), (Some(229), Some(17), Some(7), None));
         // A lone effect2 becomes the only effect.
-        let veil = &s[1].template;
+        let veil = &s[1];
         assert_eq!(
             (veil.abilities_tab, veil.effects.len(), veil.effects[0].target, veil.effects[0].positive),
             (0, 1, 1, true)
         );
-
-        let kit = |id| VisualKit { id, ..Default::default() };
-        let visuals =
-            HashMap::from([(229, SpellVisual { impact: Some(kit(179)), unit_go_animation: 6, ..Default::default() })]);
-        let kits = HashMap::from([(17, kit(17)), (179, kit(179))]);
-        let r = v.resolve(&visuals, &kits);
-        assert_eq!((r.impact.map(|k| k.id), r.unit_go_animation, r.traveling.is_none()), (Some(17), 7, true));
     }
 
     #[test]
@@ -542,10 +400,9 @@ mod tests {
 
     #[test]
     fn shipped_spells_are_valid() {
-        let root = crate::custom_assets_root();
+        let root = crate::content_root();
         let spells = load_spells(&root);
-        for s in &spells {
-            let t = &s.template;
+        for t in &spells {
             assert!(t.entry >= CUSTOM_SPELL_FIRST && !t.name.is_empty() && !t.icon.is_empty(), "{t:?}");
             assert!(!t.effects.is_empty(), "{} has no effects", t.name);
             assert!(!t.description.contains("$E4"), "{}", t.name);
@@ -562,7 +419,7 @@ mod tests {
         }
         for (class, spell) in load_class_spells(&root) {
             assert!((1..=4).contains(&class));
-            assert!(spell < CUSTOM_SPELL_FIRST || spells.iter().any(|s| s.template.entry == spell), "{spell}");
+            assert!(spell < CUSTOM_SPELL_FIRST || spells.iter().any(|s| s.entry == spell), "{spell}");
         }
     }
 

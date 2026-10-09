@@ -73,7 +73,8 @@ fn load_map(
     mut loaded: MessageWriter<MapLoaded>,
 ) {
     let name = current.requested.take().unwrap();
-    let path = data.root.join("maps").join(format!("{name}.map"));
+    let path =
+        data.find_file(&format!("maps/{name}.map")).unwrap_or_else(|| data.root.join(format!("maps/{name}.map")));
     let map = match MapFile::load(&path) {
         Ok(m) => m,
         Err(e) => {

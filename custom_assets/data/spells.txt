@@ -10,8 +10,7 @@
 #   Periodic auras: the formula is the total over `duration`, ticking every `interval` ms.
 #   range: 64 per cell (130 = melee). speed: projectile (16 ~ 12 cells/s), 0 = instant.
 #   Tooltip tokens: $E1min $E1max (effect values), $E2D3 (raw data3), $DUR, $INVL.
-#   Visuals: visual=<legacy spell entry> plus *_kit=<spell_visual_kit id> overrides (0 = none);
-#   go_anim / cast_anim: swing | cast | shoot | cast_alt.
+#   Visuals: data/spell_visuals.txt.
 #   Icons: tools/artgen/icons.py --custom-spells -> content/custom/icons/spells/.
 #
 # Balance (level 1, starter gear): legacy Fireball ~28 fire on a 1.5 s cast / 6 s cooldown,
@@ -33,8 +32,6 @@ effect1=weapon_damage
 effect1_data=1,180,0
 effect1_target=hostile
 effect1_formula=value+(splvl*5)
-visual=14
-go_anim=swing
 
 [50002]
 name=Open Vein
@@ -54,8 +51,6 @@ effect2=apply_aura
 effect2_data=1,1,0
 effect2_target=hostile
 effect2_formula=3+(clvl*3)+(STR/3)
-visual=229
-go_anim=swing
 
 [50003]
 name=Skullcrack
@@ -73,9 +68,6 @@ effect1_target=hostile
 effect2=apply_aura
 effect2_data=3,8,0
 effect2_target=hostile
-impact_kit=15
-aura_kit=61
-go_anim=swing
 
 [50004]
 name=Run Down
@@ -95,9 +87,6 @@ effect2_target=hostile
 effect3=apply_aura
 effect3_data=3,7,-50
 effect3_target=hostile
-go_kit=6
-impact_kit=129
-go_anim=swing
 
 [50005]
 name=Clear the Row
@@ -110,8 +99,6 @@ effect1=weapon_damage
 effect1_data=1,70,0
 effect1_target=area_src_hostile
 effect1_radius=2
-go_kit=199
-go_anim=swing
 
 # --- ranged ---
 
@@ -128,9 +115,6 @@ effect1=school_damage
 effect1_data=1,0,0
 effect1_target=hostile
 effect1_formula=2+(clvl*2)+(AGI/2)
-traveling_kit=78
-impact_kit=132
-go_anim=swing
 
 [50007]
 name=Ember Bolt
@@ -153,9 +137,6 @@ effect2=apply_aura
 effect2_data=1,3,0
 effect2_target=hostile
 effect2_formula=1+(INT/5)
-visual=243
-go_anim=swing
-cast_anim=cast
 
 [50008]
 name=Drag-Hook
@@ -176,9 +157,6 @@ effect1_formula=3+clvl+(AGI/3)
 effect2=apply_aura
 effect2_data=3,7,-50
 effect2_target=hostile
-visual=46
-go_anim=shoot
-cast_anim=shoot
 
 # --- utility ---
 
@@ -198,10 +176,6 @@ effect1_data=2,0,0
 effect1_target=caster
 effect1_positive=1
 effect1_formula=6+(clvl*4)+(WIL/2)
-casting_kit=119
-impact_kit=98
-go_anim=cast
-cast_anim=cast
 
 [50010]
 name=Draw the Veil
@@ -220,5 +194,3 @@ effect2=apply_aura
 effect2_data=11,0,-15
 effect2_target=caster
 effect2_positive=1
-impact_kit=158
-go_anim=cast

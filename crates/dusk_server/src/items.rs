@@ -11,7 +11,6 @@ use crate::spells::{CastRequest, CastRequests, Spellbook};
 use crate::stats::{Stats, player_stats};
 use crate::world::{Dead, GameWorld, Motion, NetId, Npc, OnMap, Outbox, Player, Scope};
 use bevy::prelude::*;
-use dusk_formats::db::GameDb;
 use dusk_formats::item::{
     self, Affix, BAG_SLOTS, EQUIP_SLOTS, ItemStats, ItemTemplate, LootRow, NpcLoot, equip, quality, slot,
 };
@@ -26,7 +25,7 @@ const LOOT_CORPSE_SECS: f32 = 60.0;
 /// Corpse lingers this long after being emptied. DESIGN.
 const LOOTED_CORPSE_SECS: f32 = 3.0;
 
-/// Static item data from `game.db`.
+/// Static item data (`dusk_formats::content::{items, rules, npcs}`).
 #[derive(Resource, Default)]
 pub struct ItemData {
     pub items: HashMap<i64, ItemTemplate>,
@@ -45,29 +44,28 @@ pub struct ItemData {
 }
 
 impl ItemData {
+    /// `root`: our content root.
     pub fn load(root: &Path) -> anyhow::Result<Self> {
-        let db = GameDb::open(root.join("game.db"))?;
-        let items = db.items()?;
-        let mut grid: HashMap<(i64, i64), Vec<i64>> = HashMap::new();
-        for t in items.values().filter(|t| t.generated && t.is_equippable()) {
-            grid.entry((t.quality, t.required_level.max(1))).or_default().push(t.entry);
-        }
-        grid.values_mut().for_each(|v| v.sort_unstable());
+        use dusk_formats::content;
+        let tables = content::items::load(root)?;
+        let rules = content::rules::load(root)?;
+        let npcs = content::npcs::load(root)?;
         Ok(Self {
-            affixes: db.affixes()?,
-            starting: db.starting_items()?,
-            class_armor: db.class_armor()?,
-            desirable_stats: db.class_desirable_stats()?,
-            loot_tables: db.loot_tables()?,
-            junk: db.junk_loot()?,
-            npc_loot: db.npc_loot()?,
-            materials: db.material_chances()?,
-            grid,
-            items,
+            items: tables.items,
+            affixes: tables.affixes,
+            starting: rules.start_items,
+            class_armor: rules.class_armor,
+            desirable_stats: rules.desirable_stats,
+            loot_tables: tables.loot_tables,
+            junk: npcs.junk,
+            npc_loot: npcs.loot,
+            materials: tables.materials,
+            grid: tables.grid,
         })
     }
 
     fn template(&self, entry: u32) -> Option<&ItemTemplate> {
+        dusk_formats::legacy_note("item", entry);
         self.items.get(&(entry as i64))
     }
 
@@ -731,11 +729,10 @@ mod tests {
 
     #[test]
     fn loot_rolls_are_sane_on_real_data() {
-        let root = dusk_formats::assets_root();
-        if !root.join("game.db").exists() {
+        if !dusk_formats::legacy_root().join("game.db").exists() {
             return;
         }
-        let d = ItemData::load(&root).unwrap();
+        let d = ItemData::load(&dusk_formats::content_root()).unwrap();
         let mut rng = Rng::default();
         let (mut gold, mut drops) = (0, 0);
         for i in 0..2000 {

@@ -174,8 +174,11 @@ fn init_emitters(
     for (e, mut em) in &mut q {
         let key = em.psi.to_lowercase();
         let info = *cache.0.entry(key).or_insert_with(|| {
-            let path = data.root.join("scripts/particles").join(&em.psi);
-            ParticleSystemInfo::load(&path).map_err(|err| warn!("{}: {err}", path.display())).ok()
+            let info = data.particle_system(&em.psi);
+            if info.is_none() {
+                warn!("unknown particle system {}", em.psi);
+            }
+            info
         });
         let Some(info) = info else {
             commands.entity(e).despawn();

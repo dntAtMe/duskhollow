@@ -106,8 +106,10 @@ fn parse_args() -> Args {
 }
 
 /// Environment variables that do not mean "start the game directly".
-const MENU_SAFE_VARS: [&str; 12] = [
+const MENU_SAFE_VARS: [&str; 14] = [
     "DUSK_ASSETS",
+    "DUSK_LEGACY",
+    "DUSK_LEGACY_LOG",
     "DUSK_CUSTOM_ASSETS",
     "DUSK_ART",
     "DUSK_AUDIO_LOG",
@@ -134,13 +136,13 @@ fn launch_mode(args: &Args) -> Launch {
 }
 
 fn main() -> AppExit {
-    let root = dusk_formats::assets_root();
+    let root = dusk_formats::content_root();
     let args = parse_args();
     let launch = launch_mode(&args);
     let settings = settings::Settings::load();
     let menu_launch = launch.is_menu();
     let game_data = data::GameData::load_with(&root, menu_launch.then_some(settings.custom_art))
-        .expect("failed to load game data (run `cargo run -p dusk_extract` first)");
+        .expect("failed to load game data (legacy data: set DUSK_LEGACY or run `cargo run -p dusk_extract`)");
 
     // A menu launch opens the window as the player left it; the command line keeps 1280x720.
     let mut window = Window { title: "Duskhollow".into(), resolution: (1280, 720).into(), ..default() };
@@ -153,6 +155,14 @@ fn main() -> AppExit {
     }
 
     let mut app = App::new();
+    // Our content is the default asset source; `legacy://` serves the legacy data pack.
+    let legacy = dusk_formats::legacy_root();
+    app.register_asset_source(
+        "legacy",
+        bevy::asset::io::AssetSourceBuilder::new(move || {
+            Box::new(LegacyReader(bevy::asset::io::file::FileAssetReader::new(legacy.clone())))
+        }),
+    );
     app.add_plugins(
         DefaultPlugins
             .set(AssetPlugin { file_path: root.to_string_lossy().into_owned(), ..default() })
@@ -194,6 +204,37 @@ fn main() -> AppExit {
         }
     }
     app.run()
+}
+
+/// File reader of the `legacy://` asset source; notes each file read (`DUSK_LEGACY_LOG=1`).
+struct LegacyReader(bevy::asset::io::file::FileAssetReader);
+
+impl bevy::asset::io::AssetReader for LegacyReader {
+    async fn read<'a>(
+        &'a self,
+        path: &'a std::path::Path,
+    ) -> Result<impl bevy::asset::io::Reader + 'a, bevy::asset::io::AssetReaderError> {
+        dusk_formats::legacy_note("file", path.to_string_lossy().replace('\\', "/"));
+        self.0.read(path).await
+    }
+
+    async fn read_meta<'a>(
+        &'a self,
+        path: &'a std::path::Path,
+    ) -> Result<impl bevy::asset::io::Reader + 'a, bevy::asset::io::AssetReaderError> {
+        self.0.read_meta(path).await
+    }
+
+    async fn read_directory<'a>(
+        &'a self,
+        path: &'a std::path::Path,
+    ) -> Result<Box<bevy::asset::io::PathStream>, bevy::asset::io::AssetReaderError> {
+        self.0.read_directory(path).await
+    }
+
+    async fn is_directory<'a>(&'a self, path: &'a std::path::Path) -> Result<bool, bevy::asset::io::AssetReaderError> {
+        self.0.is_directory(path).await
+    }
 }
 
 /// Debug aid: `DUSK_SCREENSHOT=out.png` saves a screenshot after `DUSK_SCREENSHOT_AT` seconds

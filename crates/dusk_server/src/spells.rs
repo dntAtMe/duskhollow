@@ -252,6 +252,9 @@ pub fn start_casts(
             }
         };
         let Some(spell) = world.spells.get(&(req.spell as i64)) else { continue };
+        if (req.spell as i64) < dusk_formats::custom::CUSTOM_SPELL_FIRST {
+            dusk_formats::legacy_note("spell", format!("{} {}", req.spell, spell.name));
+        }
         if dead {
             continue;
         }
@@ -941,10 +944,10 @@ mod skill_tests {
 
     impl Sim {
         fn new() -> Option<Self> {
-            let root = dusk_formats::assets_root();
-            if !root.join("game.db").exists() {
+            if !dusk_formats::legacy_root().join("game.db").exists() {
                 return None;
             }
+            let root = dusk_formats::content_root();
             let world = GameWorld::load(&root, Some("custom_duskhollow")).unwrap();
             let (map, start) = world.start;
             let dir = (0..16)

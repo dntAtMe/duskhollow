@@ -20,6 +20,7 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 pub const TICK_HZ: f64 = 20.0;
 
 pub struct ServerConfig {
+    /// Our content root ([`dusk_formats::content_root`]).
     pub assets: PathBuf,
     /// Spawn players on this map instead of the original start point.
     pub start_map: Option<String>,

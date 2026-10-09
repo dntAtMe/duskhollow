@@ -12,7 +12,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 fn assets() -> Option<PathBuf> {
-    let p = dusk_formats::assets_root();
+    let p = dusk_formats::legacy_root();
     p.join("game.db").exists().then_some(p)
 }
 

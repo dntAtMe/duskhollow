@@ -157,7 +157,7 @@ pub(super) fn custom_proximity(
 
 /// Reads `sprite_sounds.txt` and the map's `.cover` and adds their emitters.
 pub(super) fn load_custom_proximity(groups: &mut Vec<ProximityGroup>, map: &MapFile, data: &GameData, name: &str) {
-    let sprite_sounds = std::fs::read_to_string(dusk_formats::custom_assets_root().join("data/sprite_sounds.txt"))
+    let sprite_sounds = std::fs::read_to_string(data.root.join("data/sprite_sounds.txt"))
         .map(|t| parse_sprite_sounds(&t))
         .unwrap_or_default();
     let cover = std::fs::read_to_string(data.root.join("maps").join(format!("{name}.cover")))
@@ -473,7 +473,7 @@ mod tests {
     #[test]
     fn contract_sounds_decode() {
         use bevy::audio::{AudioSource, Decodable};
-        let dir = dusk_formats::custom_assets_root().join("content/custom/sfx");
+        let dir = dusk_formats::content_root().join("content/custom/sfx");
         let mut names: Vec<String> = [
             "gaze_open",
             "gaze_close",

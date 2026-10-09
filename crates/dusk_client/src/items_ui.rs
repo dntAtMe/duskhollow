@@ -21,10 +21,7 @@ use crate::{
 };
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use dusk_formats::{
-    db::GameDb,
-    item::{self, Affix, BAG_SLOTS, EQUIP_SLOTS, ItemTemplate, equip, quality, slot, stat},
-};
+use dusk_formats::item::{self, Affix, BAG_SLOTS, EQUIP_SLOTS, ItemTemplate, equip, quality, slot, stat};
 use dusk_protocol::{ClientMsg, CombatStats, EntityId, Item, ServerMsg};
 use std::collections::{HashMap, HashSet};
 
@@ -240,11 +237,8 @@ fn absolute(left: f32, top: f32, w: f32, h: f32) -> Node {
 }
 
 fn load_item_db(mut commands: Commands, data: Res<GameData>) {
-    let db = GameDb::open(data.root.join("game.db")).expect("game.db");
-    commands.insert_resource(ItemDb {
-        items: db.items().expect("item_template"),
-        affixes: db.affixes().expect("affix_template"),
-    });
+    let tables = dusk_formats::content::items::load(&data.root).expect("item tables");
+    commands.insert_resource(ItemDb { items: tables.items, affixes: tables.affixes });
 }
 
 fn spawn_slot(p: &mut ChildSpawnerCommands, r: SlotRef, pos: Vec2, size: f32, font: &TextFont) {

@@ -277,7 +277,10 @@ fn submit(text: &str, log: &mut ChatLog, net: &Net, data: &GameData) {
             }
         }
         "help" | "?" => {
-            let help = std::fs::read_to_string(data.root.join("scripts/text/help.txt")).unwrap_or_default();
+            let help = data
+                .find_file("scripts/text/help.txt")
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .unwrap_or_default();
             for line in help.lines().filter(|l| !l.trim().is_empty()) {
                 log.system(line.trim(), SYSTEM);
             }

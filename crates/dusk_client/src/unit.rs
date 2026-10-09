@@ -300,7 +300,7 @@ pub fn spawn_unit(
 fn npc_script_dir(data: &GameData, model: &str) -> &'static str {
     let file = format!("{model}.txt");
     let has_custom = data.root.join("scripts/npc/custom").join(&file).exists();
-    let custom = has_custom && (data.custom_art || !data.root.join("scripts/npc").join(&file).exists());
+    let custom = has_custom && (data.custom_art || data.find_file(&format!("scripts/npc/{file}")).is_none());
     if custom { "npc/custom" } else { "npc" }
 }
 

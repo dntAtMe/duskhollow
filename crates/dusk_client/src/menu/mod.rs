@@ -271,8 +271,9 @@ fn setup(
     mut model: ResMut<MenuModel>,
 ) {
     commands.insert_resource(Skin::load(&data, &assets, font.0.clone()));
-    let stats =
-        dusk_formats::db::GameDb::open(data.root.join("game.db")).and_then(|db| db.class_stats()).unwrap_or_default();
+    let stats: Vec<_> = dusk_formats::content::rules::load(&data.root)
+        .map(|r| r.class_stats.into_values().collect())
+        .unwrap_or_default();
     model.classes = CLASSES
         .iter()
         .enumerate()
@@ -299,14 +300,8 @@ fn setup(
 
 /// Custom maps first (`custom_duskhollow` leading), then the legacy ones if asked for.
 fn start_maps(data: &GameData, legacy: bool) -> Vec<(String, String)> {
-    let mut custom: Vec<String> = std::fs::read_dir(data.root.join("maps"))
-        .map(|d| {
-            d.flatten()
-                .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".map")).map(String::from))
-                .filter(|n| n.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX))
-                .collect()
-        })
-        .unwrap_or_default();
+    let is_custom = |n: &str| n.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX);
+    let mut custom: Vec<String> = data.maps.iter().filter(|m| is_custom(&m.name)).map(|m| m.name.clone()).collect();
     custom.sort_by_key(|n| (n != settings::DEFAULT_MAP, n.clone()));
     let label = |n: &str| {
         let base = n.strip_prefix(dusk_formats::custom::CUSTOM_MAP_PREFIX).unwrap_or(n);
@@ -324,7 +319,7 @@ fn start_maps(data: &GameData, legacy: bool) -> Vec<(String, String)> {
     };
     let mut out: Vec<(String, String)> = custom.iter().map(|n| (n.clone(), label(n))).collect();
     if legacy || out.is_empty() {
-        let mut names: Vec<&str> = data.maps.iter().map(|m| m.name.as_str()).collect();
+        let mut names: Vec<&str> = data.maps.iter().map(|m| m.name.as_str()).filter(|n| !is_custom(n)).collect();
         names.sort();
         out.extend(names.into_iter().map(|n| (n.to_string(), format!("{n} (legacy)"))));
     }

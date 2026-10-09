@@ -92,8 +92,11 @@ impl HudConfig {
 }
 
 fn load_config(mut commands: Commands, data: Res<GameData>) {
-    let config =
-        std::fs::read_to_string(data.root.join("config.ini")).map(|t| HudConfig::parse(&t)).unwrap_or_default();
+    let config = data
+        .find_file("config.ini")
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|t| HudConfig::parse(&t))
+        .unwrap_or_default();
     commands.insert_resource(config);
 }
 
@@ -121,7 +124,8 @@ impl Portraits {
     /// Baked portrait for a bare file name like `portrait_goblin.png`; `None` while loading.
     pub fn get(&mut self, data: &GameData, assets: &AssetServer, name: &str) -> Option<Handle<Image>> {
         let offsets = self.offsets.get_or_insert_with(|| {
-            std::fs::read_to_string(data.root.join("scripts/sprite/portrait_offset.txt"))
+            data.find_file("scripts/sprite/portrait_offset.txt")
+                .and_then(|p| std::fs::read_to_string(p).ok())
                 .unwrap_or_default()
                 .lines()
                 .filter_map(|l| l.split_once('='))

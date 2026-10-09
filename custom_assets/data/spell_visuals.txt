@@ -1,0 +1,52 @@
+# Visuals of our spells (dusk_formats::content::visuals), one `[spell <entry>]` section per spell
+# of data/spells.txt:
+#   visual=<legacy spell entry>   start from that spell's legacy visual
+#   traveling_kit impact_kit casting_kit go_kit aura_kit = <legacy visual kit id> (0 = none)
+#   go_anim / cast_anim = swing | cast | shoot | cast_alt (unit animation)
+
+[spell 50001]
+visual=14
+go_anim=swing
+
+[spell 50002]
+visual=229
+go_anim=swing
+
+[spell 50003]
+impact_kit=15
+aura_kit=61
+go_anim=swing
+
+[spell 50004]
+go_kit=6
+impact_kit=129
+go_anim=swing
+
+[spell 50005]
+go_kit=199
+go_anim=swing
+
+[spell 50006]
+traveling_kit=78
+impact_kit=132
+go_anim=swing
+
+[spell 50007]
+visual=243
+go_anim=swing
+cast_anim=cast
+
+[spell 50008]
+visual=46
+go_anim=shoot
+cast_anim=shoot
+
+[spell 50009]
+casting_kit=119
+impact_kit=98
+go_anim=cast
+cast_anim=cast
+
+[spell 50010]
+impact_kit=158
+go_anim=cast

@@ -1,9 +1,13 @@
-//! Static game data loaded once at startup from the extracted assets.
+//! Static game data loaded once at startup through the content seam (`dusk_formats::content`).
+//!
+//! Asset paths (`GameData::asset_path`) are relative to our content root (Bevy's default asset
+//! source) or `legacy://...` for files of the legacy data pack (a second asset source).
 
 use bevy::prelude::*;
 use dusk_formats::{
-    FileIndex,
-    db::{GameDb, MapInfo, NpcModel, NpcTemplate},
+    FileIndex, content,
+    db::{MapInfo, NpcModel, NpcTemplate},
+    psi::ParticleSystemInfo,
     spell::{SpellTemplate, SpellVisual},
     sprite_anim::SpriteAnim,
     sprite_fx::{SpriteLight, SpritePsi},
@@ -15,6 +19,7 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Resource)]
 pub struct GameData {
+    /// Our content root (`dusk_formats::content_root`).
     pub root: PathBuf,
     pub index: FileIndex,
     pub maps: Vec<MapInfo>,
@@ -33,162 +38,119 @@ pub struct GameData {
     pub sprite_lights: HashMap<String, Vec<SpriteLight>>,
     /// `zone_template.night_pct` by zone id.
     pub zone_night: HashMap<u32, f32>,
+    /// Particle systems by `content::particles::key`.
+    particles: HashMap<String, ParticleSystemInfo>,
     flipbooks: Mutex<HashMap<String, Option<Arc<SpriteAnim>>>>,
     image_sizes: Mutex<HashMap<String, Option<UVec2>>>,
     scripts: Mutex<HashMap<String, Option<Arc<SpriteScript>>>>,
 }
 
-/// Installs `custom_assets` (our own art and maps) into the asset root and indexes its images.
-/// Returns whether any custom content exists.
+/// Indexes every file under `<root>/content` by bare name over the legacy index. Returns whether
+/// any of our content exists.
 ///
-/// Files under `content/override/` carry ORIGINAL file names (icons, interface art, spell
-/// flipbook frames...) and replace those originals in the index only when `overrides` is set
-/// (`--art custom`); everything else has custom-only names and is always indexed.
-fn install_custom_assets(root: &Path, index: &mut FileIndex, overrides: bool) -> bool {
-    match dusk_formats::custom::install(&dusk_formats::custom_assets_root(), root) {
-        Ok(files) => {
-            let mut replaced = 0;
-            for (name, rel) in &files {
-                let is_override = rel.starts_with("content/override/");
-                if !is_override || overrides {
-                    index.insert(name, rel);
-                    replaced += is_override as usize;
-                }
-            }
-            if replaced > 0 {
-                info!("custom art replaces {replaced} original files");
-            }
-            !files.is_empty()
-        }
-        Err(e) => {
-            warn!("custom assets not installed: {e}");
-            false
-        }
-    }
-}
-
-/// Contents of every file called `file_name` under `content/custom` (metadata written by tools/artgen).
-/// `roof <sprite prefix> <dx> <dy>` lines; `#` comments.
-fn parse_roofs(text: &str) -> Vec<(String, IVec2)> {
-    text.lines()
-        .filter_map(|l| match l.split_whitespace().collect::<Vec<_>>()[..] {
-            ["roof", name, dx, dy] => Some((name.to_lowercase(), IVec2::new(dx.parse().ok()?, dy.parse().ok()?))),
-            _ => None,
-        })
-        .collect()
-}
-
-fn custom_metadata(root: &Path, file_name: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut stack = vec![root.join("content/custom")];
+/// Files under `content/override/` carry ORIGINAL file names (icons, interface art...) and
+/// replace those originals in the index only when `overrides` is set (`--art custom`);
+/// everything else has our own names and is always indexed.
+fn index_content(root: &Path, index: &mut FileIndex, overrides: bool) -> bool {
+    let (mut found, mut replaced) = (0, 0);
+    let mut stack = vec![root.join("content")];
     while let Some(dir) = stack.pop() {
         let Ok(entries) = std::fs::read_dir(&dir) else { continue };
         for e in entries.flatten() {
-            let p = e.path();
-            if p.is_dir() {
-                stack.push(p);
-            } else if p.file_name().is_some_and(|n| n == file_name) {
-                out.push(std::fs::read_to_string(&p).unwrap_or_default());
+            let path = e.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            let Ok(rel) = path.strip_prefix(root) else { continue };
+            let rel = rel.to_string_lossy().replace('\\', "/");
+            found += 1;
+            let is_override = rel.starts_with("content/override/");
+            if !is_override || overrides {
+                index.insert(&e.file_name().to_string_lossy(), &rel);
+                replaced += is_override as usize;
             }
         }
     }
-    out
-}
-
-/// Adds custom-art effects to a table loaded from the db.
-fn with_custom<T>(mut table: HashMap<String, Vec<T>>, extra: Vec<(String, T)>) -> HashMap<String, Vec<T>> {
-    for (k, v) in extra {
-        table.entry(k).or_default().push(v);
+    if replaced > 0 {
+        info!("custom art replaces {replaced} original files");
     }
-    table
-}
-
-/// `name x y` lines from the custom `hotspots.txt` files.
-fn custom_hotspots(root: &Path) -> Vec<(String, (i32, i32))> {
-    let text = custom_metadata(root, "hotspots.txt").join("\n");
-    text.lines()
-        .filter_map(|line| {
-            let v: Vec<&str> = line.split_whitespace().collect();
-            let [name, x, y] = v[..] else { return None };
-            Some((name.to_lowercase(), (x.parse().ok()?, y.parse().ok()?)))
-        })
-        .collect()
+    found > 0
 }
 
 impl GameData {
-    /// `custom_art`: the menu's "custom art" setting, used when neither `--art` nor `DUSK_ART`
-    /// is given (`None`: off, as for command-line launches).
+    /// `root`: our content root. `custom_art`: the menu's "custom art" setting, used when
+    /// neither `--art` nor `DUSK_ART` is given (`None`: off, as for command-line launches).
     pub fn load_with(root: &Path, custom_art: Option<bool>) -> anyhow::Result<Self> {
-        let mut index = FileIndex::load(root.join("file_index.txt"))?;
+        let mut index = FileIndex::load_legacy();
         let args: Vec<String> = std::env::args().collect();
         let art_arg = args.windows(2).find(|w| w[0] == "--art").map(|w| w[1] == "custom");
         let art_env = std::env::var("DUSK_ART").ok().map(|v| v == "custom");
         let art_requested = art_arg.or(art_env).or(custom_art).unwrap_or(false);
-        let custom = install_custom_assets(root, &mut index, art_requested);
-        let db = GameDb::open(root.join("game.db"))?;
-        let custom_npcs = dusk_formats::custom::load_npc_templates(&dusk_formats::custom_assets_root());
-        let custom_fx = dusk_formats::sprite_fx::parse_custom_fx(&custom_metadata(root, "sprite_fx.txt").join("\n"));
-        // Our own skills (`custom_assets/data/spells.txt`); visuals reuse legacy kits by id.
-        let mut spells = db.spells()?;
-        let mut spell_visuals = db.spell_visuals()?;
-        let custom_spells =
-            dusk_formats::custom::merge_spells(&dusk_formats::custom_assets_root(), &mut spells, &mut HashMap::new());
-        let kits = db.spell_visual_kits()?;
-        for s in &custom_spells {
-            let v = s.visual.resolve(&spell_visuals, &kits);
-            spell_visuals.insert(s.template.entry, v);
-        }
+        let custom = index_content(root, &mut index, art_requested);
+        let npcs = content::npcs::load(root)?;
+        let spells = content::spells::load(root)?;
+        let spell_visuals = content::visuals::load(root, &spells)?;
+        let fx = content::sprite_fx::load(root)?;
         Ok(Self {
             root: root.to_path_buf(),
             index,
-            maps: db.maps()?,
-            npc_models: db
-                .npc_models()?
-                .into_iter()
-                .chain(custom_npcs.iter().map(|(_, m)| (m.id, m.clone())))
-                .collect(),
-            npc_templates: db
-                .npc_templates()?
-                .into_iter()
-                .chain(custom_npcs.into_iter().map(|(t, _)| (t.entry, t)))
-                .collect(),
-            hotspots: db.sprite_hotspots()?.into_iter().chain(custom_hotspots(root)).collect(),
+            maps: content::maps::load(root)?,
+            npc_models: npcs.models,
+            npc_templates: npcs.templates,
+            hotspots: fx.hotspots,
             spells,
             custom_art: custom && art_requested,
-            roofs: parse_roofs(&custom_metadata(root, "roofs.txt").join(
-                "
-",
-            )),
+            roofs: fx.roofs.into_iter().map(|(name, (x, y))| (name, IVec2::new(x, y))).collect(),
             spell_visuals,
-            sprite_psi: with_custom(db.sprite_psi()?, custom_fx.0),
-            sprite_lights: with_custom(db.sprite_lights()?, custom_fx.1),
-            zone_night: db.zone_night_pct()?,
+            sprite_psi: fx.psi,
+            sprite_lights: fx.lights,
+            zone_night: fx.zone_night,
+            particles: content::particles::load(root)?,
             flipbooks: default(),
             image_sizes: default(),
             scripts: default(),
         })
     }
 
-    /// Loads `scripts/animation/<name>` (a `.sa` flipbook), cached. With `--art custom`, a
-    /// replacement in `scripts/override/animation/` wins (custom_assets never overwrites originals).
+    /// Filesystem path of an asset path from [`GameData::asset_path`] (`legacy://` included).
+    pub fn fs_path(&self, rel: &str) -> PathBuf {
+        match rel.strip_prefix(dusk_formats::LEGACY_SOURCE) {
+            Some(_) => dusk_formats::fs_path(rel),
+            None => self.root.join(rel),
+        }
+    }
+
+    /// `rel` (e.g. `maps/x.map`, `scripts/npc/x.txt`) from our content root, else from the legacy
+    /// data (logged with `DUSK_LEGACY_LOG=1`).
+    pub fn find_file(&self, rel: &str) -> Option<PathBuf> {
+        dusk_formats::find_file(&self.root, rel)
+    }
+
+    /// Particle system by name (`campfire.psi` or `campfire`).
+    pub fn particle_system(&self, name: &str) -> Option<ParticleSystemInfo> {
+        let key = content::particles::key(name);
+        let info = self.particles.get(&key).copied();
+        if info.is_some() {
+            dusk_formats::legacy_note("particles", &key);
+        }
+        info
+    }
+
+    /// Loads a `.sa` flipbook by name (`content::visuals::flipbook_path`: ours first), cached.
     pub fn flipbook(&self, name: &str) -> Option<Arc<SpriteAnim>> {
         let mut cache = self.flipbooks.lock().unwrap();
         cache
             .entry(name.to_string())
             .or_insert_with(|| {
-                let custom = self.root.join("scripts/override/animation").join(name);
-                let path = if self.custom_art && custom.exists() {
-                    custom
-                } else {
-                    self.root.join("scripts/animation").join(name)
-                };
+                let path = content::visuals::flipbook_path(&self.root, name)?;
                 let text = std::fs::read_to_string(path).ok()?;
                 SpriteAnim::parse(&text).ok().map(Arc::new)
             })
             .clone()
     }
 
-    /// Asset path (relative to assets root) for a bare original filename.
+    /// Asset path for a bare file name: relative to our content root, or `legacy://...`.
     pub fn asset_path(&self, name: &str) -> Option<String> {
         self.index.resolve(name).map(str::to_string)
     }
@@ -198,7 +160,7 @@ impl GameData {
         let key = name.to_lowercase();
         let mut cache = self.image_sizes.lock().unwrap();
         *cache.entry(key).or_insert_with(|| {
-            let path = self.index.resolve_path(&self.root, name)?;
+            let path = self.fs_path(self.index.resolve(name)?);
             let mut header = [0u8; 24];
             use std::io::Read;
             std::fs::File::open(path).ok()?.read_exact(&mut header).ok()?;
@@ -228,7 +190,7 @@ impl GameData {
         cache
             .entry(key)
             .or_insert_with(|| {
-                let path = self.root.join("scripts").join(dir).join(format!("{name}.txt"));
+                let path = self.find_file(&format!("scripts/{dir}/{name}.txt"))?;
                 let text = std::fs::read_to_string(&path).ok()?;
                 match SpriteScript::parse(&text) {
                     Ok(s) => Some(Arc::new(s)),

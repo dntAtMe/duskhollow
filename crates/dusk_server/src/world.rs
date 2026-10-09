@@ -1,10 +1,10 @@
-//! World state: maps (collision), entity components, NPC spawning from game.db.
+//! World state: maps (collision), entity components, NPC spawning.
 
 use crate::ai::Rng;
 use crate::stats::{Stats, npc_stats};
 use bevy::prelude::*;
 use dusk_formats::{
-    db::{ClassStats, ExpLevel, GameDb, NpcTemplate},
+    db::{ClassStats, ExpLevel, NpcTemplate},
     map::{MapFile, WalkGrid},
     spell::SpellTemplate,
 };
@@ -19,15 +19,14 @@ pub struct ServerMap {
 
 #[derive(Resource)]
 pub struct GameWorld {
-    pub db: std::sync::Mutex<GameDb>,
     pub maps: HashMap<i64, ServerMap>,
     pub npc_templates: HashMap<i64, NpcTemplate>,
     /// (class, level) -> stats
     pub class_stats: HashMap<(i64, i64), ClassStats>,
     pub exp_levels: Vec<ExpLevel>,
     pub spells: HashMap<i64, SpellTemplate>,
-    /// NPC spawns of custom maps (map id -> spawns), see `dusk_formats::custom::parse_spawns`.
-    pub custom_spawns: HashMap<i64, Vec<dusk_formats::db::NpcSpawn>>,
+    /// NPC spawns by map id (`dusk_formats::content::maps::spawns`).
+    pub spawns: HashMap<i64, Vec<dusk_formats::db::NpcSpawn>>,
     /// class -> starting spells (`player_create_spell`)
     pub class_spells: HashMap<i64, Vec<i64>>,
     /// New characters (and the dead) appear here.
@@ -36,46 +35,22 @@ pub struct GameWorld {
 }
 
 impl GameWorld {
-    /// `start_map`: override the spawn map (offline play); default is the
-    /// original `teleport_names.name = 'start'` spot.
+    /// `root`: our content root ([`dusk_formats::content_root`]). `start_map`: override the
+    /// spawn map (offline play); default is the default map's start point.
     pub fn load(root: &Path, start_map: Option<&str>) -> anyhow::Result<Self> {
-        let db = GameDb::open(root.join("game.db"))?;
-        if let Err(e) = dusk_formats::custom::install(&dusk_formats::custom_assets_root(), root) {
-            warn!("custom assets not installed: {e}");
-        }
-        let mut infos = db.maps()?;
-        // Our own maps (`maps/custom_*.map` from tools/artgen) get ids from 10000 and NPCs
-        // from a `.spawns` sidecar instead of the `npc` table.
-        let mut custom_spawns = HashMap::new();
-        let mut custom: Vec<_> =
-            std::fs::read_dir(root.join("maps")).map(|d| d.flatten().map(|e| e.path()).collect()).unwrap_or_default();
-        custom.retain(|p: &std::path::PathBuf| {
-            p.extension().is_some_and(|e| e == "map")
-                && p.file_stem()
-                    .is_some_and(|s| s.to_string_lossy().starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX))
-        });
-        custom.sort();
-        for (i, path) in custom.iter().enumerate() {
-            let id = 10_000 + i as i64;
-            let name = path.file_stem().unwrap().to_string_lossy().into_owned();
-            let spawns = std::fs::read_to_string(path.with_extension("spawns"))
-                .map(|t| dusk_formats::custom::parse_spawns(&t, id, 1_000_000 + id * 1000))
-                .unwrap_or_default();
-            custom_spawns.insert(id, spawns);
-            infos.push(dusk_formats::db::MapInfo {
-                id,
-                name,
-                music: vec![],
-                ambience: String::new(),
-                start: (0.0, 0.0),
-            });
-        }
+        use dusk_formats::content;
+        let infos = content::maps::load(root)?;
         let mut maps = HashMap::new();
+        let mut spawns = HashMap::new();
         for info in &infos {
-            let path = root.join("maps").join(format!("{}.map", info.name));
+            let Some(path) = content::maps::map_file(root, &info.name, "map") else {
+                warn!("map {} unavailable: no {}.map", info.name, info.name);
+                continue;
+            };
             match MapFile::load(&path) {
                 Ok(m) => {
                     maps.insert(info.id, ServerMap { name: info.name.clone(), grid: m.walk_grid() });
+                    spawns.insert(info.id, content::maps::spawns(root, info));
                 }
                 Err(e) => warn!("map {} unavailable: {e}", info.name),
             }
@@ -85,16 +60,14 @@ impl GameWorld {
                 let info =
                     infos.iter().find(|i| i.name == name).ok_or_else(|| anyhow::anyhow!("unknown map {name}"))?;
                 let grid = &maps.get(&info.id).ok_or_else(|| anyhow::anyhow!("map {name} failed to load"))?.grid;
-                // Custom maps: the `arrival` marker of `maps/<name>.markers` (`name x y [radius]`).
-                let arrival =
-                    std::fs::read_to_string(root.join("maps").join(format!("{name}.markers"))).ok().and_then(|t| {
-                        t.lines().find_map(|l| {
-                            let v: Vec<&str> = l.split_whitespace().collect();
-                            match v[..] {
-                                ["arrival", x, y, ..] => Some((x.parse().ok()?, y.parse().ok()?)),
-                                _ => None,
-                            }
-                        })
+                // Our maps: the `arrival` marker of `maps/<name>.markers` (`name x y [radius]`).
+                let arrival = content::maps::map_file(root, name, "markers")
+                    .and_then(|p| std::fs::read_to_string(p).ok())
+                    .and_then(|t| {
+                        dusk_formats::custom::parse_markers(&t)
+                            .into_iter()
+                            .find(|m| m.name == "arrival")
+                            .map(|m| (m.x, m.y))
                     });
                 let want = if let Some(a) = arrival {
                     a
@@ -106,30 +79,18 @@ impl GameWorld {
                 let (x, y) = grid.nearest_floor(want).unwrap_or(want);
                 (info.id, Vec2::new(x, y))
             }
-            None => db
-                .teleports()?
-                .into_iter()
-                .find(|t| t.name == "start")
-                .map(|t| (t.map, Vec2::new(t.x + 0.5, t.y + 0.5)))
+            None => content::maps::default_map(&infos)
+                .map(|m| (m.id, Vec2::new(m.start.0, m.start.1)))
                 .unwrap_or((1, Vec2::new(17.5, 106.5))),
         };
-        let custom_npcs = dusk_formats::custom::load_npc_templates(&dusk_formats::custom_assets_root());
-        let class_stats = db.class_stats()?.into_iter().map(|c| ((c.class, c.level), c)).collect();
-        // Our own skills (`custom_assets/data/spells.txt`, `class_spells.txt`).
-        let (mut spells, mut class_spells) = (db.spells()?, db.class_spells()?);
-        dusk_formats::custom::merge_spells(&dusk_formats::custom_assets_root(), &mut spells, &mut class_spells);
+        let rules = content::rules::load(root)?;
         Ok(Self {
-            npc_templates: db
-                .npc_templates()?
-                .into_iter()
-                .chain(custom_npcs.into_iter().map(|(t, _)| (t.entry, t)))
-                .collect(),
-            class_stats,
-            exp_levels: db.exp_levels()?,
-            spells,
-            custom_spawns,
-            class_spells,
-            db: std::sync::Mutex::new(db),
+            npc_templates: content::npcs::load(root)?.templates,
+            class_stats: rules.class_stats,
+            exp_levels: rules.exp_levels,
+            spells: content::spells::load(root)?,
+            spawns,
+            class_spells: rules.class_spells,
             maps,
             start,
             next_id: 1,
@@ -290,12 +251,12 @@ pub fn spawn_npcs(
     let map_ids: Vec<i64> = world.maps.keys().copied().collect();
     let mut total = 0;
     for map in map_ids {
-        let spawns = match world.custom_spawns.get(&map) {
-            Some(s) => s.clone(),
-            None => world.db.lock().unwrap().npc_spawns(map).unwrap_or_default(),
-        };
+        let spawns = world.spawns.get(&map).cloned().unwrap_or_default();
         for s in spawns {
             let Some(t) = world.npc_templates.get(&s.entry).cloned() else { continue };
+            if s.entry < dusk_formats::custom::CUSTOM_NPC_FIRST {
+                dusk_formats::legacy_note("npc_template", s.entry);
+            }
             let id = world.alloc_id();
             let lo = t.min_level.max(1) as u32;
             let hi = (t.max_level.max(1) as u32).max(lo);

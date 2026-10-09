@@ -14,7 +14,7 @@ fn main() -> AppExit {
         }
     }
     let (rx, addr) = dusk_protocol::net::listen(("0.0.0.0", port)).expect("bind server port");
-    let config = ServerConfig { assets: dusk_formats::assets_root(), start_map };
+    let config = ServerConfig { assets: dusk_formats::content_root(), start_map };
     let mut app = build_app(&config, Acceptor(rx)).expect("load world data (run dusk_extract first)");
     app.add_plugins(LogPlugin::default());
     app.add_systems(Startup, move || info!("listening on {addr}"));

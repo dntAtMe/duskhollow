@@ -43,6 +43,8 @@ pub struct MapInfo {
     pub music: Vec<String>,
     pub ambience: String,
     pub start: (f32, f32),
+    /// New characters start on this map (at `start`) unless told otherwise.
+    pub default: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -173,6 +175,7 @@ impl GameDb {
             music: text(r, "music").split(',').filter(|s| !s.is_empty()).map(str::to_string).collect(),
             ambience: text(r, "ambience"),
             start: (real(r, "start_x"), real(r, "start_y")),
+            default: false,
         })
     }
 
