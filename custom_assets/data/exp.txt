@@ -1,0 +1,131 @@
+# Experience per level (dusk_formats::content::rules). Section id = level; the last is the cap.
+#   exp       experience to advance from this level
+#   kill_exp  base experience for killing an enemy of this level (+-10 % per level of
+#             difference, nothing 5+ levels below)
+#   title     rank shown for the level
+# Levels 1-6 are what First Gaze is tuned around (kept within 10 %).
+
+[1]
+exp=100
+kill_exp=20
+title=Newcomer
+
+[2]
+exp=100
+kill_exp=20
+title=Sword
+
+[3]
+exp=123
+kill_exp=24
+title=Watched Sword
+
+[4]
+exp=150
+kill_exp=30
+title=Field Sword
+
+[5]
+exp=195
+kill_exp=39
+title=Row-cutter
+
+[6]
+exp=265
+kill_exp=44
+title=Shade-keeper
+
+[7]
+exp=375
+kill_exp=62
+title=Ember-bearer
+
+[8]
+exp=530
+kill_exp=88
+title=Gate Sword
+
+[9]
+exp=760
+kill_exp=126
+title=Gazeworn
+
+[10]
+exp=1090
+kill_exp=155
+title=Hollow-hunter
+
+[11]
+exp=1550
+kill_exp=185
+title=Cairn-friend
+
+[12]
+exp=2190
+kill_exp=225
+title=Long Ender
+
+[13]
+exp=3090
+kill_exp=270
+title=Red Field Veteran
+
+[14]
+exp=4330
+kill_exp=320
+title=Rift-walker
+
+[15]
+exp=6030
+kill_exp=385
+title=Warden's Equal
+
+[16]
+exp=8350
+kill_exp=465
+title=Unbowed
+
+[17]
+exp=11500
+kill_exp=555
+title=Eye-scorned
+
+[18]
+exp=15800
+kill_exp=665
+title=Barrow-seeker
+
+[19]
+exp=21550
+kill_exp=800
+title=Blade Pilgrim
+
+[20]
+exp=29350
+kill_exp=960
+title=Gate-breaker
+
+[21]
+exp=39800
+kill_exp=1150
+title=Old Sword
+
+[22]
+exp=53750
+kill_exp=1380
+title=Grey Ender
+
+[23]
+exp=72450
+kill_exp=1660
+title=Unblinking
+
+[24]
+exp=97400
+kill_exp=1990
+title=Last Light
+
+[25]
+exp=129300
+kill_exp=2390
+title=Ender of Enders

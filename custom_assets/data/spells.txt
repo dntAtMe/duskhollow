@@ -1,20 +1,25 @@
-# Duskhollow player skills (entries >= 50000), merged into the game.db spell templates by server
-# and client. Format: dusk_formats::custom::parse_spells (keys mirror spell_template columns).
+# Every spell of the game (dusk_formats::content::spells): player skills (50001..), auto
+# attacks (50100, 50101), item spells (50110..), NPC spells (51001..).
 #
 # Quick reference (docs/combat.md):
-#   effectN        school_damage | weapon_damage | apply_aura | heal | heal_pct | charge (or a number)
+#   effectN        school_damage | weapon_damage | apply_aura | heal | heal_pct | restore_mana_pct
+#                  | melee_atk | ranged_atk | charge (or a number)
 #   effectN_data   d1,d2,d3. Damage/heal: d2 = base `value`. Weapon damage: d2 = weapon %.
 #                  Auras: d1 = aura type (1 periodic damage, 2 periodic heal, 3 mechanic,
-#                  11 move speed %, 100 strain gain %), d2 = mechanic (7 snare, 8 stun), d3 = value.
-#   effectN_target caster | hostile | area_src_hostile | friendly ...; effectN_radius in cells.
-#   Periodic auras: the formula is the total over `duration`, ticking every `interval` ms.
+#                  10 periodic mana, 11 move speed %, 14 damage dealt %, 15 damage taken %,
+#                  100 strain gain %), d2 = mechanic (7 snare, 8 stun, 9 incapacitate), d3 = value.
+#   effectN_target caster | hostile | area_src_hostile | area_dst_hostile | friendly ...;
+#                  effectN_radius in cells.
+#   Periodic auras: the formula is the total over `duration`, ticking every `interval` ms,
+#   unless the description says "every" (then the value is per tick).
 #   range: 64 per cell (130 = melee). speed: projectile (16 ~ 12 cells/s), 0 = instant.
+#   abilities_tab: 1 Spells (default), 0 Actions.
 #   Tooltip tokens: $E1min $E1max (effect values), $E2D3 (raw data3), $DUR, $INVL.
 #   Visuals: data/spell_visuals.txt.
 #   Icons: tools/artgen/icons.py --custom-spells -> content/custom/icons/spells/.
 #
-# Balance (level 1, starter gear): legacy Fireball ~28 fire on a 1.5 s cast / 6 s cooldown,
-# Mighty Blow 135% weapon / 7 s. Glarewolves have 42 hp, the Alpha 150, Corvin 180 x boss.
+# Balance (level 1, starter gear): a fire bolt does ~28 on a 1.5 s cast / 6 s cooldown, a big
+# swing 135% weapon / 7 s. Glarewolves have 42 hp, the Alpha 150, Corvin 180 x boss.
 # Skills here stay at or under that line: they add choices (reach, control, sustain), not burst.
 
 # --- melee ---
@@ -194,3 +199,249 @@ effect2=apply_aura
 effect2_data=11,0,-15
 effect2_target=caster
 effect2_positive=1
+
+# --- Emberwright ---
+
+[50011]
+name=Hurled Brand
+icon=skill_hurled_brand.png
+description=Pull a burning brand from the cairn fire you carry and hurl it: $E1min-$E1max Fire damage.
+mana=3+(clvl*3)
+cast_time=1800
+cooldown=7000
+range=576
+speed=14
+school=3
+effect1=school_damage
+effect1_data=3,0,0
+effect1_target=hostile
+effect1_formula=3+(((INT+CUR)*80)/100)
+
+[50012]
+name=Scatter the Coals
+icon=skill_scatter_the_coals.png
+description=Throw a fistful of live coals: $E1min-$E1max Fire damage to the target, $E2min-$E2max more to it and every enemy within 2 paces, all slowed by $E3D3% for $DUR.
+aura_description=Coals underfoot. Slowed.
+mana=4+(clvl*2)
+cooldown=12000
+range=512
+speed=16
+duration=3000
+school=3
+effect1=school_damage
+effect1_data=3,0,0
+effect1_target=hostile
+effect1_formula=1+(((INT+CUR)*15)/100)
+effect2=school_damage
+effect2_data=3,0,0
+effect2_target=area_dst_hostile
+effect2_radius=2
+effect2_formula=2+(((INT+CUR)*30)/100)
+effect3=apply_aura
+effect3_data=3,7,-30
+effect3_target=area_dst_hostile
+effect3_radius=2
+
+[50013]
+name=Blinding Flare
+icon=skill_blinding_flare.png
+description=Flash cairn fire in the target's eyes. Fire blinds the Watcher; it blinds lesser things for $DUR. Any damage breaks it.
+aura_description=Blinded by firelight.
+mana=3+clvl
+cast_time=1000
+cooldown=20000
+range=448
+duration=5000
+school=3
+effect1=apply_aura
+effect1_data=3,9,0
+effect1_target=hostile
+
+# --- Cutthroat ---
+
+[50014]
+name=Between the Ribs
+icon=skill_between_the_ribs.png
+description=Slip the knife in where the hide is thin: $E1min% weapon damage.
+mana=2+clvl
+cooldown=12000
+range=130
+school=1
+effect1=weapon_damage
+effect1_data=1,150,0
+effect1_target=hostile
+effect1_formula=value+(splvl*5)
+
+# --- Ashpriest ---
+
+[50015]
+name=Ember Prayer
+icon=skill_ember_prayer.png
+description=Murmur an ember prayer over a friend, or yourself: heals $E1min-$E1max.
+mana=3+(clvl*2)
+cast_time=1500
+cooldown=3000
+range=576
+school=3
+effect1=heal
+effect1_data=6,0,0
+effect1_target=friendly
+effect1_positive=1
+effect1_formula=4+(clvl*3)+(((WIL+INT)*50)/100)
+
+[50016]
+name=Ash Ward
+icon=skill_ash_ward.png
+description=Mark a friend's brow, or your own, with cairn ash. For $DUR they take $E1D3% less damage.
+aura_description=Warded with cairn ash. Takes less damage.
+mana=4+clvl
+cooldown=25000
+range=576
+duration=10000
+school=3
+effect1=apply_aura
+effect1_data=15,0,-25
+effect1_target=friendly
+effect1_positive=1
+
+# --- Vanguard ---
+
+[50017]
+name=Set Your Feet
+icon=skill_set_your_feet.png
+description=Plant your feet and take it on the guard: $E1D3% less damage for $DUR, but you move $E2D3% slower.
+aura_description=Feet set. Takes less damage, moves slower.
+mana=3
+cooldown=30000
+duration=8000
+school=1
+effect1=apply_aura
+effect1_data=15,0,-30
+effect1_target=caster
+effect1_positive=1
+effect2=apply_aura
+effect2_data=11,0,-30
+effect2_target=caster
+effect2_positive=1
+
+# --- auto attacks (driven by the Attack message, never cast; kept off the action bar) ---
+
+[50100]
+name=Attack
+icon=skill_attack.png
+description=Swing your weapon at the target until told otherwise.
+abilities_tab=0
+range=130
+attributes=128
+school=1
+effect1=melee_atk
+effect1_target=hostile
+
+[50101]
+name=Shoot
+icon=skill_shoot.png
+description=Loose arrows at the target with your ranged weapon.
+abilities_tab=0
+cast_time=300
+range=610
+speed=16
+attributes=1073741824
+school=1
+effect1=ranged_atk
+effect1_target=hostile
+
+# --- item spells (potions: cast on yourself by using the item) ---
+
+[50110]
+name=Ember Draught
+icon=skill_ember_draught.png
+description=Restores $E1D3 health every $INVL for $DUR.
+aura_description=Restores 90 health over 20 sec.
+abilities_tab=0
+cooldown=60000
+duration=20000
+interval=2000
+school=1
+effect1=apply_aura
+effect1_data=2,9,9
+effect1_target=caster
+effect1_positive=1
+
+[50111]
+name=Lamp Tonic
+icon=skill_lamp_tonic.png
+description=Restores $E1D3 mana every $INVL for $DUR.
+aura_description=Restores 110 mana over 20 sec.
+abilities_tab=0
+cooldown=60000
+duration=20000
+interval=2000
+school=1
+effect1=apply_aura
+effect1_data=10,11,11
+effect1_target=caster
+effect1_positive=1
+
+# --- NPC spells ---
+
+# Glarewolf Alpha: a tearing bite that bleeds (2 x level in all over 8 s).
+[51001]
+name=Rend
+icon=skill_rend.png
+description=A tearing bite. The wound bleeds $E1max over $DUR.
+aura_description=Bleeding.
+cast_time=300
+range=130
+duration=8000
+interval=2000
+school=1
+effect1=apply_aura
+effect1_data=1,1,0
+effect1_target=hostile
+effect1_formula=clvl*2
+
+# Warden Corvin: a halberd sweep that saps the target's strength.
+[51002]
+name=Harrowing Sweep
+icon=skill_harrowing_sweep.png
+description=A wide sweep of the halberd for $E1min% weapon damage. The target deals $E2D3% less damage for $DUR.
+aura_description=Harrowed. Deals less damage.
+mana=1+((clvl*10)/10)
+cooldown=3000
+range=130
+duration_formula=10000
+school=1
+effect1=weapon_damage
+effect1_data=4,140,10
+effect1_target=hostile
+effect1_formula=value+(splvl*10)
+effect2=apply_aura
+effect2_data=14,1,-5
+effect2_target=hostile
+
+# Warden Corvin: the halberd brought down on the flagstones; stuns everything within 4 cells.
+[51003]
+name=Gate Slam
+icon=skill_gate_slam.png
+description=Brings the halberd down on the flagstones. Everything within 4 paces is stunned for $DUR.
+aura_description=Stunned.
+cast_time=500
+duration=4000
+attributes=1073741824
+school=1
+effect1=apply_aura
+effect1_data=3,8,0
+effect1_target=area_src_hostile
+effect1_radius=4
+
+# Pit Crawler: a quick nip of the mandibles.
+[51004]
+name=Mandible Nip
+icon=skill_mandible_nip.png
+description=A quick nip of the mandibles for $E1min% weapon damage.
+cast_time=300
+range=130
+school=1
+effect1=weapon_damage
+effect1_data=1,75,0
+effect1_target=hostile

@@ -50,3 +50,83 @@ cast_anim=cast
 [spell 50010]
 impact_kit=158
 go_anim=cast
+
+# --- Stream A: auto attacks, item spells, NPC spells (replacing legacy 81, 82, 89, 95, 229, 67,
+# 275, 142) and the new class skills 50011-50017. Legacy visuals / kit ids for now; the named kit
+# each slot means is in the comment (docs/standalone-plan.md, Stream B converts).
+
+# Attack (was 81): impact melee_hit
+[spell 50100]
+visual=81
+
+# Shoot (was 82): casting bow_draw, traveling arrow_flight, impact arrow_hit, cast_anim shoot
+[spell 50101]
+visual=82
+
+# Ember Draught (was 89): impact item_use, go_anim block
+[spell 50110]
+visual=89
+
+# Lamp Tonic (was 95): impact item_use, go_anim block
+[spell 50111]
+visual=95
+
+# Rend (was 229): impact bleed_hit
+[spell 51001]
+visual=229
+
+# Harrowing Sweep (was 67): impact warden_sweep
+[spell 51002]
+visual=67
+
+# Gate Slam (was 275): casting warden_wind_up, go ground_slam, aura stun_ring
+[spell 51003]
+visual=275
+
+# Mandible Nip (was 142): impact melee_hit
+[spell 51004]
+visual=142
+
+# Hurled Brand: casting fire_cast, traveling ember_trail, impact ember_burst
+[spell 50011]
+casting_kit=119
+traveling_kit=122
+impact_kit=47
+go_anim=swing
+cast_anim=cast
+
+# Scatter the Coals: traveling ember_trail, impact ember_burst
+[spell 50012]
+traveling_kit=122
+impact_kit=47
+go_anim=swing
+
+# Blinding Flare: casting fire_cast, impact ember_warmth, aura stun_ring
+[spell 50013]
+casting_kit=119
+impact_kit=98
+aura_kit=61
+go_anim=cast
+cast_anim=cast
+
+# Between the Ribs: impact bleed_hit
+[spell 50014]
+impact_kit=179
+go_anim=swing
+
+# Ember Prayer: casting fire_cast, impact ember_warmth
+[spell 50015]
+casting_kit=119
+impact_kit=98
+go_anim=cast
+cast_anim=cast
+
+# Ash Ward: impact veil
+[spell 50016]
+impact_kit=158
+go_anim=cast
+
+# Set Your Feet: impact veil, go_anim block
+[spell 50017]
+impact_kit=158
+go_anim=block

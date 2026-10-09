@@ -1,9 +1,8 @@
 //! Inventories, equipment, item use and NPC loot.
 //!
 //! Item numbers come from `dusk_formats::item` (shared with the client tooltips). Loot rules are
-//! a mix of data (`loot`, `npc_models_junkloot`, `npc_template.loot_*_chance / custom_loot /
-//! custom_gold_ratio`, `material_chance_*`, `player_desirable_*`) and DESIGN where the data only
-//! names knobs without the original server's logic. See `docs/items.md`.
+//! a mix of data (`data/loot.txt`, NPC `junk=` / `loot=` / `loot_chances=` / `gold_ratio=`, the
+//! level bands of `data/item_bases.txt`, class `stats=`) and DESIGN. See `docs/items.md`.
 
 use crate::ai::Rng;
 use crate::combat::player_stats_msg;
@@ -12,7 +11,7 @@ use crate::stats::{Stats, player_stats};
 use crate::world::{Dead, GameWorld, Motion, NetId, Npc, OnMap, Outbox, Player, Scope};
 use bevy::prelude::*;
 use dusk_formats::item::{
-    self, Affix, BAG_SLOTS, EQUIP_SLOTS, ItemStats, ItemTemplate, LootRow, NpcLoot, equip, quality, slot,
+    self, Affix, BAG_SLOTS, EQUIP_SLOTS, ItemStats, ItemTemplate, LootRow, NpcLoot, quality, slot,
 };
 use dusk_protocol::{ClientMsg, CombatStats, EntityId, Item, ServerMsg};
 use std::collections::HashMap;
@@ -32,13 +31,12 @@ pub struct ItemData {
     pub affixes: HashMap<i64, Affix>,
     starting: HashMap<i64, Vec<(i64, i64)>>,
     class_armor: HashMap<i64, Vec<i64>>,
+    class_weapons: HashMap<i64, Vec<i64>>,
     desirable_stats: HashMap<i64, Vec<i64>>,
     loot_tables: HashMap<i64, Vec<LootRow>>,
     /// npc model -> junk items
     junk: HashMap<i64, Vec<i64>>,
     npc_loot: HashMap<i64, NpcLoot>,
-    /// (weapon?, level, material / armor_type) -> percent
-    materials: HashMap<(bool, i64, i64), f32>,
     /// (quality, required_level) -> generated equippable templates, sorted.
     grid: HashMap<(i64, i64), Vec<i64>>,
 }
@@ -55,21 +53,21 @@ impl ItemData {
             affixes: tables.affixes,
             starting: rules.start_items,
             class_armor: rules.class_armor,
+            class_weapons: rules.class_weapons,
             desirable_stats: rules.desirable_stats,
             loot_tables: tables.loot_tables,
             junk: npcs.junk,
             npc_loot: npcs.loot,
-            materials: tables.materials,
             grid: tables.grid,
         })
     }
 
     fn template(&self, entry: u32) -> Option<&ItemTemplate> {
-        let t = self.items.get(&(entry as i64));
-        if let Some(t) = t.filter(|_| dusk_formats::legacy_log_enabled()) {
-            dusk_formats::legacy_note("item", format!("{entry} {}", t.name));
-        }
-        t
+        self.items.get(&(entry as i64))
+    }
+
+    fn can_use(&self, class: i64, t: &ItemTemplate) -> bool {
+        item::class_can_use(class, t, &self.class_armor, &self.class_weapons)
     }
 
     fn max_stack(&self, entry: u32) -> u32 {
@@ -147,7 +145,7 @@ impl Inventory {
         if t.required_level > level as i64 {
             return Err(format!("Requires level {}", t.required_level));
         }
-        if !item::class_can_use(class, t, &data.class_armor) {
+        if !data.can_use(class, t) {
             return Err("Your class can't use that".into());
         }
         // Rings: first free ring slot, else replace the first.
@@ -278,7 +276,7 @@ fn refresh(
     }
 }
 
-/// New players: starting items (`player_create_item`) go on if they can, else into the bags.
+/// New players: starting items (class `start_item=`) go on if they can, else into the bags.
 #[allow(clippy::too_many_arguments)]
 pub fn init_inventories(
     mut commands: Commands,
@@ -460,8 +458,8 @@ fn take_loot(
     }
 }
 
-/// DESIGN default drop chances (percent) for green / blue / gold / purple items when
-/// `npc_template.loot_*_chance` is -1, plus plain (quality 2) gear.
+/// DESIGN default drop chances (percent) for green / blue / gold / purple items when an NPC's
+/// `loot_chances` are -1, plus plain (quality 2) gear.
 const DEFAULT_QUALITY_CHANCES: [f32; 4] = [6.0, 1.5, 0.4, 0.1];
 const COMMON_GEAR_CHANCE: f32 = 8.0;
 /// DESIGN: chance for coins / a junk item on any kill.
@@ -485,7 +483,7 @@ pub fn roll_npc_loot(
     let cfg = data.npc_loot.get(&npc_entry).copied();
     let mut items = Vec::new();
 
-    // Coins: level x U(1, 3), scaled by `custom_gold_ratio` percent (DB knob, DESIGN base).
+    // Coins: level x U(1, 3), scaled by the NPC's `gold_ratio` percent.
     let ratio = cfg.map(|c| c.gold_ratio).filter(|r| *r >= 0).unwrap_or(100) as f32 / 100.0;
     let gold = if rng.next_f32() < GOLD_CHANCE {
         (level as f32 * rng.range(1.0, 3.0) * ratio * rank_mult).round() as u32
@@ -493,7 +491,7 @@ pub fn roll_npc_loot(
         0
     };
 
-    // Junk for the npc model, closest `item_level` to the npc's level (DB).
+    // Junk of the npc model, closest `item_level` to the npc's level.
     if rng.next_f32() < JUNK_CHANCE
         && let Some(list) = data.junk.get(&npc_model)
     {
@@ -505,8 +503,7 @@ pub fn roll_npc_loot(
         }
     }
 
-    // Hand-made tables (`custom_loot` -> `loot.lootId`); rows gated by quest conditions are
-    // skipped until quests exist.
+    // Its hand-made table (`loot=` -> `data/loot.txt`).
     if let Some(rows) = cfg.filter(|c| c.custom_loot > 0).and_then(|c| data.loot_tables.get(&c.custom_loot)) {
         for r in rows.iter().filter(|r| !r.conditional && data.items.contains_key(&r.item)) {
             if rng.next_f32() * 100.0 < r.chance {
@@ -539,51 +536,24 @@ fn pick<'a, T>(v: &'a [T], rng: &mut Rng) -> Option<&'a T> {
     if v.is_empty() { None } else { v.get((rng.next_f32() * v.len() as f32) as usize % v.len()) }
 }
 
-/// A generated item of quality `q` and required level `level`: slot type uniform, then
-/// material / armour tier weighted by `material_chance_*` for that level (DB), affix from the
-/// level band (`affix_template.min/max_level`, DB) for green and better.
+/// A generated item of quality `q` and required level `level`: slot type uniform, then a base
+/// whose level band covers `level` (the band is its tier), affix from the level band for green
+/// and better.
 pub fn random_gear(data: &ItemData, q: i64, level: i64, class: i64, rng: &mut Rng) -> Option<Item> {
     let all = data.grid.get(&(q, level))?;
-    let usable: Vec<i64> =
-        all.iter().copied().filter(|e| item::class_can_use(class, &data.items[e], &data.class_armor)).collect();
+    let usable: Vec<i64> = all.iter().copied().filter(|e| data.can_use(class, &data.items[e])).collect();
     let pool = if !usable.is_empty() && rng.next_f32() < CLASS_BIAS { &usable } else { all };
     let mut types: Vec<i64> = pool.iter().map(|e| data.items[e].equip_type).collect();
     types.sort_unstable();
     types.dedup();
     let ty = *pick(&types, rng)?;
-    let cands: Vec<(i64, f32)> = pool
-        .iter()
-        .map(|e| &data.items[e])
-        .filter(|t| t.equip_type == ty)
-        .map(|t| {
-            let w = match t.equip_type {
-                equip::WEAPON | equip::RANGED => data.materials.get(&(true, level, t.weapon_material)),
-                equip::HEAD | equip::CHEST | equip::LEGS | equip::FEET | equip::HANDS | equip::SHIELD => {
-                    data.materials.get(&(false, level, t.armor_type))
-                }
-                _ => Some(&1.0),
-            };
-            (t.entry, w.copied().unwrap_or(0.0))
-        })
-        .collect();
-    let total: f32 = cands.iter().map(|c| c.1).sum();
-    let entry = if total > 0.0 {
-        let mut x = rng.next_f32() * total;
-        cands
-            .iter()
-            .find(|c| {
-                x -= c.1;
-                x <= 0.0 && c.1 > 0.0
-            })?
-            .0
-    } else {
-        pick(&cands, rng)?.0
-    };
+    let cands: Vec<i64> = pool.iter().copied().filter(|e| data.items[e].equip_type == ty).collect();
+    let entry = *pick(&cands, rng)?;
     let affix = if q >= quality::GREEN { random_affix(data, level, class, rng) } else { 0 };
     Some(Item { entry: entry as u32, affix, count: 1 })
 }
 
-/// DESIGN: 75% of affixes only carry stats in `player_desirable_stats` for the killer's class.
+/// DESIGN: 75% of affixes only carry stats the killer's class favours (class `stats=`).
 fn random_affix(data: &ItemData, level: i64, class: i64, rng: &mut Rng) -> u32 {
     let mut band: Vec<&Affix> =
         data.affixes.values().filter(|a| a.min_level <= level && level <= a.max_level).collect();
@@ -640,6 +610,7 @@ pub fn expire_loot(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dusk_formats::item::equip;
 
     fn data() -> ItemData {
         let mut d = ItemData::default();
@@ -666,6 +637,7 @@ mod tests {
             d.items.insert(t.entry, t);
         }
         d.class_armor.insert(1, vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        d.class_weapons.insert(1, vec![1, 3, 4, 6, 10]);
         d
     }
 
@@ -732,14 +704,11 @@ mod tests {
 
     #[test]
     fn loot_rolls_are_sane_on_real_data() {
-        if !dusk_formats::legacy_root().join("game.db").exists() {
-            return;
-        }
         let d = ItemData::load(&dusk_formats::content_root()).unwrap();
         let mut rng = Rng::default();
         let (mut gold, mut drops) = (0, 0);
         for i in 0..2000 {
-            let (g, items) = roll_npc_loot(&d, 1, 1, 1 + i % 25, 1.0, 1 + (i as i64 % 4), &mut rng);
+            let (g, items) = roll_npc_loot(&d, 50001, 50001, 1 + i % 25, 1.0, 1 + (i as i64 % 4), &mut rng);
             gold += g;
             drops += items.len();
             for it in items {
@@ -751,11 +720,20 @@ mod tests {
             }
         }
         assert!(gold > 0 && drops > 100, "gold {gold}, drops {drops}");
+        // Corvin's table and the glarewolves' junk come through.
+        let (mut named, mut junk) = (0, 0);
+        for _ in 0..300 {
+            let (_, items) = roll_npc_loot(&d, 50004, 50004, 4, 5.0, 1, &mut rng);
+            named += items.iter().filter(|i| (1001..=1003).contains(&i.entry)).count();
+            let (_, items) = roll_npc_loot(&d, 50001, 50001, 1, 1.0, 1, &mut rng);
+            junk += items.iter().filter(|i| (100..=102).contains(&i.entry)).count();
+        }
+        assert!(named > 100 && junk > 60, "named {named}, junk {junk}");
         // Every class gets gear it can use most of the time.
         for class in 1..=4 {
             let usable = (0..200)
                 .filter_map(|_| random_gear(&d, quality::GREEN, 5, class, &mut rng))
-                .filter(|it| item::class_can_use(class, &d.items[&(it.entry as i64)], &d.class_armor))
+                .filter(|it| d.can_use(class, &d.items[&(it.entry as i64)]))
                 .count();
             assert!(usable > 120, "class {class}: {usable}/200 usable");
         }

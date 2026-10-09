@@ -1,6 +1,8 @@
-# Duskhollow NPC templates (entries >= 50000), merged into the game.db templates by server and
-# client. Format: dusk_formats::custom::parse_npc_templates. Models: tools/artgen/valefolk.py.
-# Factions: 1 friendly, 3 hostile. Unset health / weapon_value derive from the level (stats.rs).
+# Every NPC template (entries >= 50000; dusk_formats::content::npcs). Models: scripts/npc/custom
+# (tools/artgen/valefolk.py, creatures.py). Factions: 1 friendly, 2 neutral (only fights back),
+# 3 hostile. Unset health / weapon_value derive from the level (stats.rs).
+# Loot: junk=<items> (data/items.txt 100-199), loot=<table> (data/loot.txt),
+# loot_chances=green,blue,gold,purple (percent, -1 = default), gold_ratio (percent, -1 = default).
 # Tuned for a level 1-4 Ender with starter gear: wolves die in ~4-6 swings and bite fast but
 # light; the alpha and the Stooped need care; Corvin needs shade, patience and ember draughts.
 
@@ -18,6 +20,7 @@ weapon_value=3
 armor=15
 melee_speed_ms=2100
 agility=10
+junk=100,101,102
 
 [50002]
 name=Glarewolf Alpha
@@ -34,8 +37,10 @@ armor=30
 melee_speed_ms=1800
 agility=14
 strength=10
-# Rend: bleeds the target (2 x level per tick for 8 s)
-spell1=229,35,4000,14000,0
+# Rend: bleeds the target (2 x level over 8 s)
+spell1=51001,35,4000,14000,0
+junk=100,101,102
+loot=2
 
 # --- the Glare Gate ---
 
@@ -51,6 +56,7 @@ weapon_value=3
 armor=25
 melee_speed_ms=2600
 resist=0,0,20,0
+junk=103,104,105
 
 [50004]
 name=Hollowed Warden Corvin
@@ -70,10 +76,12 @@ strength=20
 courage=10
 resist=0,0,40,0
 leash_range=18
-# Harrowing Strike: 140% weapon damage as shadow, saps the target's damage (halberd sweep)
-spell1=67,40,3000,9000,0
-# War Stomp: overhead slam into the ground, stuns everything within 4 cells for 4 s
-spell2=275,25,6000,25000,0
+# Harrowing Sweep: 150% weapon damage, saps the target's damage (halberd sweep)
+spell1=51002,40,3000,9000,0
+# Gate Slam: overhead slam into the ground, stuns everything within 4 cells for 4 s
+spell2=51003,25,6000,25000,0
+junk=106,107,108
+loot=1
 
 # --- Lowshade ---
 
@@ -106,3 +114,48 @@ faction=1
 health=420
 weapon_value=16
 armor=90
+
+# --- the glade (custom_glade) ---
+
+[50020]
+name=Ditch Gnawer
+model=goblin
+height=50
+level=1
+faction=3
+armor=80
+melee_speed_ms=2000
+junk=110,111,112
+
+[50021]
+name=Gnawer Rusher
+model=goblin_charger
+height=50
+level=1
+faction=3
+armor=80
+melee_speed_ms=2000
+junk=110,111,112
+
+[50022]
+name=Pit Crawler
+model=antlion_small
+height=50
+level=1
+faction=2
+health=60
+armor=80
+melee_speed_ms=2000
+# Mandible Nip: 75% weapon damage
+spell1=51004,15,1500,20000,0
+junk=116,117,118
+
+[50023]
+name=Thatch Spinner
+model=spider
+height=50
+level=1
+faction=2
+armor=80
+melee_speed_ms=2000
+junk=113,114,115

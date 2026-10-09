@@ -6,10 +6,6 @@
 //! attributes `STR AGI WIL INT CUR` (from the original client's evaluator, which
 //! substitutes those tokens before evaluating). See `scripts/text/STF_*.txt`.
 
-use crate::db::GameDb;
-use rusqlite::{Row, types::ValueRef};
-use std::collections::HashMap;
-
 pub mod effect {
     pub const SCHOOL_DAMAGE: i64 = 1;
     pub const APPLY_AURA: i64 = 3;
@@ -30,6 +26,8 @@ pub mod aura {
     pub const INFLICT_MECHANIC: i64 = 3;
     pub const MODIFY_STAT: i64 = 4;
     pub const MODIFY_STAT_PCT: i64 = 5;
+    /// Mana every tick (Lamp Tonic).
+    pub const PERIODIC_MANA: i64 = 10;
     pub const MODIFY_MOVE_SPEED_PCT: i64 = 11;
     pub const MODIFY_DMG_DEALT_PCT: i64 = 14;
     pub const MODIFY_DMG_RECEIVED_PCT: i64 = 15;
@@ -106,145 +104,7 @@ impl SpellTemplate {
     }
 }
 
-fn int(row: &Row, col: &str) -> i64 {
-    match row.get_ref(col) {
-        Ok(ValueRef::Integer(i)) => i,
-        Ok(ValueRef::Real(f)) => f as i64,
-        Ok(ValueRef::Text(t)) => std::str::from_utf8(t).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0),
-        _ => 0,
-    }
-}
-
-fn text(row: &Row, col: &str) -> String {
-    match row.get_ref(col) {
-        Ok(ValueRef::Text(t)) => String::from_utf8_lossy(t).trim().to_string(),
-        Ok(ValueRef::Integer(i)) => i.to_string(),
-        _ => String::new(),
-    }
-}
-
-impl GameDb {
-    pub fn spells(&self) -> rusqlite::Result<HashMap<i64, SpellTemplate>> {
-        let mut stmt = self.conn().prepare("SELECT * FROM spell_template")?;
-        let rows = stmt.query_map([], |r| {
-            let effects = (1..=3)
-                .filter_map(|i| {
-                    let kind = int(r, &format!("effect{i}"));
-                    (kind != 0).then(|| SpellEffect {
-                        kind,
-                        data: [1, 2, 3].map(|d| int(r, &format!("effect{i}_data{d}"))),
-                        target: int(r, &format!("effect{i}_targetType")),
-                        radius: int(r, &format!("effect{i}_radius")),
-                        positive: int(r, &format!("effect{i}_positive")) != 0,
-                        formula: text(r, &format!("effect{i}_scale_formula")),
-                    })
-                })
-                .collect();
-            Ok(SpellTemplate {
-                entry: int(r, "entry"),
-                name: text(r, "name"),
-                icon: text(r, "icon"),
-                description: text(r, "description"),
-                aura_description: text(r, "aura_description"),
-                mana_formula: text(r, "mana_formula"),
-                mana_pct: int(r, "mana_pct"),
-                effects,
-                attributes: int(r, "attributes"),
-                cast_time_ms: int(r, "cast_time"),
-                cooldown_ms: int(r, "cooldown"),
-                cast_interrupt_flags: int(r, "cast_interrupt_flags"),
-                school: int(r, "cast_school"),
-                duration_ms: int(r, "duration"),
-                duration_formula: text(r, "duration_formula"),
-                speed: int(r, "speed"),
-                range: int(r, "range"),
-                interval_ms: int(r, "interval"),
-                required_equipment: int(r, "required_equipment"),
-                abilities_tab: int(r, "abilities_tab"),
-            })
-        })?;
-        rows.map(|r| r.map(|s| (s.entry, s))).collect()
-    }
-
-    /// `player_create_spell`: class -> starting spells.
-    pub fn class_spells(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
-        let mut stmt = self.conn().prepare("SELECT class, spell FROM player_create_spell ORDER BY class, spell")?;
-        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
-        let rows = stmt.query_map([], |r| Ok((int(r, "class"), int(r, "spell"))))?;
-        for row in rows {
-            let (c, s) = row?;
-            out.entry(c).or_default().push(s);
-        }
-        Ok(out)
-    }
-}
-
 pub use crate::content::visuals::{KitAnim, SpellVisual, VisualKit};
-
-impl GameDb {
-    /// `spell_visual_kit` by id.
-    pub fn spell_visual_kits(&self) -> rusqlite::Result<HashMap<i64, VisualKit>> {
-        let mut kits: HashMap<i64, VisualKit> = HashMap::new();
-        {
-            let mut stmt = self.conn().prepare("SELECT * FROM spell_visual_kit")?;
-            let rows = stmt.query_map([], |r| {
-                let anims = [
-                    ("spranim", "spranim_x", "spranim_y", "sprcolor", "spranim_blend"),
-                    ("spranim_2", "spranim_x_2", "spranim_y_2", "sprcolor_2", "spranim2_blend"),
-                ]
-                .iter()
-                .filter_map(|(n, x, y, c, b)| {
-                    let sa = text(r, n);
-                    (!sa.is_empty()).then(|| KitAnim {
-                        sa,
-                        x: int(r, x),
-                        y: text(r, y),
-                        color: int(r, c),
-                        blend: int(r, b),
-                    })
-                })
-                .collect();
-                Ok(VisualKit {
-                    id: int(r, "id"),
-                    anims,
-                    psystem: text(r, "psystem"),
-                    psystem_x: text(r, "psystem_x"),
-                    psystem_y: text(r, "psystem_y"),
-                    sound: text(r, "sound"),
-                    unit_glow: int(r, "unit_glow_color"),
-                    ground_glow: int(r, "ground_glow_color"),
-                })
-            })?;
-            for k in rows {
-                let k = k?;
-                kits.insert(k.id, k);
-            }
-        }
-        Ok(kits)
-    }
-
-    /// `spell_visual` by spell entry, with its kits resolved.
-    pub fn spell_visuals(&self) -> rusqlite::Result<HashMap<i64, SpellVisual>> {
-        let kits = self.spell_visual_kits()?;
-        let mut stmt = self.conn().prepare("SELECT * FROM spell_visual")?;
-        let rows = stmt.query_map([], |r| {
-            let kit = |c: &str| kits.get(&int(r, c)).cloned();
-            Ok((
-                int(r, "entry"),
-                SpellVisual {
-                    traveling: kit("traveling_kit"),
-                    impact: kit("impact_kit"),
-                    casting: kit("casting_kit"),
-                    go: kit("go_kit"),
-                    aura_ontop: kit("aura_kit_ontop"),
-                    unit_go_animation: int(r, "unit_go_animation"),
-                    unit_cast_animation: int(r, "unit_cast_animation"),
-                },
-            ))
-        })?;
-        rows.collect()
-    }
-}
 
 /// Inputs for formula evaluation.
 #[derive(Debug, Clone, Copy, Default)]

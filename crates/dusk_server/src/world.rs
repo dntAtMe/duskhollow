@@ -27,7 +27,7 @@ pub struct GameWorld {
     pub spells: HashMap<i64, SpellTemplate>,
     /// NPC spawns by map id (`dusk_formats::content::maps::spawns`).
     pub spawns: HashMap<i64, Vec<dusk_formats::db::NpcSpawn>>,
-    /// class -> starting spells (`player_create_spell`)
+    /// class -> starting spells (`data/class_spells.txt`)
     pub class_spells: HashMap<i64, Vec<i64>>,
     /// New characters (and the dead) appear here.
     pub start: (i64, Vec2),
@@ -55,34 +55,17 @@ impl GameWorld {
                 Err(e) => warn!("map {} unavailable: {e}", info.name),
             }
         }
-        let start = match start_map {
-            Some(name) => {
-                let info =
-                    infos.iter().find(|i| i.name == name).ok_or_else(|| anyhow::anyhow!("unknown map {name}"))?;
-                let grid = &maps.get(&info.id).ok_or_else(|| anyhow::anyhow!("map {name} failed to load"))?.grid;
-                // Our maps: the `arrival` marker of `maps/<name>.markers` (`name x y [radius]`).
-                let arrival = content::maps::map_file(root, name, "markers")
-                    .and_then(|p| std::fs::read_to_string(p).ok())
-                    .and_then(|t| {
-                        dusk_formats::custom::parse_markers(&t)
-                            .into_iter()
-                            .find(|m| m.name == "arrival")
-                            .map(|m| (m.x, m.y))
-                    });
-                let want = if let Some(a) = arrival {
-                    a
-                } else if info.start != (0.0, 0.0) {
-                    info.start
-                } else {
-                    (grid.size as f32 / 2.0, grid.size as f32 / 2.0)
-                };
-                let (x, y) = grid.nearest_floor(want).unwrap_or(want);
-                (info.id, Vec2::new(x, y))
-            }
-            None => content::maps::default_map(&infos)
-                .map(|m| (m.id, Vec2::new(m.start.0, m.start.1)))
-                .unwrap_or((1, Vec2::new(17.5, 106.5))),
+        // New characters (and the dead) appear at the start map's `arrival` marker (its
+        // `MapInfo::start`), else in the middle of it; `start_map` overrides the default map.
+        let info = match start_map {
+            Some(name) => infos.iter().find(|i| i.name == name).ok_or_else(|| anyhow::anyhow!("unknown map {name}"))?,
+            None => content::maps::default_map(&infos).ok_or_else(|| anyhow::anyhow!("no default map"))?,
         };
+        let grid = &maps.get(&info.id).ok_or_else(|| anyhow::anyhow!("map {} failed to load", info.name))?.grid;
+        let middle = (grid.size as f32 / 2.0, grid.size as f32 / 2.0);
+        let want = if info.start != (0.0, 0.0) { info.start } else { middle };
+        let (x, y) = grid.nearest_floor(want).unwrap_or(want);
+        let start = (info.id, Vec2::new(x, y));
         let rules = content::rules::load(root)?;
         Ok(Self {
             npc_templates: content::npcs::load(root)?.templates,
@@ -254,13 +237,6 @@ pub fn spawn_npcs(
         let spawns = world.spawns.get(&map).cloned().unwrap_or_default();
         for s in spawns {
             let Some(t) = world.npc_templates.get(&s.entry).cloned() else { continue };
-            // Legacy templates on our maps (legacy maps use nothing else).
-            let map_name = &world.maps[&map].name;
-            if s.entry < dusk_formats::custom::CUSTOM_NPC_FIRST
-                && map_name.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX)
-            {
-                dusk_formats::legacy_note("npc_template", format!("{} {} on {map_name}", s.entry, t.name));
-            }
             let id = world.alloc_id();
             let lo = t.min_level.max(1) as u32;
             let hi = (t.max_level.max(1) as u32).max(lo);

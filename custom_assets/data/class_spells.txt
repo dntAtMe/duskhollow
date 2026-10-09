@@ -1,32 +1,51 @@
-# Skills every new character of a class knows, after the legacy `player_create_spell` ones.
-# `class spell` per line. Classes (player_class_stats): 1 Str/Cou fighter, 2 Int caster,
-# 3 Agi skirmisher, 4 Wil healer. Spells: custom_assets/data/spells.txt.
+# Everything a new character of a class knows (dusk_formats::content::rules), in action-bar
+# order. Section id = class (data/classes.txt). Spells: data/spells.txt.
+# Every class has the auto attacks 50100 Attack and 50101 Shoot (kept off the action bar).
 
-# 1: heavy melee, a thrown knife for runners
-1 50001
-1 50002
-1 50003
-1 50004
-1 50005
-1 50006
-1 50009
-1 50010
+# Vanguard: heavy blows, a thick hide, a knife for the ones that run.
+[1]
+spell=50100
+spell=50101
+spell=50001
+spell=50003
+spell=50005
+spell=50002
+spell=50004
+spell=50006
+spell=50017
+spell=50009
+spell=50010
 
-# 2: fire from range
-2 50007
-2 50009
-2 50010
+# Emberwright: throws cairn fire from range.
+[2]
+spell=50100
+spell=50101
+spell=50007
+spell=50011
+spell=50012
+spell=50013
+spell=50009
+spell=50010
 
-# 3: cuts, knives and hooks; keeps enemies at the end of the chain
-3 50002
-3 50004
-3 50006
-3 50008
-3 50009
-3 50010
+# Cutthroat: quick cuts and thrown knives; keeps the hollowed at the end of a chain.
+[3]
+spell=50100
+spell=50101
+spell=50014
+spell=50002
+spell=50006
+spell=50008
+spell=50004
+spell=50009
+spell=50010
 
-# 4: ember fire and a mace to the brow
-4 50003
-4 50007
-4 50009
-4 50010
+# Ashpriest: mends with ember prayers and settles the rest with a mace.
+[4]
+spell=50100
+spell=50101
+spell=50015
+spell=50016
+spell=50003
+spell=50007
+spell=50009
+spell=50010

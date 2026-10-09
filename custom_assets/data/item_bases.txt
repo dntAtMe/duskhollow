@@ -1,0 +1,1099 @@
+# Random gear (dusk_formats::content::items): every base becomes one item per quality 2..6 and
+# level of its band; entry = 100000 + base*1000 + quality*100 + level. The band is the tier:
+# higher armour types / weapon materials drop at higher levels.
+#   name model icon  one value, or five (qualities 2..6: common green blue gold purple)
+#   equip_type head neck chest belt legs feet hands ring weapon shield ranged
+#   weapon_type axe bow mace sword staff dagger wand  |  armor_type 1 cloth, 2-4 leather,
+#   5-8 mail, 9-11 plate, 12-15 robe (shields 4-8)
+#   material  weapon tier: 1-7 metals, 8-14 woods
+#   levels    lo-hi required levels
+
+# ---------------------------------------------------------------- armour
+
+[base 1]
+name=Rag Hood
+icon=icon_item_rb_head_c01b.png,icon_item_rb_head_c01a.png,icon_item_rb_head_l01.png,icon_item_rb_head_e01.png,icon_item_rb_head_m01.png
+equip_type=head
+armor_type=1
+levels=1-6
+
+[base 2]
+name=Hide Cap
+model=leather_hood
+icon=icon_item_lt_head_c01b.png,icon_item_lt_head_c01a.png,icon_item_lt_head_l01.png,icon_item_lt_head_e01.png,icon_item_lt_head_m01.png
+equip_type=head
+armor_type=2
+levels=1-8
+
+[base 3]
+name=Tanned Cap
+model=leather_hood
+icon=icon_item_lt_head_c01b.png,icon_item_lt_head_c01a.png,icon_item_lt_head_l01.png,icon_item_lt_head_e01.png,icon_item_lt_head_m01.png
+equip_type=head
+armor_type=3
+levels=6-15
+
+[base 4]
+name=Boiled Cap
+model=leather_hood
+icon=icon_item_lt_head_c01b.png,icon_item_lt_head_c01a.png,icon_item_lt_head_l01.png,icon_item_lt_head_e01.png,icon_item_lt_head_m01.png
+equip_type=head
+armor_type=4
+levels=13-25
+
+[base 5]
+name=Rusted Coif
+model=chain_coif
+icon=icon_item_ch_head_c01b.png,icon_item_ch_head_c01a.png,icon_item_ch_head_l01.png,icon_item_ch_head_e01.png,icon_item_ch_head_m01.png
+equip_type=head
+armor_type=5
+levels=1-10
+
+[base 6]
+name=Riveted Coif
+model=chain_coif
+icon=icon_item_ch_head_c01b.png,icon_item_ch_head_c01a.png,icon_item_ch_head_l01.png,icon_item_ch_head_e01.png,icon_item_ch_head_m01.png
+equip_type=head
+armor_type=6
+levels=8-16
+
+[base 7]
+name=Gatewatch Coif
+model=chain_coif
+icon=icon_item_ch_head_c01b.png,icon_item_ch_head_c01a.png,icon_item_ch_head_l01.png,icon_item_ch_head_e01.png,icon_item_ch_head_m01.png
+equip_type=head
+armor_type=7
+levels=14-21
+
+[base 8]
+name=Warden's Coif
+model=chain_coif
+icon=icon_item_ch_head_c01b.png,icon_item_ch_head_c01a.png,icon_item_ch_head_l01.png,icon_item_ch_head_e01.png,icon_item_ch_head_m01.png
+equip_type=head
+armor_type=8
+levels=19-25
+
+[base 9]
+name=Blackened Helm
+model=plate_helm
+icon=icon_item_pl_head_c01b.png,icon_item_pl_head_c01a.png,icon_item_pl_head_l01.png,icon_item_pl_head_e01.png,icon_item_pl_head_m01.png
+equip_type=head
+armor_type=9
+levels=8-16
+
+[base 10]
+name=Gorgeforged Helm
+model=plate_helm
+icon=icon_item_pl_head_c01b.png,icon_item_pl_head_c01a.png,icon_item_pl_head_l01.png,icon_item_pl_head_e01.png,icon_item_pl_head_m01.png
+equip_type=head
+armor_type=10
+levels=14-21
+
+[base 11]
+name=Swordfall Helm
+model=plate_helm
+icon=icon_item_pl_head_c01b.png,icon_item_pl_head_c01a.png,icon_item_pl_head_l01.png,icon_item_pl_head_e01.png,icon_item_pl_head_m01.png
+equip_type=head
+armor_type=11
+levels=19-25
+
+[base 12]
+name=Ashen Cowl
+model=mage_hood
+icon=icon_item_rb_head_c01b.png,icon_item_rb_head_c01a.png,icon_item_rb_head_l01.png,icon_item_rb_head_e01.png,icon_item_rb_head_m01.png
+equip_type=head
+armor_type=12
+levels=1-8
+
+[base 13]
+name=Cinder Cowl
+model=mage_hood
+icon=icon_item_rb_head_c01b.png,icon_item_rb_head_c01a.png,icon_item_rb_head_l01.png,icon_item_rb_head_e01.png,icon_item_rb_head_m01.png
+equip_type=head
+armor_type=13
+levels=6-14
+
+[base 14]
+name=Lamplit Cowl
+model=mage_hood_alt1
+icon=icon_item_rb_head_c01b.png,icon_item_rb_head_c01a.png,icon_item_rb_head_l01.png,icon_item_rb_head_e01.png,icon_item_rb_head_m01.png
+equip_type=head
+armor_type=14
+levels=12-20
+
+[base 15]
+name=Emberwoven Cowl
+model=mage_hood_alt2
+icon=icon_item_rb_head_c01b.png,icon_item_rb_head_c01a.png,icon_item_rb_head_l01.png,icon_item_rb_head_e01.png,icon_item_rb_head_m01.png
+equip_type=head
+armor_type=15
+levels=18-25
+
+[base 16]
+name=Field Shirt
+model=cloth_shirt
+icon=icon_item_rb_torso_c01.png,icon_item_rb_torso_r01.png,icon_item_rb_torso_l01.png,icon_item_rb_torso_e01.png,icon_item_rb_torso_m01.png
+equip_type=chest
+armor_type=1
+levels=1-6
+
+[base 17]
+name=Hide Jerkin
+model=leather_chest
+icon=icon_item_lt_torso_c01.png,icon_item_lt_torso_r01.png,icon_item_lt_torso_l01.png,icon_item_lt_torso_e01.png,icon_item_lt_torso_m01.png
+equip_type=chest
+armor_type=2
+levels=1-8
+
+[base 18]
+name=Tanned Jerkin
+model=leather_chest
+icon=icon_item_lt_torso_c01.png,icon_item_lt_torso_r01.png,icon_item_lt_torso_l01.png,icon_item_lt_torso_e01.png,icon_item_lt_torso_m01.png
+equip_type=chest
+armor_type=3
+levels=6-15
+
+[base 19]
+name=Boiled Jerkin
+model=leather_chest
+icon=icon_item_lt_torso_c01.png,icon_item_lt_torso_r01.png,icon_item_lt_torso_l01.png,icon_item_lt_torso_e01.png,icon_item_lt_torso_m01.png
+equip_type=chest
+armor_type=4
+levels=13-25
+
+[base 20]
+name=Rusted Hauberk
+model=chain_cuirass
+icon=icon_item_ch_torso_c01.png,icon_item_ch_torso_r01.png,icon_item_ch_torso_l01.png,icon_item_ch_torso_e01.png,icon_item_ch_torso_m01.png
+equip_type=chest
+armor_type=5
+levels=1-10
+
+[base 21]
+name=Riveted Hauberk
+model=chain_cuirass
+icon=icon_item_ch_torso_c01.png,icon_item_ch_torso_r01.png,icon_item_ch_torso_l01.png,icon_item_ch_torso_e01.png,icon_item_ch_torso_m01.png
+equip_type=chest
+armor_type=6
+levels=8-16
+
+[base 22]
+name=Gatewatch Hauberk
+model=chain_cuirass
+icon=icon_item_ch_torso_c01.png,icon_item_ch_torso_r01.png,icon_item_ch_torso_l01.png,icon_item_ch_torso_e01.png,icon_item_ch_torso_m01.png
+equip_type=chest
+armor_type=7
+levels=14-21
+
+[base 23]
+name=Warden's Hauberk
+model=chain_cuirass
+icon=icon_item_ch_torso_c01.png,icon_item_ch_torso_r01.png,icon_item_ch_torso_l01.png,icon_item_ch_torso_e01.png,icon_item_ch_torso_m01.png
+equip_type=chest
+armor_type=8
+levels=19-25
+
+[base 24]
+name=Blackened Breastplate
+model=plate_cuirass
+icon=icon_item_pl_torso_c01.png,icon_item_pl_torso_r01.png,icon_item_pl_torso_l01.png,icon_item_pl_torso_e01.png,icon_item_pl_torso_m01.png
+equip_type=chest
+armor_type=9
+levels=8-16
+
+[base 25]
+name=Gorgeforged Breastplate
+model=plate_cuirass
+icon=icon_item_pl_torso_c01.png,icon_item_pl_torso_r01.png,icon_item_pl_torso_l01.png,icon_item_pl_torso_e01.png,icon_item_pl_torso_m01.png
+equip_type=chest
+armor_type=10
+levels=14-21
+
+[base 26]
+name=Swordfall Breastplate
+model=plate_cuirass
+icon=icon_item_pl_torso_c01.png,icon_item_pl_torso_r01.png,icon_item_pl_torso_l01.png,icon_item_pl_torso_e01.png,icon_item_pl_torso_m01.png
+equip_type=chest
+armor_type=11
+levels=19-25
+
+[base 27]
+name=Ashen Robe
+model=mage_vest
+icon=icon_item_rb_torso_c01.png,icon_item_rb_torso_r01.png,icon_item_rb_torso_l01.png,icon_item_rb_torso_e01.png,icon_item_rb_torso_m01.png
+equip_type=chest
+armor_type=12
+levels=1-8
+
+[base 28]
+name=Cinder Robe
+model=mage_vest
+icon=icon_item_rb_torso_c01.png,icon_item_rb_torso_r01.png,icon_item_rb_torso_l01.png,icon_item_rb_torso_e01.png,icon_item_rb_torso_m01.png
+equip_type=chest
+armor_type=13
+levels=6-14
+
+[base 29]
+name=Lamplit Robe
+model=mage_vest_alt1
+icon=icon_item_rb_torso_c01.png,icon_item_rb_torso_r01.png,icon_item_rb_torso_l01.png,icon_item_rb_torso_e01.png,icon_item_rb_torso_m01.png
+equip_type=chest
+armor_type=14
+levels=12-20
+
+[base 30]
+name=Emberwoven Robe
+model=mage_vest_alt2
+icon=icon_item_rb_torso_c01.png,icon_item_rb_torso_r01.png,icon_item_rb_torso_l01.png,icon_item_rb_torso_e01.png,icon_item_rb_torso_m01.png
+equip_type=chest
+armor_type=15
+levels=18-25
+
+[base 31]
+name=Field Breeches
+model=cloth_pants
+icon=icon_item_rb_pants_c01.png,icon_item_rb_pants_r01.png,icon_item_rb_pants_l01.png,icon_item_rb_pants_e01.png,icon_item_rb_pants_m01.png
+equip_type=legs
+armor_type=1
+levels=1-6
+
+[base 32]
+name=Hide Trousers
+model=leather_pants
+icon=icon_item_lt_pants_c01.png,icon_item_lt_pants_r01.png,icon_item_lt_pants_l01.png,icon_item_lt_pants_e01.png,icon_item_lt_pants_m01.png
+equip_type=legs
+armor_type=2
+levels=1-8
+
+[base 33]
+name=Tanned Trousers
+model=leather_pants
+icon=icon_item_lt_pants_c01.png,icon_item_lt_pants_r01.png,icon_item_lt_pants_l01.png,icon_item_lt_pants_e01.png,icon_item_lt_pants_m01.png
+equip_type=legs
+armor_type=3
+levels=6-15
+
+[base 34]
+name=Boiled Trousers
+model=leather_pants
+icon=icon_item_lt_pants_c01.png,icon_item_lt_pants_r01.png,icon_item_lt_pants_l01.png,icon_item_lt_pants_e01.png,icon_item_lt_pants_m01.png
+equip_type=legs
+armor_type=4
+levels=13-25
+
+[base 35]
+name=Rusted Chausses
+model=chain_greaves
+icon=icon_item_ch_pants_c01.png,icon_item_ch_pants_r01.png,icon_item_ch_pants_l01.png,icon_item_ch_pants_e01.png,icon_item_ch_pants_m01.png
+equip_type=legs
+armor_type=5
+levels=1-10
+
+[base 36]
+name=Riveted Chausses
+model=chain_greaves
+icon=icon_item_ch_pants_c01.png,icon_item_ch_pants_r01.png,icon_item_ch_pants_l01.png,icon_item_ch_pants_e01.png,icon_item_ch_pants_m01.png
+equip_type=legs
+armor_type=6
+levels=8-16
+
+[base 37]
+name=Gatewatch Chausses
+model=chain_greaves
+icon=icon_item_ch_pants_c01.png,icon_item_ch_pants_r01.png,icon_item_ch_pants_l01.png,icon_item_ch_pants_e01.png,icon_item_ch_pants_m01.png
+equip_type=legs
+armor_type=7
+levels=14-21
+
+[base 38]
+name=Warden's Chausses
+model=chain_greaves
+icon=icon_item_ch_pants_c01.png,icon_item_ch_pants_r01.png,icon_item_ch_pants_l01.png,icon_item_ch_pants_e01.png,icon_item_ch_pants_m01.png
+equip_type=legs
+armor_type=8
+levels=19-25
+
+[base 39]
+name=Blackened Legplates
+model=plate_greaves
+icon=icon_item_pl_pants_c01.png,icon_item_pl_pants_r01.png,icon_item_pl_pants_l01.png,icon_item_pl_pants_e01.png,icon_item_pl_pants_m01.png
+equip_type=legs
+armor_type=9
+levels=8-16
+
+[base 40]
+name=Gorgeforged Legplates
+model=plate_greaves
+icon=icon_item_pl_pants_c01.png,icon_item_pl_pants_r01.png,icon_item_pl_pants_l01.png,icon_item_pl_pants_e01.png,icon_item_pl_pants_m01.png
+equip_type=legs
+armor_type=10
+levels=14-21
+
+[base 41]
+name=Swordfall Legplates
+model=plate_greaves
+icon=icon_item_pl_pants_c01.png,icon_item_pl_pants_r01.png,icon_item_pl_pants_l01.png,icon_item_pl_pants_e01.png,icon_item_pl_pants_m01.png
+equip_type=legs
+armor_type=11
+levels=19-25
+
+[base 42]
+name=Ashen Skirt
+model=mage_skirt
+icon=icon_item_rb_pants_c01.png,icon_item_rb_pants_r01.png,icon_item_rb_pants_l01.png,icon_item_rb_pants_e01.png,icon_item_rb_pants_m01.png
+equip_type=legs
+armor_type=12
+levels=1-8
+
+[base 43]
+name=Cinder Skirt
+model=mage_skirt
+icon=icon_item_rb_pants_c01.png,icon_item_rb_pants_r01.png,icon_item_rb_pants_l01.png,icon_item_rb_pants_e01.png,icon_item_rb_pants_m01.png
+equip_type=legs
+armor_type=13
+levels=6-14
+
+[base 44]
+name=Lamplit Skirt
+model=mage_skirt_alt1
+icon=icon_item_rb_pants_c01.png,icon_item_rb_pants_r01.png,icon_item_rb_pants_l01.png,icon_item_rb_pants_e01.png,icon_item_rb_pants_m01.png
+equip_type=legs
+armor_type=14
+levels=12-20
+
+[base 45]
+name=Emberwoven Skirt
+model=mage_skirt_alt2
+icon=icon_item_rb_pants_c01.png,icon_item_rb_pants_r01.png,icon_item_rb_pants_l01.png,icon_item_rb_pants_e01.png,icon_item_rb_pants_m01.png
+equip_type=legs
+armor_type=15
+levels=18-25
+
+[base 46]
+name=Rag Sandals
+model=cloth_sandals
+icon=icon_item_rb_shoes_c01.png,icon_item_rb_shoes_r01.png,icon_item_rb_shoes_l01.png,icon_item_rb_shoes_e01.png,icon_item_rb_shoes_m01.png
+equip_type=feet
+armor_type=1
+levels=1-6
+
+[base 47]
+name=Hide Boots
+model=leather_boots
+icon=icon_item_lt_shoes_c01.png,icon_item_lt_shoes_r01.png,icon_item_lt_shoes_l01.png,icon_item_lt_shoes_e01.png,icon_item_lt_shoes_m01.png
+equip_type=feet
+armor_type=2
+levels=1-8
+
+[base 48]
+name=Tanned Boots
+model=leather_boots
+icon=icon_item_lt_shoes_c01.png,icon_item_lt_shoes_r01.png,icon_item_lt_shoes_l01.png,icon_item_lt_shoes_e01.png,icon_item_lt_shoes_m01.png
+equip_type=feet
+armor_type=3
+levels=6-15
+
+[base 49]
+name=Boiled Boots
+model=leather_boots
+icon=icon_item_lt_shoes_c01.png,icon_item_lt_shoes_r01.png,icon_item_lt_shoes_l01.png,icon_item_lt_shoes_e01.png,icon_item_lt_shoes_m01.png
+equip_type=feet
+armor_type=4
+levels=13-25
+
+[base 50]
+name=Rusted Greaves
+model=chain_boots
+icon=icon_item_ch_shoes_c01.png,icon_item_ch_shoes_r01.png,icon_item_ch_shoes_l01.png,icon_item_ch_shoes_e01.png,icon_item_ch_shoes_m01.png
+equip_type=feet
+armor_type=5
+levels=1-10
+
+[base 51]
+name=Riveted Greaves
+model=chain_boots
+icon=icon_item_ch_shoes_c01.png,icon_item_ch_shoes_r01.png,icon_item_ch_shoes_l01.png,icon_item_ch_shoes_e01.png,icon_item_ch_shoes_m01.png
+equip_type=feet
+armor_type=6
+levels=8-16
+
+[base 52]
+name=Gatewatch Greaves
+model=chain_boots
+icon=icon_item_ch_shoes_c01.png,icon_item_ch_shoes_r01.png,icon_item_ch_shoes_l01.png,icon_item_ch_shoes_e01.png,icon_item_ch_shoes_m01.png
+equip_type=feet
+armor_type=7
+levels=14-21
+
+[base 53]
+name=Warden's Greaves
+model=chain_boots
+icon=icon_item_ch_shoes_c01.png,icon_item_ch_shoes_r01.png,icon_item_ch_shoes_l01.png,icon_item_ch_shoes_e01.png,icon_item_ch_shoes_m01.png
+equip_type=feet
+armor_type=8
+levels=19-25
+
+[base 54]
+name=Blackened Sabatons
+model=plate_boots
+icon=icon_item_pl_shoes_c01.png,icon_item_pl_shoes_r01.png,icon_item_pl_shoes_l01.png,icon_item_pl_shoes_e01.png,icon_item_pl_shoes_m01.png
+equip_type=feet
+armor_type=9
+levels=8-16
+
+[base 55]
+name=Gorgeforged Sabatons
+model=plate_boots
+icon=icon_item_pl_shoes_c01.png,icon_item_pl_shoes_r01.png,icon_item_pl_shoes_l01.png,icon_item_pl_shoes_e01.png,icon_item_pl_shoes_m01.png
+equip_type=feet
+armor_type=10
+levels=14-21
+
+[base 56]
+name=Swordfall Sabatons
+model=plate_boots
+icon=icon_item_pl_shoes_c01.png,icon_item_pl_shoes_r01.png,icon_item_pl_shoes_l01.png,icon_item_pl_shoes_e01.png,icon_item_pl_shoes_m01.png
+equip_type=feet
+armor_type=11
+levels=19-25
+
+[base 57]
+name=Ashen Slippers
+model=mage_boots
+icon=icon_item_rb_shoes_c01.png,icon_item_rb_shoes_r01.png,icon_item_rb_shoes_l01.png,icon_item_rb_shoes_e01.png,icon_item_rb_shoes_m01.png
+equip_type=feet
+armor_type=12
+levels=1-8
+
+[base 58]
+name=Cinder Slippers
+model=mage_boots
+icon=icon_item_rb_shoes_c01.png,icon_item_rb_shoes_r01.png,icon_item_rb_shoes_l01.png,icon_item_rb_shoes_e01.png,icon_item_rb_shoes_m01.png
+equip_type=feet
+armor_type=13
+levels=6-14
+
+[base 59]
+name=Lamplit Slippers
+model=mage_boots_alt1
+icon=icon_item_rb_shoes_c01.png,icon_item_rb_shoes_r01.png,icon_item_rb_shoes_l01.png,icon_item_rb_shoes_e01.png,icon_item_rb_shoes_m01.png
+equip_type=feet
+armor_type=14
+levels=12-20
+
+[base 60]
+name=Emberwoven Slippers
+model=mage_boots_alt2
+icon=icon_item_rb_shoes_c01.png,icon_item_rb_shoes_r01.png,icon_item_rb_shoes_l01.png,icon_item_rb_shoes_e01.png,icon_item_rb_shoes_m01.png
+equip_type=feet
+armor_type=15
+levels=18-25
+
+[base 61]
+name=Sacking Wraps
+model=cloth_gloves
+icon=icon_item_rb_glove_c01.png,icon_item_rb_glove_r01.png,icon_item_rb_glove_l01.png,icon_item_rb_glove_e01.png,icon_item_rb_glove_m01.png
+equip_type=hands
+armor_type=1
+levels=1-6
+
+[base 62]
+name=Hide Gloves
+model=leather_gloves
+icon=icon_item_lt_glove_c01.png,icon_item_lt_glove_r01.png,icon_item_lt_glove_l01.png,icon_item_lt_glove_e01.png,icon_item_lt_glove_m01.png
+equip_type=hands
+armor_type=2
+levels=1-8
+
+[base 63]
+name=Tanned Gloves
+model=leather_gloves
+icon=icon_item_lt_glove_c01.png,icon_item_lt_glove_r01.png,icon_item_lt_glove_l01.png,icon_item_lt_glove_e01.png,icon_item_lt_glove_m01.png
+equip_type=hands
+armor_type=3
+levels=6-15
+
+[base 64]
+name=Boiled Gloves
+model=leather_gloves
+icon=icon_item_lt_glove_c01.png,icon_item_lt_glove_r01.png,icon_item_lt_glove_l01.png,icon_item_lt_glove_e01.png,icon_item_lt_glove_m01.png
+equip_type=hands
+armor_type=4
+levels=13-25
+
+[base 65]
+name=Rusted Mitts
+model=chain_gloves
+icon=icon_item_ch_glove_c01.png,icon_item_ch_glove_r01.png,icon_item_ch_glove_l01.png,icon_item_ch_glove_e01.png,icon_item_ch_glove_m01.png
+equip_type=hands
+armor_type=5
+levels=1-10
+
+[base 66]
+name=Riveted Mitts
+model=chain_gloves
+icon=icon_item_ch_glove_c01.png,icon_item_ch_glove_r01.png,icon_item_ch_glove_l01.png,icon_item_ch_glove_e01.png,icon_item_ch_glove_m01.png
+equip_type=hands
+armor_type=6
+levels=8-16
+
+[base 67]
+name=Gatewatch Mitts
+model=chain_gloves
+icon=icon_item_ch_glove_c01.png,icon_item_ch_glove_r01.png,icon_item_ch_glove_l01.png,icon_item_ch_glove_e01.png,icon_item_ch_glove_m01.png
+equip_type=hands
+armor_type=7
+levels=14-21
+
+[base 68]
+name=Warden's Mitts
+model=chain_gloves
+icon=icon_item_ch_glove_c01.png,icon_item_ch_glove_r01.png,icon_item_ch_glove_l01.png,icon_item_ch_glove_e01.png,icon_item_ch_glove_m01.png
+equip_type=hands
+armor_type=8
+levels=19-25
+
+[base 69]
+name=Blackened Gauntlets
+model=plate_gauntlets
+icon=icon_item_pl_glove_c01.png,icon_item_pl_glove_r01.png,icon_item_pl_glove_l01.png,icon_item_pl_glove_e01.png,icon_item_pl_glove_m01.png
+equip_type=hands
+armor_type=9
+levels=8-16
+
+[base 70]
+name=Gorgeforged Gauntlets
+model=plate_gauntlets
+icon=icon_item_pl_glove_c01.png,icon_item_pl_glove_r01.png,icon_item_pl_glove_l01.png,icon_item_pl_glove_e01.png,icon_item_pl_glove_m01.png
+equip_type=hands
+armor_type=10
+levels=14-21
+
+[base 71]
+name=Swordfall Gauntlets
+model=plate_gauntlets
+icon=icon_item_pl_glove_c01.png,icon_item_pl_glove_r01.png,icon_item_pl_glove_l01.png,icon_item_pl_glove_e01.png,icon_item_pl_glove_m01.png
+equip_type=hands
+armor_type=11
+levels=19-25
+
+[base 72]
+name=Ashen Sleeves
+model=mage_sleeves
+icon=icon_item_rb_glove_c01.png,icon_item_rb_glove_r01.png,icon_item_rb_glove_l01.png,icon_item_rb_glove_e01.png,icon_item_rb_glove_m01.png
+equip_type=hands
+armor_type=12
+levels=1-8
+
+[base 73]
+name=Cinder Sleeves
+model=mage_sleeves
+icon=icon_item_rb_glove_c01.png,icon_item_rb_glove_r01.png,icon_item_rb_glove_l01.png,icon_item_rb_glove_e01.png,icon_item_rb_glove_m01.png
+equip_type=hands
+armor_type=13
+levels=6-14
+
+[base 74]
+name=Lamplit Sleeves
+model=mage_sleeves_alt1
+icon=icon_item_rb_glove_c01.png,icon_item_rb_glove_r01.png,icon_item_rb_glove_l01.png,icon_item_rb_glove_e01.png,icon_item_rb_glove_m01.png
+equip_type=hands
+armor_type=14
+levels=12-20
+
+[base 75]
+name=Emberwoven Sleeves
+model=mage_sleeves_alt2
+icon=icon_item_rb_glove_c01.png,icon_item_rb_glove_r01.png,icon_item_rb_glove_l01.png,icon_item_rb_glove_e01.png,icon_item_rb_glove_m01.png
+equip_type=hands
+armor_type=15
+levels=18-25
+
+# ---------------------------------------------------------------- trinkets
+
+[base 76]
+name=Pendant
+icon=icon_item_necklace_c01.png,icon_item_necklace_r01.png,icon_item_necklace_l01.png,icon_item_necklace_e01.png,icon_item_necklace_m01.png
+equip_type=neck
+levels=1-25
+
+[base 77]
+name=Belt
+icon=icon_item_belt_c01.png,icon_item_belt_r01.png,icon_item_belt_u01.png,icon_item_belt_e01.png,icon_item_belt_m01.png
+equip_type=belt
+levels=1-25
+
+[base 78]
+name=Band
+icon=icon_item_ring_c02.png,icon_item_ring_r01.png,icon_item_ring_l01.png,icon_item_ring_e01.png,icon_item_ring_m01.png
+equip_type=ring
+levels=1-25
+
+# ---------------------------------------------------------------- weapons
+
+[base 79]
+name=Bog-iron Hatchet,Bog-iron Hatchet,Bog-iron Infantry Axe,Bog-iron Battle Axe,Bog-iron Battle Axe
+model=hand_axe,hand_axe,infantry_axe,battle_axe,battle_axe
+icon=icon_item_polearm_c01.png,icon_item_polearm_r01.png,icon_item_polearm_l01.png,icon_item_polearm_e01.png,icon_item_polearm_deva65a.png
+equip_type=weapon
+weapon_type=axe
+material=1
+levels=1-5
+
+[base 80]
+name=Forged Hatchet,Forged Hatchet,Forged Infantry Axe,Forged Battle Axe,Forged Battle Axe
+model=hand_axe,hand_axe,infantry_axe,battle_axe,battle_axe
+icon=icon_item_polearm_c01.png,icon_item_polearm_r01.png,icon_item_polearm_l01.png,icon_item_polearm_e01.png,icon_item_polearm_deva65a.png
+equip_type=weapon
+weapon_type=axe
+material=2
+levels=4-9
+
+[base 81]
+name=Blackened Hatchet,Blackened Hatchet,Blackened Infantry Axe,Blackened Battle Axe,Blackened Battle Axe
+model=hand_axe,hand_axe,infantry_axe,battle_axe,battle_axe
+icon=icon_item_polearm_c01.png,icon_item_polearm_r01.png,icon_item_polearm_l01.png,icon_item_polearm_e01.png,icon_item_polearm_deva65a.png
+equip_type=weapon
+weapon_type=axe
+material=3
+levels=8-12
+
+[base 82]
+name=Gate-steel Hatchet,Gate-steel Hatchet,Gate-steel Infantry Axe,Gate-steel Battle Axe,Gate-steel Battle Axe
+model=hand_axe,hand_axe,infantry_axe,battle_axe,battle_axe
+icon=icon_item_polearm_c01.png,icon_item_polearm_r01.png,icon_item_polearm_l01.png,icon_item_polearm_e01.png,icon_item_polearm_deva65a.png
+equip_type=weapon
+weapon_type=axe
+material=4
+levels=11-15
+
+[base 83]
+name=Warden-steel Hatchet,Warden-steel Hatchet,Warden-steel Infantry Axe,Warden-steel Battle Axe,Warden-steel Battle Axe
+model=hand_axe,hand_axe,infantry_axe,battle_axe,battle_axe
+icon=icon_item_polearm_c01.png,icon_item_polearm_r01.png,icon_item_polearm_l01.png,icon_item_polearm_e01.png,icon_item_polearm_deva65a.png
+equip_type=weapon
+weapon_type=axe
+material=5
+levels=14-18
+
+[base 84]
+name=Barrow-steel Hatchet,Barrow-steel Hatchet,Barrow-steel Infantry Axe,Barrow-steel Battle Axe,Barrow-steel Battle Axe
+model=hand_axe,hand_axe,infantry_axe,battle_axe,battle_axe
+icon=icon_item_polearm_c01.png,icon_item_polearm_r01.png,icon_item_polearm_l01.png,icon_item_polearm_e01.png,icon_item_polearm_deva65a.png
+equip_type=weapon
+weapon_type=axe
+material=6
+levels=17-21
+
+[base 85]
+name=Swordfall Hatchet,Swordfall Hatchet,Swordfall Infantry Axe,Swordfall Battle Axe,Swordfall Battle Axe
+model=hand_axe,hand_axe,infantry_axe,battle_axe,battle_axe
+icon=icon_item_polearm_c01.png,icon_item_polearm_r01.png,icon_item_polearm_l01.png,icon_item_polearm_e01.png,icon_item_polearm_deva65a.png
+equip_type=weapon
+weapon_type=axe
+material=7
+levels=20-25
+
+[base 86]
+name=Bog-iron Club,Bog-iron Hammer,Bog-iron Mace,Bog-iron War Hammer,Bog-iron Maul
+model=club,smith_hammer,mace,war_hammer,maul
+icon=icon_item_mace_c01.png,icon_item_mace_r01.png,icon_item_mace_l01.png,icon_item_mace_s01.png,icon_item_mace_deva65a.png
+equip_type=weapon
+weapon_type=mace
+material=1
+levels=1-5
+
+[base 87]
+name=Forged Club,Forged Hammer,Forged Mace,Forged War Hammer,Forged Maul
+model=club,smith_hammer,mace,war_hammer,maul
+icon=icon_item_mace_c01.png,icon_item_mace_r01.png,icon_item_mace_l01.png,icon_item_mace_s01.png,icon_item_mace_deva65a.png
+equip_type=weapon
+weapon_type=mace
+material=2
+levels=4-9
+
+[base 88]
+name=Blackened Club,Blackened Hammer,Blackened Mace,Blackened War Hammer,Blackened Maul
+model=club,smith_hammer,mace,war_hammer,maul
+icon=icon_item_mace_c01.png,icon_item_mace_r01.png,icon_item_mace_l01.png,icon_item_mace_s01.png,icon_item_mace_deva65a.png
+equip_type=weapon
+weapon_type=mace
+material=3
+levels=8-12
+
+[base 89]
+name=Gate-steel Club,Gate-steel Hammer,Gate-steel Mace,Gate-steel War Hammer,Gate-steel Maul
+model=club,smith_hammer,mace,war_hammer,maul
+icon=icon_item_mace_c01.png,icon_item_mace_r01.png,icon_item_mace_l01.png,icon_item_mace_s01.png,icon_item_mace_deva65a.png
+equip_type=weapon
+weapon_type=mace
+material=4
+levels=11-15
+
+[base 90]
+name=Warden-steel Club,Warden-steel Hammer,Warden-steel Mace,Warden-steel War Hammer,Warden-steel Maul
+model=club,smith_hammer,mace,war_hammer,maul
+icon=icon_item_mace_c01.png,icon_item_mace_r01.png,icon_item_mace_l01.png,icon_item_mace_s01.png,icon_item_mace_deva65a.png
+equip_type=weapon
+weapon_type=mace
+material=5
+levels=14-18
+
+[base 91]
+name=Barrow-steel Club,Barrow-steel Hammer,Barrow-steel Mace,Barrow-steel War Hammer,Barrow-steel Maul
+model=club,smith_hammer,mace,war_hammer,maul
+icon=icon_item_mace_c01.png,icon_item_mace_r01.png,icon_item_mace_l01.png,icon_item_mace_s01.png,icon_item_mace_deva65a.png
+equip_type=weapon
+weapon_type=mace
+material=6
+levels=17-21
+
+[base 92]
+name=Swordfall Club,Swordfall Hammer,Swordfall Mace,Swordfall War Hammer,Swordfall Maul
+model=club,smith_hammer,mace,war_hammer,maul
+icon=icon_item_mace_c01.png,icon_item_mace_r01.png,icon_item_mace_l01.png,icon_item_mace_s01.png,icon_item_mace_deva65a.png
+equip_type=weapon
+weapon_type=mace
+material=7
+levels=20-25
+
+[base 93]
+name=Bog-iron Shortsword,Bog-iron Longsword,Bog-iron Zweihander,Bog-iron Greatsword,Bog-iron Greatsword
+model=shortsword,longsword,zweihander,greatsword,greatsword
+icon=icon_item_sword_c01.png,icon_item_sword_r01.png,icon_item_sword_l01.png,icon_item_sword_e01.png,icon_item_sword_m01.png
+equip_type=weapon
+weapon_type=sword
+material=1
+levels=1-5
+
+[base 94]
+name=Forged Shortsword,Forged Longsword,Forged Zweihander,Forged Greatsword,Forged Greatsword
+model=shortsword,longsword,zweihander,greatsword,greatsword
+icon=icon_item_sword_c01.png,icon_item_sword_r01.png,icon_item_sword_l01.png,icon_item_sword_e01.png,icon_item_sword_m01.png
+equip_type=weapon
+weapon_type=sword
+material=2
+levels=4-9
+
+[base 95]
+name=Blackened Shortsword,Blackened Longsword,Blackened Zweihander,Blackened Greatsword,Blackened Greatsword
+model=shortsword,longsword,zweihander,greatsword,greatsword
+icon=icon_item_sword_c01.png,icon_item_sword_r01.png,icon_item_sword_l01.png,icon_item_sword_e01.png,icon_item_sword_m01.png
+equip_type=weapon
+weapon_type=sword
+material=3
+levels=8-12
+
+[base 96]
+name=Gate-steel Shortsword,Gate-steel Longsword,Gate-steel Zweihander,Gate-steel Greatsword,Gate-steel Greatsword
+model=shortsword,longsword,zweihander,greatsword,greatsword
+icon=icon_item_sword_c01.png,icon_item_sword_r01.png,icon_item_sword_l01.png,icon_item_sword_e01.png,icon_item_sword_m01.png
+equip_type=weapon
+weapon_type=sword
+material=4
+levels=11-15
+
+[base 97]
+name=Warden-steel Shortsword,Warden-steel Longsword,Warden-steel Zweihander,Warden-steel Greatsword,Warden-steel Greatsword
+model=shortsword,longsword,zweihander,greatsword,greatsword
+icon=icon_item_sword_c01.png,icon_item_sword_r01.png,icon_item_sword_l01.png,icon_item_sword_e01.png,icon_item_sword_m01.png
+equip_type=weapon
+weapon_type=sword
+material=5
+levels=14-18
+
+[base 98]
+name=Barrow-steel Shortsword,Barrow-steel Longsword,Barrow-steel Zweihander,Barrow-steel Greatsword,Barrow-steel Greatsword
+model=shortsword,longsword,zweihander,greatsword,greatsword
+icon=icon_item_sword_c01.png,icon_item_sword_r01.png,icon_item_sword_l01.png,icon_item_sword_e01.png,icon_item_sword_m01.png
+equip_type=weapon
+weapon_type=sword
+material=6
+levels=17-21
+
+[base 99]
+name=Swordfall Shortsword,Swordfall Longsword,Swordfall Zweihander,Swordfall Greatsword,Swordfall Greatsword
+model=shortsword,longsword,zweihander,greatsword,greatsword
+icon=icon_item_sword_c01.png,icon_item_sword_r01.png,icon_item_sword_l01.png,icon_item_sword_e01.png,icon_item_sword_m01.png
+equip_type=weapon
+weapon_type=sword
+material=7
+levels=20-25
+
+[base 100]
+name=Bog-iron Knife,Bog-iron Dirk,Bog-iron Kris,Bog-iron Kris,Bog-iron Kris
+model=dagger,dagger,dagger_red,dagger_red,dagger_red
+icon=icon_item_dagger_c01.png,icon_item_dagger_r01.png,icon_item_dagger_l01.png,icon_item_dagger_e01.png,icon_item_dagger_m01.png
+equip_type=weapon
+weapon_type=dagger
+material=1
+levels=1-5
+
+[base 101]
+name=Forged Knife,Forged Dirk,Forged Kris,Forged Kris,Forged Kris
+model=dagger,dagger,dagger_red,dagger_red,dagger_red
+icon=icon_item_dagger_c01.png,icon_item_dagger_r01.png,icon_item_dagger_l01.png,icon_item_dagger_e01.png,icon_item_dagger_m01.png
+equip_type=weapon
+weapon_type=dagger
+material=2
+levels=4-9
+
+[base 102]
+name=Blackened Knife,Blackened Dirk,Blackened Kris,Blackened Kris,Blackened Kris
+model=dagger,dagger,dagger_red,dagger_red,dagger_red
+icon=icon_item_dagger_c01.png,icon_item_dagger_r01.png,icon_item_dagger_l01.png,icon_item_dagger_e01.png,icon_item_dagger_m01.png
+equip_type=weapon
+weapon_type=dagger
+material=3
+levels=8-12
+
+[base 103]
+name=Gate-steel Knife,Gate-steel Dirk,Gate-steel Kris,Gate-steel Kris,Gate-steel Kris
+model=dagger,dagger,dagger_red,dagger_red,dagger_red
+icon=icon_item_dagger_c01.png,icon_item_dagger_r01.png,icon_item_dagger_l01.png,icon_item_dagger_e01.png,icon_item_dagger_m01.png
+equip_type=weapon
+weapon_type=dagger
+material=4
+levels=11-15
+
+[base 104]
+name=Warden-steel Knife,Warden-steel Dirk,Warden-steel Kris,Warden-steel Kris,Warden-steel Kris
+model=dagger,dagger,dagger_red,dagger_red,dagger_red
+icon=icon_item_dagger_c01.png,icon_item_dagger_r01.png,icon_item_dagger_l01.png,icon_item_dagger_e01.png,icon_item_dagger_m01.png
+equip_type=weapon
+weapon_type=dagger
+material=5
+levels=14-18
+
+[base 105]
+name=Barrow-steel Knife,Barrow-steel Dirk,Barrow-steel Kris,Barrow-steel Kris,Barrow-steel Kris
+model=dagger,dagger,dagger_red,dagger_red,dagger_red
+icon=icon_item_dagger_c01.png,icon_item_dagger_r01.png,icon_item_dagger_l01.png,icon_item_dagger_e01.png,icon_item_dagger_m01.png
+equip_type=weapon
+weapon_type=dagger
+material=6
+levels=17-21
+
+[base 106]
+name=Swordfall Knife,Swordfall Dirk,Swordfall Kris,Swordfall Kris,Swordfall Kris
+model=dagger,dagger,dagger_red,dagger_red,dagger_red
+icon=icon_item_dagger_c01.png,icon_item_dagger_r01.png,icon_item_dagger_l01.png,icon_item_dagger_e01.png,icon_item_dagger_m01.png
+equip_type=weapon
+weapon_type=dagger
+material=7
+levels=20-25
+
+[base 107]
+name=Ashwood Staff,Ashwood Staff,Ashwood Greatstaff,Ashwood Greatstaff,Ashwood Greatstaff
+model=staff_grey,staff,greatstaff,greatstaff_purple,greatstaff_red
+icon=icon_item_staff_c01.png,icon_item_staff_r01.png,icon_item_staff_l01.png,icon_item_staff_e01.png,icon_item_staff_deva65a.png
+equip_type=weapon
+weapon_type=staff
+material=8
+levels=1-5
+
+[base 108]
+name=Blackthorn Staff,Blackthorn Staff,Blackthorn Greatstaff,Blackthorn Greatstaff,Blackthorn Greatstaff
+model=staff_grey,staff,greatstaff,greatstaff_purple,greatstaff_red
+icon=icon_item_staff_c01.png,icon_item_staff_r01.png,icon_item_staff_l01.png,icon_item_staff_e01.png,icon_item_staff_deva65a.png
+equip_type=weapon
+weapon_type=staff
+material=9
+levels=4-9
+
+[base 109]
+name=Yew Staff,Yew Staff,Yew Greatstaff,Yew Greatstaff,Yew Greatstaff
+model=staff_grey,staff,greatstaff,greatstaff_purple,greatstaff_red
+icon=icon_item_staff_c01.png,icon_item_staff_r01.png,icon_item_staff_l01.png,icon_item_staff_e01.png,icon_item_staff_deva65a.png
+equip_type=weapon
+weapon_type=staff
+material=10
+levels=8-12
+
+[base 110]
+name=Bog-oak Staff,Bog-oak Staff,Bog-oak Greatstaff,Bog-oak Greatstaff,Bog-oak Greatstaff
+model=staff_grey,staff,greatstaff,greatstaff_purple,greatstaff_red
+icon=icon_item_staff_c01.png,icon_item_staff_r01.png,icon_item_staff_l01.png,icon_item_staff_e01.png,icon_item_staff_deva65a.png
+equip_type=weapon
+weapon_type=staff
+material=11
+levels=11-15
+
+[base 111]
+name=Redheart Staff,Redheart Staff,Redheart Greatstaff,Redheart Greatstaff,Redheart Greatstaff
+model=staff_grey,staff,greatstaff,greatstaff_purple,greatstaff_red
+icon=icon_item_staff_c01.png,icon_item_staff_r01.png,icon_item_staff_l01.png,icon_item_staff_e01.png,icon_item_staff_deva65a.png
+equip_type=weapon
+weapon_type=staff
+material=12
+levels=14-18
+
+[base 112]
+name=Gloamwood Staff,Gloamwood Staff,Gloamwood Greatstaff,Gloamwood Greatstaff,Gloamwood Greatstaff
+model=staff_grey,staff,greatstaff,greatstaff_purple,greatstaff_red
+icon=icon_item_staff_c01.png,icon_item_staff_r01.png,icon_item_staff_l01.png,icon_item_staff_e01.png,icon_item_staff_deva65a.png
+equip_type=weapon
+weapon_type=staff
+material=13
+levels=17-21
+
+[base 113]
+name=Barrowroot Staff,Barrowroot Staff,Barrowroot Greatstaff,Barrowroot Greatstaff,Barrowroot Greatstaff
+model=staff_grey,staff,greatstaff,greatstaff_purple,greatstaff_red
+icon=icon_item_staff_c01.png,icon_item_staff_r01.png,icon_item_staff_l01.png,icon_item_staff_e01.png,icon_item_staff_deva65a.png
+equip_type=weapon
+weapon_type=staff
+material=14
+levels=20-25
+
+[base 114]
+name=Ashwood Wand,Ashwood Rod,Ashwood Rod,Ashwood Rod,Ashwood Rod
+model=wand,rod,rod_blue,rod_purple,rod_red
+icon=icon_item_cannon_c01.png,icon_item_cannon_r01.png,icon_item_cannon_l01.png,icon_item_cannon_e01.png,icon_item_cannon_deva65a.png
+equip_type=weapon
+weapon_type=wand
+material=8
+levels=1-5
+
+[base 115]
+name=Blackthorn Wand,Blackthorn Rod,Blackthorn Rod,Blackthorn Rod,Blackthorn Rod
+model=wand,rod,rod_blue,rod_purple,rod_red
+icon=icon_item_cannon_c01.png,icon_item_cannon_r01.png,icon_item_cannon_l01.png,icon_item_cannon_e01.png,icon_item_cannon_deva65a.png
+equip_type=weapon
+weapon_type=wand
+material=9
+levels=4-9
+
+[base 116]
+name=Yew Wand,Yew Rod,Yew Rod,Yew Rod,Yew Rod
+model=wand,rod,rod_blue,rod_purple,rod_red
+icon=icon_item_cannon_c01.png,icon_item_cannon_r01.png,icon_item_cannon_l01.png,icon_item_cannon_e01.png,icon_item_cannon_deva65a.png
+equip_type=weapon
+weapon_type=wand
+material=10
+levels=8-12
+
+[base 117]
+name=Bog-oak Wand,Bog-oak Rod,Bog-oak Rod,Bog-oak Rod,Bog-oak Rod
+model=wand,rod,rod_blue,rod_purple,rod_red
+icon=icon_item_cannon_c01.png,icon_item_cannon_r01.png,icon_item_cannon_l01.png,icon_item_cannon_e01.png,icon_item_cannon_deva65a.png
+equip_type=weapon
+weapon_type=wand
+material=11
+levels=11-15
+
+[base 118]
+name=Redheart Wand,Redheart Rod,Redheart Rod,Redheart Rod,Redheart Rod
+model=wand,rod,rod_blue,rod_purple,rod_red
+icon=icon_item_cannon_c01.png,icon_item_cannon_r01.png,icon_item_cannon_l01.png,icon_item_cannon_e01.png,icon_item_cannon_deva65a.png
+equip_type=weapon
+weapon_type=wand
+material=12
+levels=14-18
+
+[base 119]
+name=Gloamwood Wand,Gloamwood Rod,Gloamwood Rod,Gloamwood Rod,Gloamwood Rod
+model=wand,rod,rod_blue,rod_purple,rod_red
+icon=icon_item_cannon_c01.png,icon_item_cannon_r01.png,icon_item_cannon_l01.png,icon_item_cannon_e01.png,icon_item_cannon_deva65a.png
+equip_type=weapon
+weapon_type=wand
+material=13
+levels=17-21
+
+[base 120]
+name=Barrowroot Wand,Barrowroot Rod,Barrowroot Rod,Barrowroot Rod,Barrowroot Rod
+model=wand,rod,rod_blue,rod_purple,rod_red
+icon=icon_item_cannon_c01.png,icon_item_cannon_r01.png,icon_item_cannon_l01.png,icon_item_cannon_e01.png,icon_item_cannon_deva65a.png
+equip_type=weapon
+weapon_type=wand
+material=14
+levels=20-25
+
+[base 121]
+name=Ashwood Shortbow,Ashwood Longbow,Ashwood Greatbow,Ashwood Greatbow,Ashwood Greatbow
+model=shortbow,longbow,greatbow,greatbow_orange,greatbow_orange
+icon=icon_item_bow_c01.png,icon_item_bow_r01.png,icon_item_bow_l01.png,icon_item_bow_e01.png,icon_item_bow_deva65a.png
+equip_type=ranged
+weapon_type=bow
+material=8
+levels=1-5
+
+[base 122]
+name=Blackthorn Shortbow,Blackthorn Longbow,Blackthorn Greatbow,Blackthorn Greatbow,Blackthorn Greatbow
+model=shortbow,longbow,greatbow,greatbow_orange,greatbow_orange
+icon=icon_item_bow_c01.png,icon_item_bow_r01.png,icon_item_bow_l01.png,icon_item_bow_e01.png,icon_item_bow_deva65a.png
+equip_type=ranged
+weapon_type=bow
+material=9
+levels=4-9
+
+[base 123]
+name=Yew Shortbow,Yew Longbow,Yew Greatbow,Yew Greatbow,Yew Greatbow
+model=shortbow,longbow,greatbow,greatbow_orange,greatbow_orange
+icon=icon_item_bow_c01.png,icon_item_bow_r01.png,icon_item_bow_l01.png,icon_item_bow_e01.png,icon_item_bow_deva65a.png
+equip_type=ranged
+weapon_type=bow
+material=10
+levels=8-12
+
+[base 124]
+name=Bog-oak Shortbow,Bog-oak Longbow,Bog-oak Greatbow,Bog-oak Greatbow,Bog-oak Greatbow
+model=shortbow,longbow,greatbow,greatbow_orange,greatbow_orange
+icon=icon_item_bow_c01.png,icon_item_bow_r01.png,icon_item_bow_l01.png,icon_item_bow_e01.png,icon_item_bow_deva65a.png
+equip_type=ranged
+weapon_type=bow
+material=11
+levels=11-15
+
+[base 125]
+name=Redheart Shortbow,Redheart Longbow,Redheart Greatbow,Redheart Greatbow,Redheart Greatbow
+model=shortbow,longbow,greatbow,greatbow_orange,greatbow_orange
+icon=icon_item_bow_c01.png,icon_item_bow_r01.png,icon_item_bow_l01.png,icon_item_bow_e01.png,icon_item_bow_deva65a.png
+equip_type=ranged
+weapon_type=bow
+material=12
+levels=14-18
+
+[base 126]
+name=Gloamwood Shortbow,Gloamwood Longbow,Gloamwood Greatbow,Gloamwood Greatbow,Gloamwood Greatbow
+model=shortbow,longbow,greatbow,greatbow_orange,greatbow_orange
+icon=icon_item_bow_c01.png,icon_item_bow_r01.png,icon_item_bow_l01.png,icon_item_bow_e01.png,icon_item_bow_deva65a.png
+equip_type=ranged
+weapon_type=bow
+material=13
+levels=17-21
+
+[base 127]
+name=Barrowroot Shortbow,Barrowroot Longbow,Barrowroot Greatbow,Barrowroot Greatbow,Barrowroot Greatbow
+model=shortbow,longbow,greatbow,greatbow_orange,greatbow_orange
+icon=icon_item_bow_c01.png,icon_item_bow_r01.png,icon_item_bow_l01.png,icon_item_bow_e01.png,icon_item_bow_deva65a.png
+equip_type=ranged
+weapon_type=bow
+material=14
+levels=20-25
+
+# ---------------------------------------------------------------- shields
+
+[base 128]
+name=Plank Buckler,Studded Buckler,Iron-rimmed Buckler,Iron-rimmed Buckler,Iron-rimmed Buckler
+model=buckler
+icon=icon_item_shield_c01.png,icon_item_shield_r01.png,icon_item_shield_l01.png,icon_item_shield_e01.png,icon_item_shield_m01.png
+equip_type=shield
+armor_type=4
+levels=1-9
+
+[base 129]
+name=Iron Buckler
+model=iron_buckler
+icon=icon_item_shield_c01.png,icon_item_shield_r01.png,icon_item_shield_l01.png,icon_item_shield_e01.png,icon_item_shield_m01.png
+equip_type=shield
+armor_type=6
+levels=8-17
+
+[base 130]
+name=Gate Shield
+model=shield
+icon=icon_item_shield_c01.png,icon_item_shield_r01.png,icon_item_shield_l01.png,icon_item_shield_e01.png,icon_item_shield_m01.png
+equip_type=shield
+armor_type=8
+levels=16-25

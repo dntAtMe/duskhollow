@@ -187,7 +187,10 @@ def write_map(ground, placed):
 
 
 def write_spawns(rng, terrain, placed):
-    """Antlings + spiders (neutral) in the meadow, goblins (hostile) camping in the ruins."""
+    """Pit crawlers + thatch spinners (neutral) in the meadow, gnawers (hostile) camping in the ruins.
+
+    Entries: data/npc_templates.txt (50020 Ditch Gnawer, 50021 Gnawer Rusher, 50022 Pit Crawler,
+    50023 Thatch Spinner)."""
     lines = ["# entry x y orientation wander_distance (cells) -- read by dusk_server for custom maps"]
 
     def free(x, y):
@@ -197,14 +200,14 @@ def write_spawns(rng, terrain, placed):
     while count < 14:
         x, y = rng.uniform(5, SIZE - 5), rng.uniform(5, SIZE - 5)
         if free(x, y) and terrain[int(y), int(x)] == 0:
-            entry = 2 if count % 3 else 8
+            entry = 50022 if count % 3 else 50023
             lines.append(f"{entry} {x:.1f} {y:.1f} {rng.uniform(0, 6.28):.2f} 4")
             count += 1
     for i in range(5):
         a = i * 2 * math.pi / 5
         x, y = PLAZA[0] + 3 * math.cos(a), PLAZA[1] + 3 * math.sin(a)
         if free(x, y):
-            lines.append(f"{13 if i % 2 else 14} {x:.1f} {y:.1f} {a + math.pi:.2f} 2")
+            lines.append(f"{50021 if i % 2 else 50020} {x:.1f} {y:.1f} {a + math.pi:.2f} 2")
     (CA / "maps" / f"{NAME}.spawns").write_text("\n".join(lines) + "\n", newline="\n")
 
 

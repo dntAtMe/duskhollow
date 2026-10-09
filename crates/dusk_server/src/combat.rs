@@ -86,6 +86,9 @@ pub fn melee(
     }
 
     for (att, att_id, tgt, result, amount, map, pos) in swings {
+        // Wards (Ash Ward, Set Your Feet) soften blows too.
+        let pct = auras.get(tgt).map_or(0, |a| a.damage_taken_pct());
+        let amount = (amount as f32 * (1.0 + pct as f32 / 100.0)).round().max(0.0) as i32;
         let Ok((tid, _, _, mut ts, is_npc, evading, ..)) = units.get_mut(tgt) else { continue };
         ts.hp = (ts.hp - amount).max(0);
         outbox.push(Scope::Near(map, pos), ServerMsg::Swing { attacker: att_id, target: tid.0, result, amount });

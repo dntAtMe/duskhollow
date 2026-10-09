@@ -1,0 +1,14 @@
+# Hand-made loot tables (dusk_formats::content::items), picked by an NPC's `loot=N`
+# (data/npc_templates.txt). Every row rolls on its own: item=<entry>,<chance %>,<min>-<max>.
+# Gold, junk and random gear come on top of these (docs/items.md).
+
+# Hollowed Warden Corvin
+[loot 1]
+item=1001,40,1-1
+item=1002,25,1-1
+item=1003,40,1-1
+item=1,50,1-2
+
+# Glarewolf Alpha
+[loot 2]
+item=1004,30,1-1

@@ -1,0 +1,22 @@
+# Our maps (dusk_formats::content::maps). Section = map name (maps/<name>.map).
+#   id        map id (from 10000)
+#   title     display name
+#   default=1 new characters start here (at the `arrival` marker of maps/<name>.markers)
+#   music     comma-separated tracks; empty = the whole soundtrack
+#   ambience  ambience loop; empty = none
+#   darkness  0 = full light .. 1 = black
+
+[custom_duskhollow]
+id=10000
+title=Duskhollow
+default=1
+music=
+ambience=
+darkness=0
+
+[custom_glade]
+id=10001
+title=The Glade
+music=
+ambience=
+darkness=0
