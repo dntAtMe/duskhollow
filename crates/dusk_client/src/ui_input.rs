@@ -3,7 +3,7 @@
 //!
 //! Gameplay input systems check [`UiInputCaptured`] before acting on keyboard/mouse input.
 //! UI modules set `keyboard` (text entry) themselves; `pointer` is computed every frame from
-//! nodes marked [`CapturesPointer`].
+//! nodes marked [`CapturesPointer`] and from every visible [`Button`].
 
 use bevy::prelude::*;
 use bevy::ui::UiSystems;
@@ -34,7 +34,7 @@ pub struct CapturesPointer;
 
 fn update_pointer(
     mut captured: ResMut<UiInputCaptured>,
-    nodes: Query<(&Interaction, &InheritedVisibility), With<CapturesPointer>>,
+    nodes: Query<(&Interaction, &InheritedVisibility), Or<(With<CapturesPointer>, With<Button>)>>,
 ) {
     let over = nodes.iter().any(|(i, v)| v.get() && *i != Interaction::None);
     if captured.pointer != over {

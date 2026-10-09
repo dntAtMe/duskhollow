@@ -5,7 +5,9 @@ use crate::{
     combat_ui::{FloatKind, FloatingText, UiFont},
     data::GameData,
     net::{Net, PlayerState, SpellNet},
+    ui_input::CapturesPointer,
     unit::Unit,
+    windows::{self, EscAction, Hint, HoverTint, UiWindow, WindowCommand, WindowId},
 };
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -37,7 +39,7 @@ impl Plugin for SpellsUiPlugin {
                     handle_spell_net,
                     (input, slot_clicks, book_clicks).chain(),
                     (refresh_slots, update_cooldowns, update_cast_bar, update_errors, update_tooltip, follow_held),
-                    (toggle_book, rebuild_book, update_aura_rows),
+                    (book_tabs, rebuild_book, update_aura_rows),
                 )
                     .chain()
                     .run_if(crate::state::in_game),
@@ -77,7 +79,7 @@ const SLOT_Y: f32 = 13.0;
 const SLOT_SIZE: f32 = 37.0;
 
 /// Auto attacks are driven by clicking enemies, not by the bar.
-const AUTO_SPELLS: [SpellId; 2] = [81, 82];
+pub const AUTO_SPELLS: [SpellId; 2] = [81, 82];
 
 const GOLD: Color = Color::srgb(0.95, 0.82, 0.45);
 const GREY: Color = Color::srgb(0.75, 0.72, 0.66);
@@ -93,16 +95,16 @@ pub struct Spellbook {
 }
 
 impl Spellbook {
-    /// Our own cast is running (Esc cancels it).
-    pub fn is_casting(&self) -> bool {
-        self.casting.is_some()
-    }
-
     fn remaining(&self, spell: SpellId, now: f32) -> (f32, f32) {
         let left = |(s, d): (f32, f32)| ((s + d - now).max(0.0), d);
         let cd = self.cooldowns.get(&spell).copied().map(left).unwrap_or((0.0, 0.0));
         let gcd = left(self.gcd);
         if cd.0 >= gcd.0 { cd } else { gcd }
+    }
+
+    /// Our own cast is in progress (`Esc` cancels it).
+    pub fn is_casting(&self) -> bool {
+        self.casting.is_some()
     }
 }
 
@@ -151,13 +153,14 @@ struct Tooltip;
 #[derive(Component)]
 struct HeldIcon;
 #[derive(Component)]
-struct BookWindow;
-#[derive(Component)]
 struct BookList;
 #[derive(Component)]
 struct BookRow(SpellId);
 #[derive(Component)]
 struct BookTabButton(BookTab);
+/// Darkens the inactive tab label / underlines the active one.
+#[derive(Component)]
+struct BookTabShade(BookTab);
 #[derive(Component)]
 struct AuraRow {
     player: bool,
@@ -198,6 +201,7 @@ fn spawn_ui(mut commands: Commands, data: Res<GameData>, assets: Res<AssetServer
                 ..default()
             },
             ImageNode::new(img(&data, &assets, "toolbar_base.png")),
+            CapturesPointer,
         ))
         .with_children(|bar| {
             for i in 0..SLOTS {
@@ -325,28 +329,42 @@ fn spawn_ui(mut commands: Commands, data: Res<GameData>, assets: Res<AssetServer
     // Abilities window (abilities.png 474x592) with Spells / Actions tabs.
     commands
         .spawn((
-            absolute(40.0, 70.0, 474.0, 592.0),
+            absolute(0.0, 0.0, 474.0, 592.0),
             ImageNode::new(img(&data, &assets, "abilities.png")),
-            Visibility::Hidden,
-            GlobalZIndex(10),
-            BookWindow,
+            UiWindow(WindowId::Abilities),
         ))
         .with_children(|w| {
-            w.spawn((absolute(150.0, 74.0, 66.0, 26.0), Button, BookTabButton(BookTab::Spells)));
-            w.spawn((absolute(245.0, 74.0, 80.0, 26.0), Button, BookTabButton(BookTab::Actions)));
+            windows::spawn_drag_handle(w, WindowId::Abilities, 12.0, 14.0, 404.0, 52.0);
+            windows::spawn_close_button(w, &data, &assets, WindowId::Abilities, 424.0, 27.0, false);
+            for (tab, cx, title) in [(BookTab::Spells, 183.0, "Spells"), (BookTab::Actions, 288.0, "Actions")] {
+                w.spawn((absolute(cx - 50.0, 69.0, 100.0, 37.0), BackgroundColor(Color::NONE), BookTabShade(tab)));
+                w.spawn((
+                    absolute(cx - 50.0, 69.0, 100.0, 37.0),
+                    HoverTint,
+                    CapturesPointer,
+                    BookTabButton(tab),
+                    Hint::new(title),
+                ));
+            }
             w.spawn((
                 Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(36.0),
-                    top: Val::Px(102.0),
+                    top: Val::Px(112.0),
                     width: Val::Px(401.0),
-                    height: Val::Px(470.0),
+                    height: Val::Px(440.0),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(4.0),
                     overflow: Overflow::clip(),
                     ..default()
                 },
                 BookList,
+            ));
+            w.spawn((
+                Node { position_type: PositionType::Absolute, left: Val::Px(36.0), top: Val::Px(560.0), ..default() },
+                Text::new("Click a spell, then an action bar slot.  Right-click a slot to clear it."),
+                f(11.0),
+                TextColor(GREY.with_alpha(0.75)),
             ));
         });
 
@@ -486,12 +504,13 @@ fn input(
     book: Res<Spellbook>,
     mut errors: Query<(&mut Text, &mut ErrorText)>,
     captured: Res<crate::ui_input::UiInputCaptured>,
+    esc: Res<EscAction>,
 ) {
+    if *esc == EscAction::CancelCast && book.casting.is_some() {
+        net.send(ClientMsg::CancelCast);
+    }
     if state.dead || captured.keyboard {
         return;
-    }
-    if book.casting.is_some() && keys.just_pressed(KeyCode::Escape) {
-        net.send(ClientMsg::CancelCast);
     }
     for (i, key) in SLOT_KEYS.iter().enumerate() {
         if keys.just_pressed(*key) {
@@ -588,12 +607,10 @@ fn autocast(
     }
 }
 
-fn open_book_once(mut done: Local<bool>, mut window: Query<&mut Visibility, With<BookWindow>>) {
+fn open_book_once(mut done: Local<bool>, mut out: MessageWriter<WindowCommand>) {
     if !*done {
-        if let Ok(mut v) = window.single_mut() {
-            *v = Visibility::Visible;
-            *done = true;
-        }
+        out.write(WindowCommand::Open(WindowId::Abilities));
+        *done = true;
     }
 }
 
@@ -777,9 +794,20 @@ pub fn describe(t: &SpellTemplate, state: &PlayerState) -> String {
     text
 }
 
+/// What the spell tooltip shows.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum TipFor {
+    Spell(SpellId),
+    /// An empty action bar slot.
+    EmptySlot(usize),
+    /// An aura icon: spell, expiry (app seconds), positive.
+    Aura(SpellId, f32, bool),
+}
+
 #[allow(clippy::too_many_arguments)]
 fn update_tooltip(
     mut commands: Commands,
+    time: Res<Time>,
     data: Res<GameData>,
     state: Res<PlayerState>,
     bar: Res<ActionBar>,
@@ -788,57 +816,96 @@ fn update_tooltip(
     window: Query<&Window, With<PrimaryWindow>>,
     slots: Query<(&Interaction, &Slot)>,
     rows: Query<(&Interaction, &BookRow)>,
+    aura_icons: Query<(&Interaction, &AuraIcon, &InheritedVisibility)>,
     mut tooltip: Query<(Entity, &mut Node, &mut Visibility), With<Tooltip>>,
-    mut shown: Local<Option<SpellId>>,
+    mut shown: Local<Option<(TipFor, i32)>>,
 ) {
     let Ok((entity, mut node, mut vis)) = tooltip.single_mut() else { return };
     // Debug aid: `DUSK_TOOLTIP_SLOT=<n>` shows slot n's tooltip as if hovered.
     let forced = std::env::var("DUSK_TOOLTIP_SLOT").ok().and_then(|s| s.parse::<usize>().ok()).filter(|i| *i < SLOTS);
+    let now = time.elapsed_secs();
     let hovered = slots
         .iter()
         .find(|(i, _)| **i == Interaction::Hovered)
-        .and_then(|(_, s)| bar.slots[s.0])
-        .or_else(|| rows.iter().find(|(i, _)| **i == Interaction::Hovered).map(|(_, r)| r.0))
-        .or_else(|| forced.and_then(|i| bar.slots[i]))
+        .map(|(_, s)| bar.slots[s.0].map_or(TipFor::EmptySlot(s.0), TipFor::Spell))
+        .or_else(|| rows.iter().find(|(i, _)| **i == Interaction::Hovered).map(|(_, r)| TipFor::Spell(r.0)))
+        .or_else(|| {
+            aura_icons
+                .iter()
+                .find(|(i, _, v)| **i == Interaction::Hovered && v.get())
+                .map(|(_, a, _)| TipFor::Aura(a.spell, a.expires, a.positive))
+        })
+        .or_else(|| forced.and_then(|i| bar.slots[i]).map(TipFor::Spell))
         .filter(|_| held.0.is_none());
     let cursor = window
         .single()
         .ok()
         .and_then(|w| w.cursor_position())
         .or_else(|| forced.map(|i| Vec2::new(210.0 + SLOT_X0 + SLOT_STRIDE * i as f32, 680.0)));
-    let (Some(spell), Some(cursor)) = (hovered, cursor) else {
+    let (Some(tip), Some(cursor)) = (hovered, cursor) else {
         *vis = Visibility::Hidden;
         *shown = None;
         return;
     };
-    let Some(t) = data.spells.get(&(spell as i64)) else { return };
-    *vis = Visibility::Visible;
-    // Keep it on screen: above the action bar, right of the book.
-    node.left = Val::Px((cursor.x + 16.0).min(980.0));
-    if let Ok(w) = window.single() {
-        node.left = Val::Px((cursor.x + 16.0).min(w.width() - 300.0));
-    }
-    node.top = Val::Px((cursor.y - 180.0).max(8.0));
-    if *shown == Some(spell) && !state.is_changed() {
+    let spell = match tip {
+        TipFor::Spell(s) | TipFor::Aura(s, ..) => data.spells.get(&(s as i64)),
+        TipFor::EmptySlot(_) => None,
+    };
+    if spell.is_none() && !matches!(tip, TipFor::EmptySlot(_)) {
         return;
     }
-    *shown = Some(spell);
+    *vis = Visibility::Visible;
+    // Keep it on screen: above the action bar, right of the book.
+    let (w, h) = window.single().map(|w| (w.width(), w.height())).unwrap_or((1280.0, 720.0));
+    node.left = Val::Px((cursor.x + 16.0).min(w - 300.0));
+    node.top = Val::Px(if cursor.y < h / 2.0 { cursor.y + 24.0 } else { (cursor.y - 180.0).max(8.0) });
+    // Aura timers tick: rebuild when the shown second changes.
+    let tick = match tip {
+        TipFor::Aura(_, expires, _) => (expires - now).ceil() as i32,
+        _ => 0,
+    };
+    if *shown == Some((tip, tick)) && !state.is_changed() {
+        return;
+    }
+    *shown = Some((tip, tick));
     commands.entity(entity).despawn_related::<Children>();
     let f = |size: f32| TextFont { font: font.0.clone().into(), font_size: size.into(), ..default() };
-    let cost = mana_cost(t, &state);
-    let mut lines: Vec<(String, f32, Color)> = vec![(t.name.clone(), 17.0, GOLD)];
-    let mut meta = Vec::new();
-    if cost > 0 {
-        meta.push(format!("{cost} Mana"));
+    let mut lines: Vec<(String, f32, Color)> = Vec::new();
+    match (tip, spell) {
+        (TipFor::EmptySlot(i), _) => {
+            lines.push((format!("Empty slot ({})", SLOT_LABELS[i]), 15.0, GOLD));
+            lines.push(("Open Abilities (P), click a spell, then click this slot.".into(), 12.0, GREY));
+        }
+        (TipFor::Aura(_, expires, positive), Some(t)) => {
+            lines.push((t.name.clone(), 16.0, if positive { GOLD } else { Color::srgb(1.0, 0.45, 0.35) }));
+            let text =
+                if t.aura_description.trim().is_empty() { describe(t, &state) } else { t.aura_description.clone() };
+            lines.push((text.trim().to_string(), 13.0, Color::srgb(1.0, 0.82, 0.0)));
+            lines.push((format!("{} remaining", secs_left(expires - now)), 12.0, GREY));
+        }
+        (_, Some(t)) => {
+            let cost = mana_cost(t, &state);
+            lines.push((t.name.clone(), 17.0, GOLD));
+            let mut meta = Vec::new();
+            if cost > 0 {
+                meta.push(format!("{cost} Mana"));
+            }
+            if t.range > 0 {
+                meta.push(format!("{} yd range", (t.range_cells() * 3.0).round()));
+            }
+            lines.push((meta.join("    "), 13.0, Color::WHITE));
+            let cast =
+                if t.cast_time_ms > 0 { format!("{} cast", secs(t.cast_time_ms as f64)) } else { "Instant".into() };
+            let cd =
+                if t.cooldown_ms > 0 { format!("    {} cooldown", secs(t.cooldown_ms as f64)) } else { String::new() };
+            lines.push((format!("{cast}{cd}"), 13.0, Color::WHITE));
+            lines.push((describe(t, &state), 13.0, Color::srgb(1.0, 0.82, 0.0)));
+            if let Some(i) = bar.slots.iter().position(|s| *s == Some(t.entry as SpellId)) {
+                lines.push((format!("Key: {}", SLOT_LABELS[i]), 11.0, GREY));
+            }
+        }
+        _ => {}
     }
-    if t.range > 0 {
-        meta.push(format!("{} yd range", (t.range_cells() * 3.0).round()));
-    }
-    lines.push((meta.join("    "), 13.0, Color::WHITE));
-    let cast = if t.cast_time_ms > 0 { format!("{} cast", secs(t.cast_time_ms as f64)) } else { "Instant".into() };
-    let cd = if t.cooldown_ms > 0 { format!("    {} cooldown", secs(t.cooldown_ms as f64)) } else { String::new() };
-    lines.push((format!("{cast}{cd}"), 13.0, Color::WHITE));
-    lines.push((describe(t, &state), 13.0, Color::srgb(1.0, 0.82, 0.0)));
     commands.entity(entity).with_children(|p| {
         for (text, size, color) in lines.into_iter().filter(|l| !l.0.is_empty()) {
             p.spawn((
@@ -851,17 +918,23 @@ fn update_tooltip(
     });
 }
 
+fn secs_left(s: f32) -> String {
+    let s = s.max(0.0).ceil() as i32;
+    if s >= 60 { format!("{}:{:02}", s / 60, s % 60) } else { format!("{s} sec") }
+}
+
 // ---------------------------------------------------------------- abilities window
 
-fn toggle_book(
-    keys: Res<ButtonInput<KeyCode>>,
-    captured: Res<crate::ui_input::UiInputCaptured>,
-    mut window: Query<&mut Visibility, With<BookWindow>>,
-) {
-    if !captured.keyboard && keys.just_pressed(KeyCode::KeyP) {
-        if let Ok(mut v) = window.single_mut() {
-            *v = if *v == Visibility::Hidden { Visibility::Visible } else { Visibility::Hidden };
-        }
+/// Active tab: lit and underlined; the other one dimmed.
+fn book_tabs(tab: Res<BookTab>, mut shades: Query<(&BookTabShade, &mut BackgroundColor, &mut Node, &mut BorderColor)>) {
+    if !tab.is_changed() {
+        return;
+    }
+    for (s, mut bg, mut node, mut border) in &mut shades {
+        let active = s.0 == *tab;
+        bg.0 = if active { Color::srgba(0.55, 0.12, 0.08, 0.22) } else { Color::srgba(0.0, 0.0, 0.0, 0.45) };
+        node.border = UiRect::bottom(Val::Px(2.0));
+        *border = BorderColor::all(if active { GOLD.with_alpha(0.85) } else { Color::NONE });
     }
 }
 
@@ -897,6 +970,7 @@ fn rebuild_book(
                 Node { width: Val::Px(401.0), height: Val::Px(70.0), flex_shrink: 0.0, ..default() },
                 ImageNode::new(slot_img.clone()),
                 Button,
+                CapturesPointer,
                 BookRow(s.entry as SpellId),
             ))
             .with_children(|r| {
@@ -931,7 +1005,20 @@ fn rebuild_book(
 
 // ---------------------------------------------------------------- aura icons
 
-#[allow(clippy::too_many_arguments)]
+/// A hoverable aura icon (the spell tooltip shows it).
+#[derive(Component)]
+struct AuraIcon {
+    spell: SpellId,
+    expires: f32,
+    positive: bool,
+}
+
+#[derive(Component)]
+struct AuraTimer;
+
+/// Rebuilds a row only when its set of auras changes (so hovering keeps working); timers tick
+/// in place.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn update_aura_rows(
     mut commands: Commands,
     time: Res<Time>,
@@ -941,49 +1028,72 @@ fn update_aura_rows(
     net: Res<Net>,
     state: Res<PlayerState>,
     rows: Query<(Entity, &AuraRow)>,
+    children: Query<&Children, With<AuraRow>>,
     auras: Query<&UnitAuras>,
-    mut acc: Local<f32>,
+    mut icons: Query<(&mut AuraIcon, &Children)>,
+    mut timers: Query<&mut Text, With<AuraTimer>>,
+    mut built: Local<HashMap<Entity, Vec<(SpellId, bool)>>>,
 ) {
-    *acc += time.delta_secs();
-    if *acc < 0.25 {
-        return;
-    }
-    *acc = 0.0;
     let now = time.elapsed_secs();
     let f = TextFont { font: font.0.clone().into(), font_size: 11.0.into(), ..default() };
     let unit_of = |id: Option<EntityId>| id.and_then(|i| net.entities.get(&i)).and_then(|e| auras.get(*e).ok());
     for (row, which) in &rows {
-        commands.entity(row).despawn_related::<Children>();
-        let list = if which.player { unit_of(net.my_id) } else { unit_of(state.target) };
-        let Some(list) = list else { continue };
-        commands.entity(row).with_children(|r| {
-            for (spell, expires, positive) in list.0.iter().filter(|a| a.1 > now) {
-                let border = if *positive { Color::srgb(0.2, 0.7, 0.2) } else { Color::srgb(0.8, 0.15, 0.1) };
-                r.spawn((
-                    Node {
-                        width: Val::Px(26.0),
-                        height: Val::Px(26.0),
-                        border: UiRect::all(Val::Px(1.0)),
-                        flex_direction: FlexDirection::Column,
-                        ..default()
-                    },
-                    BorderColor::all(border),
-                    ImageNode::new(icon(&data, &assets, *spell)),
-                ))
-                .with_children(|i| {
-                    i.spawn((
+        let list: Vec<(SpellId, f32, bool)> = (if which.player { unit_of(net.my_id) } else { unit_of(state.target) })
+            .map(|a| a.0.iter().filter(|a| a.1 > now).copied().collect())
+            .unwrap_or_default();
+        let key: Vec<(SpellId, bool)> = list.iter().map(|a| (a.0, a.2)).collect();
+        if built.get(&row) != Some(&key) {
+            built.insert(row, key);
+            commands.entity(row).despawn_related::<Children>();
+            commands.entity(row).with_children(|r| {
+                for (spell, expires, positive) in &list {
+                    let border = if *positive { Color::srgb(0.2, 0.7, 0.2) } else { Color::srgb(0.8, 0.15, 0.1) };
+                    r.spawn((
                         Node {
-                            position_type: PositionType::Absolute,
-                            top: Val::Px(26.0),
-                            left: Val::Px(2.0),
+                            width: Val::Px(26.0),
+                            height: Val::Px(26.0),
+                            border: UiRect::all(Val::Px(1.0)),
+                            flex_direction: FlexDirection::Column,
                             ..default()
                         },
-                        Text::new(format!("{}", (expires - now).ceil() as i32)),
-                        f.clone(),
-                        TextColor(Color::WHITE),
-                    ));
-                });
+                        BorderColor::all(border),
+                        ImageNode::new(icon(&data, &assets, *spell)),
+                        Interaction::default(),
+                        CapturesPointer,
+                        AuraIcon { spell: *spell, expires: *expires, positive: *positive },
+                    ))
+                    .with_children(|i| {
+                        i.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                top: Val::Px(26.0),
+                                left: Val::Px(2.0),
+                                ..default()
+                            },
+                            Text::new(format!("{}", (expires - now).ceil() as i32)),
+                            f.clone(),
+                            TextColor(Color::WHITE),
+                            TextShadow::default(),
+                            AuraTimer,
+                        ));
+                    });
+                }
+            });
+            continue;
+        }
+        // Same auras (in the same order): refresh expiry (re-applied auras) and the countdown.
+        let Ok(kids) = children.get(row) else { continue };
+        for ((_, expires, _), k) in list.iter().zip(kids.iter()) {
+            let Ok((mut icon, icon_kids)) = icons.get_mut(k) else { continue };
+            icon.expires = *expires;
+            for t in icon_kids.iter() {
+                if let Ok(mut t) = timers.get_mut(t) {
+                    let s = format!("{}", (expires - now).ceil() as i32);
+                    if t.0 != s {
+                        t.0 = s;
+                    }
+                }
             }
-        });
+        }
     }
 }

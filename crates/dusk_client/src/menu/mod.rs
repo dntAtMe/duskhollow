@@ -233,30 +233,6 @@ struct WelcomeWait(f32);
 const WELCOME_TIMEOUT: f32 = 15.0;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(6);
 
-/// Whether nothing else wants this Esc (chat input, cast cancel, loot window, dialogue, target),
-/// so it may open the game menu. Checked before the other handlers run this frame.
-/// MERGE: the window manager's "Esc consumed" flag / `windows::any_open()` slots in here.
-#[derive(SystemParam)]
-pub struct EscProbe<'w> {
-    captured: Res<'w, UiInputCaptured>,
-    modal: Option<Res<'w, crate::dialogue::Modal>>,
-    dialogue: Option<Res<'w, crate::dialogue::Dialogue>>,
-    book: Option<Res<'w, crate::spells_ui::Spellbook>>,
-    items: Option<Res<'w, crate::items_ui::ItemsState>>,
-    player: Option<Res<'w, net::PlayerState>>,
-}
-
-impl EscProbe<'_> {
-    pub fn esc_free(&self) -> bool {
-        !self.captured.keyboard
-            && !self.modal.as_ref().is_some_and(|m| m.dialogue || m.card || m.chat_typing)
-            && !self.dialogue.as_ref().is_some_and(|d| d.is_open())
-            && !self.book.as_ref().is_some_and(|b| b.is_casting())
-            && !self.items.as_ref().is_some_and(|i| i.loot_open())
-            && !self.player.as_ref().is_some_and(|p| p.target.is_some())
-    }
-}
-
 pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
@@ -277,6 +253,7 @@ impl Plugin for MenuPlugin {
                 Update,
                 (
                     (boot, debug_open, debug_cycle, poll_connect, welcome_timeout),
+                    open_game_menu.run_if(crate::windows::pause_menu_requested.and_then(crate::state::in_game)),
                     (rebuild, navigate, pointer, edit_text, refresh).chain(),
                     (vista::manage, vista::animate).chain(),
                 )
@@ -503,6 +480,16 @@ fn debug_cycle(mut commands: Commands, time: Res<Time>, mut ctx: Ctx, mut phase:
 
 // ---------------------------------------------------------------- input
 
+/// Esc that nothing in game wanted, or the micro-menu's Menu button (`windows::EscAction`):
+/// the game menu. While it is open the keyboard is ours, so the next Esc closes it.
+fn open_game_menu(mut model: ResMut<MenuModel>, mut sfx: MessageWriter<PlaySfx>) {
+    if model.screen == Screen::None {
+        info!("game menu");
+        model.go(Screen::GameMenu);
+        sfx.write(PlaySfx::ui(builtin::WINDOW_OPEN));
+    }
+}
+
 /// `DUSK_MENU_ESC=6,8.5`: presses Esc at those seconds (tests the Esc priority chain).
 fn debug_esc(time: Res<Time>, mut keys: ResMut<ButtonInput<KeyCode>>, mut pressed: Local<usize>) {
     let Ok(list) = std::env::var("DUSK_MENU_ESC") else { return };
@@ -520,22 +507,10 @@ fn collect_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut typed: MessageReader<KeyboardInput>,
     mut input: ResMut<MenuInput>,
-    mut model: ResMut<MenuModel>,
-    state: Res<State<AppState>>,
-    probe: EscProbe,
-    mut sfx: MessageWriter<PlaySfx>,
+    model: Res<MenuModel>,
 ) {
     *input = MenuInput::default();
     let events: Vec<KeyboardInput> = typed.read().cloned().collect();
-    if *state.get() == AppState::InGame && model.screen == Screen::None {
-        // Esc opens the game menu only when nothing else wants it.
-        if keys.just_pressed(KeyCode::Escape) && probe.esc_free() {
-            info!("game menu");
-            model.go(Screen::GameMenu);
-            sfx.write(PlaySfx::ui(builtin::WINDOW_OPEN));
-        }
-        return;
-    }
     if model.screen == Screen::None {
         return;
     }

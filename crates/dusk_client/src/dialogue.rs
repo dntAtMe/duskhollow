@@ -15,6 +15,7 @@ use crate::{
     player::{MainCamera, Player},
     ui_input::{CapturesPointer, UiInputCaptured},
     unit::{Dead, Npc, Unit},
+    windows::{ButtonArt, EscAction, Hint},
 };
 use bevy::input::InputSystems;
 use bevy::prelude::*;
@@ -157,7 +158,7 @@ fn abs(left: f32, top: f32, w: f32, h: f32) -> Node {
     }
 }
 
-fn spawn_window(mut commands: Commands, font: Res<UiFont>) {
+fn spawn_window(mut commands: Commands, font: Res<UiFont>, data: Res<GameData>, assets: Res<AssetServer>) {
     let f = |size: f32| TextFont { font: font.0.clone().into(), font_size: size.into(), ..default() };
     let shadow = TextShadow { offset: Vec2::splat(1.0), color: Color::BLACK.with_alpha(0.9) };
     commands
@@ -201,11 +202,15 @@ fn spawn_window(mut commands: Commands, font: Res<UiFont>) {
             for (x, y) in [(3.0, 3.0), (WINDOW_W - 11.0, 3.0)] {
                 w.spawn((abs(x, y, 4.0, 4.0), BackgroundColor(BRONZE)));
             }
-            w.spawn((abs(WINDOW_W - 30.0, 4.0, 22.0, 20.0), Button, CapturesPointer, CloseButton)).with_child((
-                Text::new("x"),
-                f(15.0),
-                TextColor(BONE),
-                Node { margin: UiRect::left(Val::Px(6.0)), ..default() },
+            let art = ButtonArt::load(&data, &assets, "ui_close_small");
+            w.spawn((
+                abs(WINDOW_W - 29.0, 3.0, 22.0, 22.0),
+                ImageNode::new(art.idle.clone()),
+                art,
+                Button,
+                CapturesPointer,
+                CloseButton,
+                Hint::new("Close (Esc)"),
             ));
             // Portrait in a bronze ring, hanging over the header.
             w.spawn((
@@ -270,7 +275,11 @@ fn spawn_window(mut commands: Commands, font: Res<UiFont>) {
 
 /// Keeps the keyboard away from gameplay while a modal is open. Runs after the chat input
 /// decided whether it is typing.
-fn capture_keyboard(mut modal: ResMut<Modal>, dialogue: Res<Dialogue>, mut captured: ResMut<UiInputCaptured>) {
+pub(crate) fn capture_keyboard(
+    mut modal: ResMut<Modal>,
+    dialogue: Res<Dialogue>,
+    mut captured: ResMut<UiInputCaptured>,
+) {
     modal.chat_typing = captured.keyboard;
     modal.dialogue = dialogue.is_open();
     if (modal.dialogue || modal.card) && !captured.keyboard {
@@ -376,12 +385,18 @@ fn choose(dialogue: &mut Dialogue, net: &Net, index: usize) {
     page.awaiting = Some(FOLLOW_UP_SECS);
 }
 
-fn keys(keys: Res<ButtonInput<KeyCode>>, modal: Res<Modal>, net: Res<Net>, mut dialogue: ResMut<Dialogue>) {
+fn keys(
+    keys: Res<ButtonInput<KeyCode>>,
+    esc: Res<EscAction>,
+    modal: Res<Modal>,
+    net: Res<Net>,
+    mut dialogue: ResMut<Dialogue>,
+) {
     if modal.chat_typing {
         return;
     }
     let Some(page) = dialogue.open.as_mut() else { return };
-    if keys.just_pressed(KeyCode::Escape) {
+    if *esc == EscAction::CloseDialogue {
         dialogue.open = None;
         return;
     }

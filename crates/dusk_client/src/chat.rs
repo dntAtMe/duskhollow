@@ -190,7 +190,21 @@ fn spawn_chat(
                 (ChatButton::Enter, Vec2::new(447.0, 196.0), Vec2::new(82.0, 40.0)),
             ] {
                 let art = ["idle", "hover", "press"].map(|s| img(&data, &assets, &format!("{}_{s}.png", button.art())));
-                p.spawn((abs(pos, size), Button, ImageNode::new(art[0].clone()), ButtonArt(art), button));
+                let hint = match button {
+                    ChatButton::Top => "Scroll to the oldest line",
+                    ChatButton::Up => "Scroll up",
+                    ChatButton::Down => "Scroll down",
+                    ChatButton::Bottom => "Scroll to the newest line",
+                    ChatButton::Enter => "Chat (Enter)",
+                };
+                p.spawn((
+                    abs(pos, size),
+                    Button,
+                    ImageNode::new(art[0].clone()),
+                    ButtonArt(art),
+                    button,
+                    crate::windows::Hint::new(hint),
+                ));
             }
         });
     log.system("Welcome to Duskhollow! Press Enter to chat, /help for commands.", SYSTEM);

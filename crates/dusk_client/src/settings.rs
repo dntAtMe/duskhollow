@@ -298,7 +298,7 @@ fn spawn_fps(mut commands: Commands, font: Res<crate::combat_ui::UiFont>) {
         TextFont { font: font.0.clone().into(), font_size: 13.0.into(), ..default() },
         TextColor(Color::srgb(0.85, 0.78, 0.6)),
         TextShadow { offset: Vec2::splat(1.0), color: Color::BLACK.with_alpha(0.9) },
-        Node { position_type: PositionType::Absolute, right: Val::Px(8.0), bottom: Val::Px(4.0), ..default() },
+        Node { position_type: PositionType::Absolute, right: Val::Px(10.0), bottom: Val::Px(48.0), ..default() },
         GlobalZIndex(500),
         Visibility::Hidden,
         FpsText,

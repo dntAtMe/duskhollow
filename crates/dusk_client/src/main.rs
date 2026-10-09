@@ -21,6 +21,7 @@ mod gaze;
 mod hud;
 mod iso;
 mod items_ui;
+mod journal;
 mod lights;
 mod map_render;
 mod menu;
@@ -37,6 +38,7 @@ mod spells_ui;
 mod state;
 mod ui_input;
 mod unit;
+mod windows;
 
 use bevy::prelude::*;
 use bevy::window::{MonitorSelection, PresentMode, WindowMode};
@@ -171,6 +173,7 @@ fn main() -> AppExit {
     .add_plugins((particles::ParticlesPlugin, lights::LightsPlugin, spell_particles::SpellParticlesPlugin))
     .add_plugins((items_ui::ItemsUiPlugin, paper_doll::PaperDollPlugin, gaze::GazePlugin, env_light::EnvLightPlugin))
     .add_plugins((dialogue::DialoguePlugin, director_ui::DirectorUiPlugin, feel::FeelPlugin))
+    .add_plugins((windows::WindowsPlugin, journal::JournalPlugin))
     .add_systems(Update, auto_screenshot.run_if(|| std::env::var_os("DUSK_SCREENSHOT").is_some()));
 
     if !menu_launch {
