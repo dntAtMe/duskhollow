@@ -283,8 +283,13 @@ fn rebuild(
             TextColor(BONE),
             Node { margin: UiRect::vertical(Val::Px(4.0)), ..default() },
         ));
-        for (k, v) in [("Given by", &q.giver), ("Where", &q.location), ("Reward", &q.reward)] {
-            if v.is_empty() {
+        let place = match q.status {
+            QuestStatus::Active => "Where",
+            QuestStatus::Ready => "Turn in",
+            QuestStatus::Done => "",
+        };
+        for (k, v) in [("Given by", &q.giver), (place, &q.location), ("Reward", &q.reward)] {
+            if v.is_empty() || k.is_empty() {
                 continue;
             }
             b.spawn(Node { column_gap: Val::Px(6.0), ..default() }).with_children(|r| {

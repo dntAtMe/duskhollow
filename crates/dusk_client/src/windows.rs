@@ -337,7 +337,7 @@ fn candidates(id: WindowId, size: Vec2, screen: Vec2) -> Vec<Vec2> {
     match id {
         WindowId::Character => vec![left, centre, right],
         WindowId::Inventory => vec![right, centre, left],
-        WindowId::Abilities => vec![Vec2::new(16.0, 70.0), right, centre],
+        WindowId::Abilities => vec![left, right, centre],
         WindowId::Journal => vec![centre, left, right],
         WindowId::Loot => vec![Vec2::new(screen.x / 2.0 - 200.0, 130.0), Vec2::new(screen.x / 2.0 + 60.0, 130.0)],
     }
@@ -390,14 +390,16 @@ fn focus_and_drag(
             .copied()
             .find(|id| roots.iter().any(|(w, rel, _)| w.0 == *id && rel.cursor_over()));
         if let Some(id) = hit {
-            windows.raise(id);
+            if windows.top() != Some(id) {
+                windows.raise(id);
+            }
             if handles.iter().any(|(i, h)| h.0 == id && *i == Interaction::Pressed) {
                 let pos = windows.pos.get(&id).copied().unwrap_or_default();
                 windows.dragging = Some((id, cursor - pos));
             }
         }
     }
-    if !mouse.pressed(MouseButton::Left) {
+    if !mouse.pressed(MouseButton::Left) && windows.dragging.is_some() {
         windows.dragging = None;
     }
     if let Some((id, grab)) = windows.dragging {
@@ -688,7 +690,13 @@ fn spawn_hint(mut commands: Commands, font: Res<UiFont>) {
         ))
         .with_children(|b| {
             b.spawn((Text::new(""), f(14.0), TextColor(GOLD), HintTitle));
-            b.spawn((Text::new(""), f(12.0), TextColor(BONE), HintBody));
+            b.spawn((
+                Text::new(""),
+                f(12.0),
+                TextColor(BONE),
+                Node { max_width: Val::Px(250.0), ..default() },
+                HintBody,
+            ));
         });
 }
 
@@ -706,7 +714,11 @@ fn hints(
 ) {
     let Ok((mut node, mut vis, computed)) = tip.single_mut() else { return };
     let now = time.elapsed_secs();
-    let over = hovered.iter().find(|(_, i, _, v)| **i == Interaction::Hovered && v.get());
+    // Debug aid: `DUSK_HINT=<title>` shows that hint as if hovered (cursor at the screen centre).
+    let forced = std::env::var("DUSK_HINT").ok();
+    let over = hovered.iter().find(|(_, i, h, v)| {
+        v.get() && (**i == Interaction::Hovered || forced.as_ref().is_some_and(|f| *f == h.title))
+    });
     let Some((e, _, hint, _)) = over else {
         *since = None;
         vis.set_if_neq(Visibility::Hidden);
@@ -728,7 +740,8 @@ fn hints(
         return;
     }
     let Ok(screen) = screen.single() else { return };
-    let Some(cursor) = screen.cursor_position() else { return };
+    let centre = Vec2::new(screen.width(), screen.height()) / 2.0;
+    let Some(cursor) = screen.cursor_position().or(forced.map(|_| centre)) else { return };
     let size = computed.size() * computed.inverse_scale_factor();
     let x = if cursor.x + 18.0 + size.x > screen.width() { cursor.x - size.x - 8.0 } else { cursor.x + 18.0 };
     let y = if cursor.y + 22.0 + size.y > screen.height() { cursor.y - size.y - 6.0 } else { cursor.y + 22.0 };

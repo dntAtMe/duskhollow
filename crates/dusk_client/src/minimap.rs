@@ -148,6 +148,7 @@ fn spawn_minimap(
                 Button,
                 ImageNode::new(art[0].clone()),
                 ZoomButton(art),
+                crate::windows::Hint::new("Zoom").with_body("Mouse wheel over the map, or numpad + / -"),
             ));
         });
 }

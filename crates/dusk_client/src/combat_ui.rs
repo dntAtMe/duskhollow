@@ -441,8 +441,8 @@ fn spawn_hud(mut commands: Commands, font: Res<UiFont>) {
             UiPosition::CENTER,
             RadialGradientShape::FarthestCorner,
             vec![
-                ColorStop::new(Color::NONE, Val::Percent(55.0)),
-                ColorStop::new(Color::srgba(0.55, 0.02, 0.01, 0.55), Val::Percent(100.0)),
+                ColorStop::new(Color::NONE, Val::Percent(64.0)),
+                ColorStop::new(Color::srgba(0.55, 0.02, 0.01, 0.4), Val::Percent(100.0)),
             ],
         )),
         Visibility::Hidden,
@@ -466,7 +466,11 @@ fn low_health_warning(
     mut vignette: Query<(&mut Visibility, &mut BackgroundGradient), With<LowHealthVignette>>,
 ) {
     let Ok((mut vis, mut grad)) = vignette.single_mut() else { return };
-    let ratio = state.hp.max(0) as f32 / state.max_hp.max(1) as f32;
+    let mut ratio = state.hp.max(0) as f32 / state.max_hp.max(1) as f32;
+    // Debug aid: `DUSK_LOW_HP_TEST=1` shows the warning at 15 % health.
+    if std::env::var_os("DUSK_LOW_HP_TEST").is_some() {
+        ratio = 0.15;
+    }
     if state.dead || state.max_hp <= 0 || ratio >= LOW_HEALTH {
         vis.set_if_neq(Visibility::Hidden);
         return;
@@ -475,10 +479,10 @@ fn low_health_warning(
     // Faster and stronger the closer to death.
     let urgency = 1.0 - ratio / LOW_HEALTH;
     let beat = (time.elapsed_secs() * (3.0 + 3.0 * urgency)).sin() * 0.5 + 0.5;
-    let a = 0.25 + 0.35 * urgency + 0.25 * beat;
+    let a = 0.15 + 0.2 * urgency + 0.15 * beat;
     if let Some(Gradient::Radial(r)) = grad.0.first_mut() {
         if let Some(stop) = r.stops.last_mut() {
-            stop.color = Color::srgba(0.55, 0.02, 0.01, a.min(0.85));
+            stop.color = Color::srgba(0.55, 0.02, 0.01, a.min(0.5));
         }
     }
 }

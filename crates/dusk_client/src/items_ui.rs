@@ -891,7 +891,7 @@ fn refresh_tabs(
                     p.spawn((
                         Node {
                             width: Val::Percent(100.0),
-                            height: Val::Px(28.0),
+                            height: Val::Px(24.0),
                             flex_shrink: 0.0,
                             align_items: AlignItems::Center,
                             column_gap: Val::Px(7.0),
@@ -905,7 +905,7 @@ fn refresh_tabs(
                     ))
                     .with_children(|r| {
                         r.spawn((
-                            Node { width: Val::Px(24.0), height: Val::Px(24.0), flex_shrink: 0.0, ..default() },
+                            Node { width: Val::Px(20.0), height: Val::Px(20.0), flex_shrink: 0.0, ..default() },
                             ImageNode::new(img(&data, &assets, &t.icon)),
                         ));
                         r.spawn((Text::new(t.name.clone()), f(13.0), TextColor(BONE)));
