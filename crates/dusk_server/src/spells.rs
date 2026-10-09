@@ -1,6 +1,6 @@
 //! Spells: cast validation, cast bars, projectiles, effects and auras, NPC casting.
 //!
-//! Field semantics recovered from the data (see docs/combat.md):
+//! Effect fields (see docs/combat.md):
 //! - SchoolDamage / Heal: amount = `effectN_scale_formula` (with `value` = data2)
 //! - WeaponDamage: weapon percent = formula (with `value` = data2)
 //! - ApplyAura: data1 = aura type, data2 = misc (mechanic / school mask / stat), data3 = value

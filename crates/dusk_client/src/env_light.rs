@@ -53,7 +53,7 @@ const OPEN_EYE: Vec3 = Vec3::new(1.0, 0.8, 0.78);
 const SHADE: Vec3 = Vec3::new(0.74, 0.64, 0.8);
 const SHELTER: Vec3 = Vec3::new(0.52, 0.44, 0.58);
 const FIRE: Vec3 = Vec3::new(1.0, 0.84, 0.64);
-/// Fire reach in cells per unit of `sprite_light` scale.
+/// Fire reach in cells per unit of a `sprite_fx.txt` light scale.
 const FIRE_REACH: f32 = 3.8;
 
 #[derive(Resource, Default)]

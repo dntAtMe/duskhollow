@@ -62,7 +62,12 @@ impl Check {
     }
 
     fn finish(self) {
-        assert!(self.problems.is_empty(), "{} problems:\n{}", self.problems.len(), self.problems.into_iter().collect::<Vec<_>>().join("\n"));
+        assert!(
+            self.problems.is_empty(),
+            "{} problems:\n{}",
+            self.problems.len(),
+            self.problems.into_iter().collect::<Vec<_>>().join("\n")
+        );
     }
 }
 

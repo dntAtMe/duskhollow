@@ -23,9 +23,8 @@ pub fn depth(cell: Vec2) -> f32 {
     1.0 + (cell.x + cell.y) * 0.5
 }
 
-/// Sprite-sheet direction for a unit orientation, as in `ClientUnit::computeDirection`
-/// (0x5548f0). `orientation` is radians of `atan2(dy, dx)` in *cell* space (same as
-/// `npc.orientation` in game.db). Sheet directions are 0=W 1=NW 2=N 3=NE 4=E 5=SE 6=S 7=SW.
+/// Sprite-sheet direction for a unit orientation. `orientation` is radians of `atan2(dy, dx)`
+/// in *cell* space (same as the orientation column of `.spawns`). Sheet directions are 0=W 1=NW 2=N 3=NE 4=E 5=SE 6=S 7=SW.
 pub fn direction_from_orientation(orientation: f32) -> u8 {
     use std::f32::consts::{FRAC_PI_4, FRAC_PI_8, TAU};
     const DIRS: [u8; 8] = [5, 6, 7, 0, 1, 2, 3, 4];

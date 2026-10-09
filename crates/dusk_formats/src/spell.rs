@@ -1,10 +1,9 @@
-//! `spell_template` rows and the designer formula language.
+//! Spell templates (`data/spells.txt`) and the formula language.
 //!
 //! Formulas (`mana_formula`, `effectN_scale_formula`, `duration_formula`) are
 //! arithmetic over `+ - * /` and parentheses with the variables `clvl` (caster level),
 //! `splvl` (spell level), `value` (the effect's base value) and the caster's
-//! attributes `STR AGI WIL INT CUR` (from the original client's evaluator, which
-//! substitutes those tokens before evaluating). See `scripts/text/STF_*.txt`.
+//! attributes `STR AGI WIL INT CUR` (substituted before evaluating).
 
 pub mod effect {
     pub const SCHOOL_DAMAGE: i64 = 1;
@@ -84,14 +83,14 @@ pub struct SpellTemplate {
     pub duration_formula: String,
     /// Projectile speed (0 = instant).
     pub speed: i64,
-    /// Original units; ~64 per cell.
+    /// Range units; 64 per cell ([`RANGE_UNITS_PER_CELL`]).
     pub range: i64,
     pub interval_ms: i64,
     pub required_equipment: i64,
     pub abilities_tab: i64,
 }
 
-/// Original range units per map cell (melee 130 ~ 2 cells, spells 610 ~ 9.5 cells).
+/// Range units per map cell (melee 130 ~ 2 cells, spells 610 ~ 9.5 cells).
 pub const RANGE_UNITS_PER_CELL: f32 = 64.0;
 
 impl SpellTemplate {

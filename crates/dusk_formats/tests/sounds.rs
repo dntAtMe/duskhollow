@@ -2,7 +2,7 @@
 //! sounds and cues, spell kit sounds, sprite_sounds.txt, map music, the soundtrack, NPC voices)
 //! is one of our files with a valid container.
 
-use dusk_formats::{content::sounds, assets_root, sound::resolve_sound};
+use dusk_formats::{assets_root, content::sounds, sound::resolve_sound};
 use std::io::Read;
 use std::path::Path;
 

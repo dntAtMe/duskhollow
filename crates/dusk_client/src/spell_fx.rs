@@ -162,7 +162,7 @@ fn spawn_flipbook(
     let canvas = anim.size as f32 * scale;
     let expr = kit_anim.y.replace("height", &format!("({unit_height})"));
     let y_off = eval_formula(&expr, &FormulaVars::default()).unwrap_or(0.0) as f32;
-    // Original (y-down): canvas bottom = feet + y_off, canvas left = feet - x.
+    // Kit offsets are y-down: canvas bottom = feet + y_off, canvas left = feet - x.
     let origin = Vec2::new(feet.x - kit_anim.x as f32, feet.y + canvas - y_off);
     let z = if kit_anim.blend == 0 && depth < 0.0 { 950.0 } else { depth.max(0.0) + 0.2 };
     let mut sprite = Sprite { image: frames[0].clone(), ..default() };

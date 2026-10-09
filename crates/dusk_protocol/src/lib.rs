@@ -1,4 +1,4 @@
-//! Client <-> server protocol. Our own design (not the original wire format):
+//! Client <-> server protocol:
 //! `u32` little-endian length prefix + postcard-encoded message, over TCP.
 //!
 //! Positions are in map cell units, orientation is cell-space radians
@@ -8,7 +8,7 @@ pub mod net;
 
 use serde::{Deserialize, Serialize};
 
-/// Same port the original client used.
+/// Default TCP port.
 pub const DEFAULT_PORT: u16 = 16383;
 /// Bump on any incompatible message change.
 pub const PROTOCOL_VERSION: u32 = 7;
@@ -16,7 +16,7 @@ pub const PROTOCOL_VERSION: u32 = 7;
 pub const MAX_FRAME: usize = 1 << 20;
 
 pub type EntityId = u64;
-/// `spell_template.entry`
+/// Spell entry (`data/spells.txt`).
 pub type SpellId = u32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -62,7 +62,7 @@ pub enum ClientMsg {
     UnequipItem {
         slot: u8,
     },
-    /// Use (potions: cast `item_template.spell_1`) one item from a bag stack.
+    /// Use (potions: cast the item's first `spell=`) one item from a bag stack.
     UseItem {
         bag_slot: u8,
     },
@@ -94,9 +94,9 @@ pub enum ClientMsg {
 /// One item stack. Stats are derived from the template (+ affix) with `dusk_formats::item`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
-    /// `item_template.entry`
+    /// Item entry (`data/items.txt` or a generated grid entry).
     pub entry: u32,
-    /// `affix_template.entry`, 0 = none.
+    /// Affix entry (`data/affixes.txt`), 0 = none.
     pub affix: u32,
     pub count: u32,
 }
@@ -121,7 +121,7 @@ pub enum EntityKind {
     Player {
         name: String,
     },
-    /// `npc_template.entry`
+    /// NPC template entry (`data/npc_templates.txt`).
     Npc {
         entry: i64,
     },
@@ -140,7 +140,7 @@ pub struct EntityInfo {
     pub dead: bool,
 }
 
-/// Outcome of an attack; names/order follow the original client's enum (1..=8).
+/// Outcome of an attack.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HitResult {
     Hit,
@@ -284,7 +284,7 @@ pub enum ServerMsg {
         equipment: Vec<Option<Item>>,
         gold: u32,
     },
-    /// Visible gear of a player: `item_template.entry` per equipment slot (0 = empty).
+    /// Visible gear of a player: item entry per equipment slot (0 = empty).
     /// Sent after `Spawn` and whenever it changes; drives the paper doll.
     Appearance {
         id: EntityId,

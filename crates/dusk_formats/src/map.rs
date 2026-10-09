@@ -195,7 +195,7 @@ impl MapFile {
 
         let terrain_tex_count = r.u32()? as usize;
         let terrain_textures = (0..terrain_tex_count).map(|_| r.cstr()).collect::<Result<Vec<_>, _>>()?;
-        // Older maps stop early; the original loader reads missing sections as empty.
+        // Maps may stop early; missing sections read as empty.
         let pairs = |r: &mut Reader| -> Result<Vec<(u32, u32)>, MapError> {
             if r.pos == r.data.len() {
                 return Ok(Vec::new());

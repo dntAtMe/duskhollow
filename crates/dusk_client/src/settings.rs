@@ -236,7 +236,7 @@ fn apply(
     let startup = !*first;
     *first = true;
     if startup && !settings.audio_from_file {
-        // No volumes in the file: start from what the audio module chose (config.ini, env).
+        // No volumes in the file: start from what the audio module chose (env).
         let s = settings.bypass_change_detection();
         s.music = (audio.music_volume * 100.0).round() as u32;
         s.effects = (audio.sfx_volume * 100.0).round() as u32;

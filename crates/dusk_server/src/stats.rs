@@ -1,8 +1,7 @@
 //! Unit stats and the melee formula.
 //!
-//! The original server is not available, so rules follow the in-game stat
-//! descriptions (`scripts/text/stats/*.txt`) wherever they say something concrete;
-//! everything marked DESIGN is our own choice where the data gives no answer.
+//! Rules follow the in-game stat descriptions (tooltips) wherever they say something concrete;
+//! everything marked DESIGN is a balance choice.
 
 use bevy::prelude::*;
 use dusk_formats::content::types::{ClassStats, NpcTemplate};

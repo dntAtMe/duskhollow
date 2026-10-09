@@ -1,5 +1,5 @@
 //! Spell UI: action bar, cast bar, cooldowns, tooltips, the Abilities window and aura icons.
-//! Art is the original `content/interface` set.
+//! Art: `content/ui/` (tools/artgen/ui.py).
 
 use crate::{
     combat_ui::{FloatKind, FloatingText, UiFont},
@@ -756,7 +756,7 @@ fn secs(ms: f64) -> String {
     }
 }
 
-/// Replaces `$E1min`, `$E1max`, `$E1D3`, `$DUR`, `$INVL` like the original tooltips
+/// Replaces `$E1min`, `$E1max`, `$E1D3`, `$DUR`, `$INVL` in tooltips
 /// (whose numbers came from the server; we compute them with the same formulas).
 pub fn describe(t: &SpellTemplate, state: &PlayerState) -> String {
     let mut text = t.description.clone();

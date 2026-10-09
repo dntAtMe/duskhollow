@@ -1,8 +1,8 @@
-//! Unit frames on the original art (player top-left, target next to it), the XP bar,
+//! Unit frames (player top-left, target next to it), the XP bar,
 //! circular portraits and the HUD options.
 //!
-//! Frame geometry comes from `UnitFrame::setFrameStyle` (`FUN_0052f460`): style 1 is the
-//! player frame (`unit_frame.png`), style 2 the mirrored target frame (`unit_frame_reverse.png`).
+//! Two frame styles: the player frame (`unit_frame.png`) and the mirrored target frame
+//! (`unit_frame_reverse.png`).
 //! See `docs/ui.md`.
 
 use crate::{
@@ -580,7 +580,7 @@ pub const HOSTILE_RED: Color = Color::srgb(0.95, 0.25, 0.2);
 pub const NEUTRAL_YELLOW: Color = Color::srgb(0.95, 0.85, 0.25);
 pub const FRIENDLY_GREEN: Color = Color::srgb(0.35, 0.9, 0.35);
 
-/// Name colour for an `npc_template.faction`.
+/// Name colour for an NPC template `faction`.
 pub fn faction_color(f: i64) -> Color {
     match f {
         faction::HOSTILE => HOSTILE_RED,

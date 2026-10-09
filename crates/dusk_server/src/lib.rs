@@ -22,7 +22,7 @@ pub const TICK_HZ: f64 = 20.0;
 pub struct ServerConfig {
     /// The asset root ([`dusk_formats::assets_root`]).
     pub assets: PathBuf,
-    /// Spawn players on this map instead of the original start point.
+    /// Spawn players on this map instead of the default map (`data/maps.txt`).
     pub start_map: Option<String>,
 }
 

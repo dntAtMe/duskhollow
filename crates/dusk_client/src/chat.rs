@@ -1,4 +1,4 @@
-//! Chat panel on the original art (`game_chat_*`), bottom-left: scrollback, `Enter` to type and
+//! Chat panel (`game_chat_*` art), bottom-left: scrollback, `Enter` to type and
 //! send (`ClientMsg::Chat`), system lines (level up, deaths, unknown commands) and speech bubbles
 //! (`saybox_*` 9-slice) over the speaker.
 //!

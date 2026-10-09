@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-/// `item_template.equip_type` (names from the client's `EquipType` enum strings / item names).
+/// Item `equip_type`.
 pub mod equip {
     /// `equip_type=` names in the data files.
     pub const NAMES: [(&str, i64); 11] = [
@@ -37,7 +37,7 @@ pub mod equip {
     pub const RANGED: i64 = 11;
 }
 
-/// `item_template.weapon_type` (from item names/models: "Axe"/hand_axe, "Shortbow"...).
+/// Item `weapon_type`.
 pub mod weapon {
     pub const AXE: i64 = 1;
     pub const BOW: i64 = 2;
@@ -61,7 +61,7 @@ pub mod weapon {
     ];
 }
 
-/// `item_template.quality`. Loot chances in `npc_template` are named green/blue/gold/purple,
+/// Item `quality`. NPC loot chances (`loot_chances=`) are green/blue/gold/purple,
 /// which are qualities 3..=6; 2 is plain (all starting gear), 1 is grey junk.
 pub mod quality {
     pub const JUNK: i64 = 1;
@@ -185,7 +185,7 @@ pub mod stat {
         }
     }
 
-    /// Tooltip phrasing: the original has "rating", plain and "skill" variants.
+    /// Tooltip phrasing: "rating", plain and "skill" variants.
     pub fn equip_line(stat: i64, amount: i32) -> String {
         match stat {
             15..=19 | 21..=24 => format!("Equip: Increases your {} rating by {amount}.", name(stat)),
@@ -288,8 +288,7 @@ impl ItemTemplate {
     }
 }
 
-/// `item_template.flags`: names from the client's `ItemFlag_*` strings; bit order assumed to
-/// follow the string order (scrolls carry 96 = Skillbook | GoldValueScales, which fits).
+/// Item `flags` bits.
 pub mod flags {
     pub const NO_SAVE: i64 = 1;
     pub const NO_TRADE: i64 = 2;
@@ -324,7 +323,7 @@ impl Affix {
     }
 }
 
-/// "Undying Shiv of the Dolphin". Mirrors the client's " of the " / " of " strings.
+/// "Undying Shiv of the Dolphin": prefix affixes before the name, noun affixes after " of the " / " of ".
 pub fn display_name(t: &ItemTemplate, affix: Option<&Affix>) -> String {
     let Some(a) = affix else { return t.name.clone() };
     let (pre, noun) = a.parts();

@@ -1,6 +1,6 @@
 //! Loads a `.map` file on request and spawns its terrain and tile sprites.
 //! Units are not touched here; whoever requested the map populates it after
-//! [`MapLoaded`] (offline: from game.db, online: from the server).
+//! [`MapLoaded`] (from the server, embedded when offline).
 
 use crate::{data::GameData, iso, lights, particles::FxMaterial};
 use bevy::prelude::*;
@@ -25,7 +25,7 @@ pub struct CurrentMap {
     /// Set this to load (or switch to) a map by name.
     pub requested: Option<String>,
     pub name: String,
-    /// `map.id` in game.db, if the map is listed there.
+    /// Map id of `data/maps.txt`, if the map is listed there.
     pub id: Option<i64>,
     pub grid: WalkGrid,
     /// Row-major: cell has a ground tile or terrain under it.
@@ -129,7 +129,7 @@ fn load_map(
             };
             let texture = map.textures.get(layer.texture as usize).map(String::as_str).unwrap_or_default();
             let resolved = textures.get(layer.texture as usize).and_then(Option::as_ref);
-            // Sprites without a texture get hotspot (1, 1) in `Sprite::renderScript`.
+            // Sprites without a texture (`.psi` effect sprites) get hotspot (1, 1).
             let hotspot = resolved.map_or(Vec2::ONE, |(_, pivot)| *pivot);
             effects += lights::spawn_sprite_effects(
                 &mut commands,

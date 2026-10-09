@@ -2,7 +2,7 @@
 //! layer `scripts/player/<model>.txt` on top of the base body (`custom_body`).
 //!
 //! Driven by `ServerMsg::Appearance` (item entries per equipment slot) for every player,
-//! including ourselves; templates come from the client's item table, so the server only
+//! including ourselves; templates come from the client's item data, so the server only
 //! sends numbers.
 
 use crate::{
@@ -33,7 +33,7 @@ pub const PLAYER_DIR: &str = "player";
 pub const PLAYER_BODY: &str = "custom_body";
 
 /// DESIGN: gear draw order, back to front (legs under boots under chest under gloves; head,
-/// shield and weapon on top). The original's per-direction ordering is not recovered.
+/// shield and weapon on top), the same in every direction.
 const GEAR_ORDER: [usize; 7] =
     [slot::LEGS, slot::FEET, slot::CHEST, slot::HANDS, slot::HEAD, slot::OFFHAND, slot::WEAPON];
 

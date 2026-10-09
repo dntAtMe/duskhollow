@@ -1,4 +1,4 @@
-//! Minimap, top-right on the original `minimap.png` frame: a second camera renders the live
+//! Minimap, top-right on the `minimap.png` frame: a second camera renders the live
 //! world around the player into a texture (so it matches whatever map is loaded), faded at the
 //! edges with `miniamp_decal.png` and overlaid with unit dots (`minimap_enemy/neutral/friendly/
 //! dead.png`) and a player arrow. Mouse wheel over it, numpad `+`/`-` or the button under it zoom.
@@ -44,7 +44,7 @@ pub fn overlay_layer() -> RenderLayers {
     RenderLayers::layer(OVERLAY_LAYER)
 }
 
-/// World pixels per minimap pixel, per zoom level (`MinimapZoom` in config.ini picks the start).
+/// World pixels per minimap pixel, per zoom level (`HudConfig::minimap_zoom` picks the start).
 const ZOOM_LEVELS: [f32; 5] = [3.0, 4.5, 6.0, 9.0, 13.0];
 /// The texture is rendered at this multiple of its display size (cheap anti-aliasing).
 const SUPERSAMPLE: f32 = 2.0;

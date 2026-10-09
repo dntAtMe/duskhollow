@@ -1,5 +1,5 @@
-//! Name plates over units: name (coloured by faction) and the original `nameplate_bg` /
-//! `nameplate_hp` bar. Which parts show follows the `config.ini` options in [`HudConfig`]:
+//! Name plates over units: name (coloured by faction) and the `nameplate_bg` /
+//! `nameplate_hp` bar. Which parts show follows [`HudConfig`]:
 //! enemy bars and NPC/player names on by default, friendly bars and our own bar off.
 //! The bar also appears on the current target and on damaged units (except our own).
 

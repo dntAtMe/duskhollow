@@ -1,5 +1,5 @@
 //! Animated 8-directional units (NPCs and the paper-doll player) driven by
-//! the original sprite scripts. Name plates / health bars are in `nameplates.rs`.
+//! sprite scripts (`scripts/npc`, `scripts/player`). Name plates / health bars are in `nameplates.rs`.
 
 use crate::{data::GameData, iso};
 use bevy::prelude::*;
@@ -114,7 +114,7 @@ impl Unit {
     }
 
     /// Seconds until the current attack's blow lands (`hit=` in the sprite script), 0 when not
-    /// attacking, already past it, or the animation has no hit time (original art).
+    /// attacking, already past it, or the animation has no hit time.
     pub fn impact_in(&self) -> f32 {
         let Some((name, t, _)) = self.action else { return 0.0 };
         self.hit_ms(name).map_or(0.0, |h| ((h - t) / 1000.0).max(0.0))
@@ -292,7 +292,7 @@ pub fn spawn_unit(
 /// NPC sprite scripts: `scripts/npc/<model>.txt` (tools/artgen/creatures.py).
 const NPC_DIR: &str = "npc";
 
-/// Spawns an NPC by `npc_template.entry` at a cell position.
+/// Spawns an NPC by template entry at a cell position.
 pub fn spawn_npc(
     commands: &mut Commands,
     data: &GameData,

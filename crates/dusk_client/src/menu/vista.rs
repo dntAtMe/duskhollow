@@ -60,7 +60,7 @@ pub(super) fn request_map(
     if exists && map.name != VISTA_MAP && map.requested.is_none() {
         map.request(VISTA_MAP);
     }
-    // Legacy zones may have left the darkness on.
+    // The previous map may have left the darkness on.
     *brightness = crate::lights::Brightness::default();
 }
 

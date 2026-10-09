@@ -145,7 +145,7 @@ pub fn spawn_sprite_effects(
         n += 1;
     }
     for l in data.sprite_lights.get(&key).into_iter().flatten() {
-        // Cell render position = sprite position - (0, 16) in the original's y-down space.
+        // Cell render position = sprite position - (0, 16) in y-down screen space.
         let at = pos + Vec2::new(l.x as f32, 16.0 - l.y as f32);
         let ground = at + Vec2::new(16.0, -8.0);
         commands.spawn((MapTile, DarknessHole { scale: l.scale }, Transform::from_xyz(ground.x, ground.y, 0.0)));

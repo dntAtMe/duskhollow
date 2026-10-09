@@ -134,7 +134,7 @@ const GREY: Color = Color::srgb(0.75, 0.72, 0.66);
 const RED: Color = Color::srgb(1.0, 0.3, 0.25);
 const BONE: Color = Color::srgb(0.88, 0.83, 0.72);
 
-/// Tooltip/name colour per `item_template.quality`.
+/// Tooltip/name colour per item `quality`.
 pub fn quality_color(q: i64) -> Color {
     match q {
         quality::JUNK => Color::srgb(0.62, 0.62, 0.62),
