@@ -44,18 +44,24 @@ def trim(img: np.ndarray):
     return img[y0:y1, x0:x1], (x0, y0)
 
 
-def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width: int = 1024):
+def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width: int = 1024, hits=None):
     """Shelf-pack trimmed frames into one sheet (custom_assets/content/custom/<image_name>)
-    and write the sprite script to `script_path`."""
+    and write the sprite script to `script_path`. Identical frames (holds, empty smear frames)
+    share one rect. `hits`: {anim: frame} where the blow lands -> `hit=<ms>` in the script."""
     entries = []
     for name, *_ in anims:
         for f, dirs in enumerate(renders[name]):
             for d, img in enumerate(dirs):
                 cropped, (x0, y0) = trim(img)
                 entries.append((name, f, d, cropped, (foot[0] - x0, foot[1] - y0)))
+    unique, alias = {}, {}
+    for name, f, d, img, pivot in entries:
+        key = (img.shape, img.tobytes(), pivot)
+        alias[(name, f, d)] = unique.setdefault(key, (name, f, d))
+    firsts = {v for v in unique.values()}
     x = y = row_h = 0
     placed = []
-    for e in sorted(entries, key=lambda e: -e[3].shape[0]):
+    for e in sorted((e for e in entries if e[:3] in firsts), key=lambda e: -e[3].shape[0]):
         h, w = e[3].shape[:2]
         if x + w > sheet_width:
             x, y, row_h = 0, y + row_h + 1, 0
@@ -68,6 +74,8 @@ def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width
         h, w = img.shape[:2]
         sheet[py : py + h, px : px + w] = img
         rects[(name, f, d)] = (px, py, w, h, pivot)
+    for k, first in alias.items():
+        rects[k] = rects[first]
 
     img_dir = OUT / "content" / "custom"
     img_dir.mkdir(parents=True, exist_ok=True)
@@ -77,6 +85,8 @@ def export(renders, anims, foot, image_name: str, script_path: Path, sheet_width
     lines = [f"image={image_name}", ""]
     for name, _, frames, duration, kind in anims:
         lines += [f"[{name}]", f"frames={frames}", f"duration={duration}ms", f"type={kind}"]
+        if hits and name in hits:
+            lines.append(f"hit={hits[name] * duration // frames}ms")
         for f in range(frames):
             for d in range(8):
                 px, py, w, h, (pvx, pvy) = rects[(name, f, d)]

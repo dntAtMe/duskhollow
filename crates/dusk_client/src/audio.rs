@@ -685,6 +685,7 @@ fn combat_sounds(
     mut timers: Local<VoiceTimers>,
     mut events: MessageReader<CombatNet>,
     npcs: Query<&Npc>,
+    units: Query<&Unit>,
     mut out: MessageWriter<PlaySfx>,
 ) {
     let now = time.elapsed_secs();
@@ -724,7 +725,9 @@ fn combat_sounds(
                     HitResult::Resist | HitResult::Immune => None,
                 };
                 if let (Some(s), Some(t)) = (sound, tgt) {
-                    out.write(PlaySfx::at_unit(s, t));
+                    // Lands with the swing's hit frame (`Unit::impact_in`).
+                    let delay = att.and_then(|a| units.get(a).ok()).map_or(0.0, |u| u.impact_in());
+                    out.write(PlaySfx { delay, ..PlaySfx::at_unit(s, t) });
                 }
                 if let Some(a) = att.filter(|_| att_npc) {
                     let engaged = timers.last_swing.insert(a, now).is_some_and(|t| now - t < AGGRO_GAP);

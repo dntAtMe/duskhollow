@@ -127,20 +127,31 @@ fn main() -> AppExit {
 }
 
 /// Debug aid: `DUSK_SCREENSHOT=out.png` saves a screenshot after `DUSK_SCREENSHOT_AT` seconds
-/// (default 4), then exits.
+/// (default 4), then exits. `DUSK_SCREENSHOT_BURST=n` takes n shots `DUSK_SCREENSHOT_STEP` seconds
+/// apart (default 0.1) as `<name>_<i>.png` instead (animation checks).
 fn auto_screenshot(
     mut commands: Commands,
     time: Res<Time>,
     mut taken: Local<Option<f32>>,
+    mut shots: Local<u32>,
     mut exit: MessageWriter<AppExit>,
 ) {
     use bevy::render::view::screenshot::{Screenshot, save_to_disk};
+    let env = |k: &str, d: f32| std::env::var(k).ok().and_then(|s| s.parse().ok()).unwrap_or(d);
     let now = time.elapsed_secs();
+    let burst = env("DUSK_SCREENSHOT_BURST", 1.0) as u32;
+    let at = env("DUSK_SCREENSHOT_AT", 4.0) + *shots as f32 * env("DUSK_SCREENSHOT_STEP", 0.1);
     match *taken {
-        None if now > std::env::var("DUSK_SCREENSHOT_AT").ok().and_then(|s| s.parse().ok()).unwrap_or(4.0) => {
-            let path = std::env::var("DUSK_SCREENSHOT").unwrap();
+        None if now > at => {
+            let mut path = std::env::var("DUSK_SCREENSHOT").unwrap();
+            if burst > 1 {
+                path = path.replace(".png", &format!("_{}.png", *shots));
+            }
             commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
-            *taken = Some(now);
+            *shots += 1;
+            if *shots >= burst {
+                *taken = Some(now);
+            }
         }
         Some(t) if now > t + 1.0 => {
             exit.write(AppExit::Success);

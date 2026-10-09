@@ -196,16 +196,19 @@ fn receive(
                 let att = net.entities.get(&attacker).copied();
                 let tgt = net.entities.get(&target).copied();
                 let tgt_pos = tgt.and_then(|t| units.get(t).ok()).map(|(u, _)| (u.pos, u.height * u.scale));
+                // Reactions wait for the attack's hit frame (`feel::ShowAfter`, `Unit::impact_in`).
+                let mut impact = 0.0;
                 if let Some(Ok((mut u, _))) = att.map(|a| units.get_mut(a)) {
                     if let Some((tp, _)) = tgt_pos {
                         u.dir = iso::direction_from_orientation(iso::orientation_of(tp - u.pos));
                     }
                     u.play_action("swing");
+                    impact = u.impact_in();
                 }
                 if let Some(Ok((mut u, _))) = tgt.map(|t| units.get_mut(t)) {
                     match result {
-                        HitResult::Hit | HitResult::Crit if !u.is_acting() => u.play_action("hit"),
-                        HitResult::Block | HitResult::Parry if !u.is_acting() => u.play_action("block"),
+                        HitResult::Hit | HitResult::Crit if !u.is_acting() => u.play_action_after("hit", impact),
+                        HitResult::Block | HitResult::Parry if !u.is_acting() => u.play_action_after("block", impact),
                         _ => {}
                     }
                 }
@@ -222,7 +225,7 @@ fn receive(
                         HitResult::Block | HitResult::Parry => format!("{amount} ({result:?})"),
                         other => format!("{other:?}"),
                     };
-                    commands.spawn(FloatingText::bundle(text, kind, pos, height));
+                    commands.spawn((FloatingText::bundle(text, kind, pos, height), crate::feel::ShowAfter(impact)));
                 }
             }
             ServerMsg::Health { id, hp, max_hp } => {

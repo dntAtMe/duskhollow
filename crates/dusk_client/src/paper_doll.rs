@@ -9,7 +9,7 @@ use crate::{
     data::GameData,
     items_ui::ItemDb,
     net::Net,
-    unit::{Unit, UnitLayer},
+    unit::{SMEAR, Unit, UnitLayer},
 };
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
@@ -32,6 +32,9 @@ const BODY: &[&str] = &["default_legs", "default_feet", "default_chest", "defaul
 /// shield and weapon on top). The original's per-direction ordering is not recovered.
 const GEAR_ORDER: [usize; 7] =
     [slot::LEGS, slot::FEET, slot::CHEST, slot::HANDS, slot::HEAD, slot::OFFHAND, slot::WEAPON];
+
+/// Weapon models (name fragments) swung two-handed: they favour the overhead chop.
+const HEAVY_WEAPONS: [&str; 6] = ["greatsword", "zweihander", "maul", "battle_axe", "infantry_axe", "greatstaff"];
 
 /// Last known appearance per server id (survives the unit being respawned locally).
 #[derive(Resource, Default)]
@@ -81,6 +84,7 @@ fn rebuild_layers(
     assets: Res<AssetServer>,
     changed: Query<(Entity, &Gear, Option<&Children>), Changed<Gear>>,
     layers: Query<(), With<UnitLayer>>,
+    mut units: Query<&mut Unit>,
 ) {
     let Some(items) = items else { return };
     // Our generated art has its own layers for the item models it covers; others are skipped
@@ -92,7 +96,17 @@ fn rebuild_layers(
                 commands.entity(*child).despawn();
             }
         }
-        for (i, name) in layer_models(&gear.0, &items, data.custom_art).iter().enumerate() {
+        let mut names = layer_models(&gear.0, &items, data.custom_art);
+        if let Ok(mut u) = units.get_mut(e) {
+            u.heavy_weapon = names.iter().any(|n| HEAVY_WEAPONS.iter().any(|h| n.contains(h)));
+        }
+        // Weapon smears (our art) go over everything.
+        if data.custom_art && SMEAR {
+            let smears: Vec<String> =
+                names.iter().map(|n| format!("{n}_smear")).filter(|s| data.sprite_script(dir, s).is_some()).collect();
+            names.extend(smears);
+        }
+        for (i, name) in names.iter().enumerate() {
             let Some(script) = data.sprite_script(dir, name) else { continue };
             let Some(path) = data.asset_path(&script.image) else { continue };
             let order = i as f32 * 0.001;

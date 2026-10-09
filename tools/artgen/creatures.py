@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import character  # noqa: E402
 import sheet  # noqa: E402
+import smear  # noqa: E402
 import vox  # noqa: E402
 from vox import Bone, Model, Prim, rot_x, rot_y, rot_z  # noqa: E402
 
@@ -183,16 +184,22 @@ def critter_anims(legs: int):
         return leg_pose(legs, p, 22, 25, {"abdomen": rot_y(R(4 * math.sin(2 * p)))}), (0, 0, 0.015 * abs(math.sin(p))), None
 
     def bite(t):
-        k = math.sin(t * math.pi)
+        # rear up with the fangs spread (held), stab down and forward on frame 2, ease back
+        u = t * 5
+        keys = [(0, -0.5), (1, -0.75), (2, 1.0), (3, 0.85), (5, 0.0)]
+        k = next(a + (b - a) * (u - f0) / (f1 - f0) for (f0, a), (f1, b) in zip(keys, keys[1:]) if u <= f1)
+        r, s = max(0.0, -k), max(0.0, k)
+        spread = min(1.0, r * 1.6) if u < 2 else 0.0
         rot = leg_pose(legs, 0, 0, 0, {
-            "body": rot_y(R(-14 * k)),
-            "head": rot_y(R(-10 * k)),
-            "fang_l": rot_z(R(-25 * k)),
-            "fang_r": rot_z(R(25 * k)),
+            "body": rot_y(R(-22 * r + 12 * s)),
+            "head": rot_y(R(-12 * r + 12 * s)),
+            "fang_l": rot_z(R(-35 * spread)),
+            "fang_r": rot_z(R(35 * spread)),
         })
-        rot["leg_l0"] = rot_x(R(40 * k)) @ rot_y(R(-30 * k))
-        rot["leg_r0"] = rot_x(R(-40 * k)) @ rot_y(R(-30 * k))
-        return rot, (0.12 * k, 0, 0.03 * k), None
+        lift = r + 0.5 * s
+        rot["leg_l0"] = rot_x(R(45 * lift)) @ rot_y(R(-35 * lift))
+        rot["leg_r0"] = rot_x(R(-45 * lift)) @ rot_y(R(-35 * lift))
+        return rot, (-0.06 * r + 0.15 * s, 0, 0.05 * r), None
 
     def hit(t):
         k = math.sin(t * math.pi)
@@ -211,9 +218,9 @@ def critter_anims(legs: int):
     return [
         ("stance", stance, 4, 900, "back_forth"),
         ("run", run, 8, 560, "looped"),
-        ("swing", bite, 5, 500, "play_once"),
-        ("cast", bite, 5, 500, "play_once"),
-        ("shoot", bite, 5, 500, "play_once"),
+        ("swing", bite, 6, 540, "play_once"),
+        ("cast", bite, 6, 540, "play_once"),
+        ("shoot", bite, 6, 540, "play_once"),
         ("hit", hit, 2, 300, "play_once"),
         ("block", hit, 2, 300, "play_once"),
         ("die", die, 6, 900, "play_once"),
@@ -244,6 +251,8 @@ def antling() -> Model:
     )
 
 
+CRITTER_HITS = {"swing": 2, "cast": 2, "shoot": 2}
+
 # model name (npc_models.name) -> (builder, anims, scale)
 CREATURES = {
     "goblin": (lambda: goblin("dagger", "rag"), GOBLIN_ANIMS, 0.5),
@@ -259,8 +268,15 @@ def main():
         anims = anims or critter_anims(model.legs)
         print(f"{name}: {sum(len(p[0]) for p in model.parts.values())} voxels")
         renders = sheet.render_all(model, anims, FRAME, FOOT, scale)
-        sheet.export(renders, anims, FOOT, f"custom_npc_{name}.png", sheet.OUT / "scripts" / "npc" / "custom" / f"{name}.txt")
+        hits = character.HITS if anims is GOBLIN_ANIMS else CRITTER_HITS
+        script_dir = sheet.OUT / "scripts" / "npc" / "custom"
+        sheet.export(renders, anims, FOOT, f"custom_npc_{name}.png", script_dir / f"{name}.txt", hits=hits)
         sheet.preview(renders, anims, FRAME, f"npc_{name}")
+        if anims is GOBLIN_ANIMS:
+            base, tip = smear.blade_from_part(model)
+            trail = smear.render_layer(model, anims, FRAME, FOOT, scale, base, tip, hits)
+            rows = smear.anims_for(anims, trail)
+            sheet.export(trail, rows, FOOT, f"custom_npc_{name}_smear.png", script_dir / f"{name}_smear.txt", 512)
 
 
 if __name__ == "__main__":

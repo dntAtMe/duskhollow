@@ -22,6 +22,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 import character  # noqa: E402
 import sheet  # noqa: E402
+import smear  # noqa: E402
 import vox  # noqa: E402
 from vox import Bone, Model, Prim, compose  # noqa: E402
 
@@ -372,11 +373,18 @@ def render_layers(body_model: Model, layers: dict[str, Model]):
     return out
 
 
+def swung(name: str, m: Model) -> bool:
+    """Weapons that leave a smear when swung (not bows, shields or armour)."""
+    return "sword" in m.parts and "bow" not in name
+
+
 def main(only: list[str]):
     names = only or list(GEAR)
     layers = {n: GEAR[n]() for n in names}
     print(f"rendering body + {len(layers)} gear layers ...")
-    renders = render_layers(body(), layers)
+    base_body = body()
+    renders = render_layers(base_body, layers)
+    script_dir = sheet.OUT / "scripts" / "player" / "custom"
     for name, r in renders.items():
         if only and name == "custom_body" and "custom_body" not in only:
             continue
@@ -385,10 +393,20 @@ def main(only: list[str]):
             character.ANIMS,
             character.FOOT,
             f"custom_gear_{name}.png",
-            sheet.OUT / "scripts" / "player" / "custom" / f"{name}.txt",
+            script_dir / f"{name}.txt",
             sheet_width=512,
+            hits=character.HITS,
         )
     sheet.preview(renders["custom_body"], character.ANIMS, character.FRAME, "gear_body")
+    # Smear layers (`<model>_smear`): the arc of this weapon's own blade, hidden behind the body.
+    for name, m in layers.items():
+        if not swung(name, m):
+            continue
+        base, tip = smear.blade_from_part(m)
+        args = (character.FRAME, character.FOOT, character.SCALE, base, tip, character.HITS)
+        trail = smear.render_layer(m, character.ANIMS, *args, depth_model=base_body)
+        rows = smear.anims_for(character.ANIMS, trail)
+        sheet.export(trail, rows, character.FOOT, f"custom_gear_{name}_smear.png", script_dir / f"{name}_smear.txt", 512)
 
 
 if __name__ == "__main__":

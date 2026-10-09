@@ -25,9 +25,16 @@ pub const FLASH: bool = true;
 pub const DEATH_FX: bool = true;
 pub const FOOTSTEP_DUST: bool = true;
 pub const CAMERA_LEAD: bool = true;
+/// Blood and ember debris bursting from the struck unit (bigger on crits).
+pub const IMPACT_FX: bool = true;
 
-/// Animation freeze on crits / heavy hits.
-const HITSTOP_SECS: f32 = 0.06;
+/// Animation freeze on crits / heavy hits (attacker and target, on the hit frame).
+const HITSTOP_SECS: f32 = 0.075;
+/// A shorter freeze on every other landed melee blow.
+const HITSTOP_LIGHT_SECS: f32 = 0.03;
+/// Debris per normal hit (blood, embers); crits double it and throw harder.
+const IMPACT_BLOOD: usize = 6;
+const IMPACT_EMBERS: usize = 3;
 /// A hit is "heavy" from this fraction of the target's max health.
 const HEAVY_FRACTION: f32 = 0.15;
 /// Max camera offset (px) at full trauma; trauma decays per second.
@@ -51,14 +58,22 @@ pub struct FeelPlugin;
 
 impl Plugin for FeelPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Shake>().init_resource::<MapAge>().add_systems(Startup, make_dust_texture).add_systems(
-            Update,
-            (
-                (on_hits, on_deaths, rise_new_units, footsteps, delayed_dust).chain(),
-                (tick_tints, animate_dust).chain(),
-                follow_camera.after(crate::player::move_player),
-            ),
-        );
+        app.init_resource::<Shake>()
+            .init_resource::<MapAge>()
+            .init_resource::<Impacts>()
+            .add_systems(Startup, (make_dust_texture, make_spark_texture))
+            .add_systems(
+                Update,
+                (
+                    (on_hits, fire_impacts, on_deaths, rise_new_units, footsteps, delayed_dust).chain(),
+                    (tick_tints, animate_dust, animate_sparks, show_after).chain(),
+                    follow_camera.after(crate::player::move_player),
+                ),
+            )
+            .add_systems(
+                PostUpdate,
+                hide_until_shown.before(bevy::camera::visibility::VisibilitySystems::VisibilityPropagate),
+            );
     }
 }
 
@@ -85,6 +100,38 @@ impl Shake {
 
 #[derive(Resource)]
 struct DustTexture(Handle<Image>);
+
+#[derive(Resource)]
+struct SparkTexture(Handle<Image>);
+
+/// Keeps an entity (floating combat text) hidden for this many seconds: it appears when the
+/// attack it belongs to actually lands (`Unit::impact_in`).
+#[derive(Component)]
+pub struct ShowAfter(pub f32);
+
+/// A landed blow whose feedback waits for the attacker's hit frame.
+struct Impact {
+    at: f32,
+    target: Entity,
+    attacker: Option<Entity>,
+    crit: bool,
+    heavy: bool,
+    melee: bool,
+    shake: f32,
+}
+
+#[derive(Resource, Default)]
+struct Impacts(Vec<Impact>);
+
+/// Blood droplet / ember thrown from an impact.
+#[derive(Component)]
+struct Spark {
+    age: f32,
+    life: f32,
+    vel: Vec2,
+    gravity: f32,
+    ember: bool,
+}
 
 /// Brief warm tint after being struck.
 #[derive(Component)]
@@ -228,66 +275,227 @@ fn delayed_dust(
     }
 }
 
-/// Hit-stop, flash, shake and the heavy-hit sound from melee swings and spell hits.
+/// Hit-stop, flash, shake, debris and the heavy-hit sound from melee swings and spell hits.
+/// Melee feedback is queued until the attacker's swing reaches its hit frame.
 #[allow(clippy::too_many_arguments)]
 fn on_hits(
-    mut commands: Commands,
     mut combat: MessageReader<CombatNet>,
     mut spells: MessageReader<SpellNet>,
     net: Res<Net>,
     data: Res<crate::data::GameData>,
-    mut shake: ResMut<Shake>,
-    mut units: Query<(&mut Unit, Option<&Health>, Option<&Npc>)>,
+    mut impacts: ResMut<Impacts>,
+    units: Query<(&Unit, Option<&Health>, Option<&Npc>)>,
     mut sfx: MessageWriter<PlaySfx>,
 ) {
     let hits = combat
         .read()
         .filter_map(|CombatNet(m)| match m {
-            ServerMsg::Swing { attacker, target, result, amount } => Some((*attacker, *target, *result, *amount)),
+            ServerMsg::Swing { attacker, target, result, amount } => Some((*attacker, *target, *result, *amount, true)),
             _ => None,
         })
         .chain(spells.read().filter_map(|SpellNet(m)| match m {
             ServerMsg::SpellHit { caster, target, result, amount, heal: false, .. } => {
-                Some((*caster, *target, *result, *amount))
+                Some((*caster, *target, *result, *amount, false))
             }
             _ => None,
         }))
-        .collect::<Vec<(EntityId, EntityId, HitResult, i32)>>();
-    for (attacker, target, result, amount) in hits {
+        .collect::<Vec<(EntityId, EntityId, HitResult, i32, bool)>>();
+    for (attacker, target, result, amount, melee) in hits {
         if amount <= 0 || !matches!(result, HitResult::Hit | HitResult::Crit | HitResult::Block) {
             continue;
         }
         let (Some(&te), ae) = (net.entities.get(&target), net.entities.get(&attacker).copied()) else { continue };
-        let Ok((mut tu, health, _)) = units.get_mut(te) else { continue };
+        let Ok((_, health, _)) = units.get(te) else { continue };
         let max = health.map_or(1, |h| h.max.max(1)) as f32;
         let crit = result == HitResult::Crit;
         let heavy = crit || amount as f32 >= max * HEAVY_FRACTION;
-        if HITSTOP && heavy {
-            tu.hitstop = HITSTOP_SECS;
-        }
-        if FLASH {
-            commands.entity(te).try_insert(Flash(FLASH_SECS));
-        }
+        let attacker_unit = ae.and_then(|a| units.get(a).ok());
+        let delay = if melee { attacker_unit.map_or(0.0, |(u, ..)| u.impact_in()) } else { 0.0 };
         if crit {
-            sfx.write(PlaySfx::at_unit("hit_heavy.wav", te));
+            sfx.write(PlaySfx { delay, ..PlaySfx::at_unit("hit_heavy.wav", te) });
         }
-        let boss_attacker = ae
-            .and_then(|a| units.get(a).ok())
+        let boss_attacker = attacker_unit
             .and_then(|(_, _, n)| n)
             .and_then(|n| data.npc_templates.get(&n.entry))
             .is_some_and(|t| t.boss);
-        if HITSTOP && heavy {
-            if let Some(Ok((mut au, ..))) = ae.map(|a| units.get_mut(a)) {
-                au.hitstop = HITSTOP_SECS;
-            }
-        }
+        let mut shake = 0.0;
         if Some(target) == net.my_id {
             let frac = amount as f32 / max;
             if frac >= 0.08 || boss_attacker {
-                shake.add((frac * 2.5).clamp(0.2, 0.6) + if boss_attacker { 0.25 } else { 0.0 });
+                shake = (frac * 2.5).clamp(0.2, 0.6) + if boss_attacker { 0.25 } else { 0.0 };
             }
         } else if Some(attacker) == net.my_id && crit {
-            shake.add(0.12);
+            shake = 0.12;
+        }
+        let melee = melee && result != HitResult::Block;
+        impacts.0.push(Impact { at: delay, target: te, attacker: ae, crit, heavy, melee, shake });
+    }
+}
+
+/// Plays queued impacts whose moment has come.
+fn fire_impacts(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut impacts: ResMut<Impacts>,
+    mut shake: ResMut<Shake>,
+    spark: Option<Res<SparkTexture>>,
+    mut units: Query<&mut Unit>,
+) {
+    let dt = time.delta_secs();
+    let mut due = Vec::new();
+    impacts.0.retain_mut(|i| {
+        i.at -= dt;
+        if i.at <= 0.0 {
+            due.push((i.target, i.attacker, i.crit, i.heavy, i.melee, i.shake));
+            false
+        } else {
+            true
+        }
+    });
+    for (te, ae, crit, heavy, melee, trauma) in due {
+        let stop = if heavy {
+            HITSTOP_SECS
+        } else if melee {
+            HITSTOP_LIGHT_SECS
+        } else {
+            0.0
+        };
+        let from = ae.and_then(|a| units.get(a).ok()).map(|u| u.pos);
+        let Ok(mut tu) = units.get_mut(te) else { continue };
+        if HITSTOP && stop > 0.0 {
+            tu.hitstop = stop;
+        }
+        let away = from.map_or(Vec2::ZERO, |p| (iso::to_screen(tu.pos) - iso::to_screen(p)).normalize_or_zero());
+        if melee {
+            tu.flinch(away);
+        }
+        let (pos, chest) = (tu.pos, tu.height * tu.scale * 0.55);
+        if FLASH {
+            commands.entity(te).try_insert(Flash(FLASH_SECS));
+        }
+        if let (Some(tex), true) = (&spark, IMPACT_FX && melee) {
+            let seed = (time.elapsed_secs() * 1000.0) as u32 ^ te.index_u32().wrapping_mul(7919);
+            spawn_sparks(&mut commands, tex, pos, chest, away, crit, seed);
+        }
+        if HITSTOP && stop > 0.0 {
+            if let Some(Ok(mut au)) = ae.map(|a| units.get_mut(a)) {
+                au.hitstop = stop;
+            }
+        }
+        if trauma > 0.0 {
+            shake.add(trauma);
+        }
+    }
+}
+
+/// A 3x3 soft-cornered square, tinted per spark.
+fn make_spark_texture(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    let mut data = Vec::with_capacity(36);
+    for y in 0..3 {
+        for x in 0..3 {
+            let corner = (x != 1) && (y != 1);
+            data.extend([255, 255, 255, if corner { 0 } else { 255 }]);
+        }
+    }
+    let img = Image::new(
+        Extent3d { width: 3, height: 3, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    commands.insert_resource(SparkTexture(images.add(img)));
+}
+
+/// Dark blood droplets thrown away from the attacker (falling) and a few embers (rising).
+fn spawn_sparks(
+    commands: &mut Commands,
+    tex: &SparkTexture,
+    cell: Vec2,
+    chest: f32,
+    away: Vec2,
+    crit: bool,
+    seed: u32,
+) {
+    let origin = iso::to_screen(cell) + Vec2::new(0.0, chest);
+    let power = if crit { 1.5 } else { 1.0 };
+    let (blood, embers) = if crit { (IMPACT_BLOOD * 2, IMPACT_EMBERS * 2) } else { (IMPACT_BLOOD, IMPACT_EMBERS) };
+    let base = if away == Vec2::ZERO { Vec2::Y } else { away };
+    for i in 0..blood + embers {
+        let r = |k: u32| hash(seed.wrapping_mul(31).wrapping_add(i as u32 * 13 + k));
+        let ember = i >= blood;
+        let spread = (r(1) - 0.5) * if ember { 2.4 } else { 1.6 };
+        let dir = Vec2::from_angle(spread).rotate(base);
+        let speed = (if ember { 40.0 } else { 70.0 } + 90.0 * r(2)) * power;
+        let mut vel = dir * speed + Vec2::new(0.0, if ember { 30.0 } else { 50.0 } * r(3));
+        if ember {
+            vel.y += 25.0;
+        }
+        let color = if ember {
+            Color::srgb(0.95, 0.42 + 0.18 * r(4), 0.1)
+        } else {
+            let d = 0.75 + 0.25 * r(4);
+            Color::srgb(0.42 * d, 0.04 * d, 0.03 * d)
+        };
+        let size = if ember { 0.6 + 0.3 * r(5) } else { 0.8 + 0.6 * r(5) * power };
+        commands.spawn((
+            Spark {
+                age: 0.0,
+                life: if ember { 0.45 + 0.35 * r(6) } else { 0.3 + 0.25 * r(6) },
+                vel,
+                gravity: if ember { -20.0 } else { 420.0 },
+                ember,
+            },
+            Sprite { image: tex.0.clone(), color, ..default() },
+            Transform::from_xyz(origin.x, origin.y, iso::depth(cell) + 0.02).with_scale(Vec3::splat(size)),
+            overlay_layer(),
+        ));
+    }
+}
+
+fn animate_sparks(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut sparks: Query<(Entity, &mut Spark, &mut Transform, &mut Sprite)>,
+) {
+    let dt = time.delta_secs();
+    for (e, mut s, mut t, mut sprite) in &mut sparks {
+        s.age += dt;
+        if s.age >= s.life {
+            commands.entity(e).despawn();
+            continue;
+        }
+        let g = s.gravity;
+        s.vel.y -= g * dt;
+        s.vel *= 1.0 - 2.5 * dt;
+        t.translation += (s.vel * dt).extend(0.0);
+        let k = s.age / s.life;
+        // Hard steps: embers flicker, blood just winks out at the end.
+        let a = if s.ember {
+            let flicker = if (s.age * 30.0) as u32 % 3 == 0 { 0.5 } else { 1.0 };
+            flicker * (1.0 - k)
+        } else {
+            (1.0 - k * k).max(0.0)
+        };
+        sprite.color.set_alpha((a * 4.0).round() / 4.0);
+    }
+}
+
+/// Newly spawned `ShowAfter` entities start hidden (before visibility is computed this frame).
+fn hide_until_shown(mut new: Query<(&ShowAfter, &mut Visibility), Added<ShowAfter>>) {
+    for (s, mut v) in &mut new {
+        if s.0 > 0.0 {
+            *v = Visibility::Hidden;
+        }
+    }
+}
+
+fn show_after(mut commands: Commands, time: Res<Time>, mut items: Query<(Entity, &mut ShowAfter, &mut Visibility)>) {
+    for (e, mut s, mut v) in &mut items {
+        s.0 -= time.delta_secs();
+        if s.0 <= 0.0 {
+            *v = Visibility::Inherited;
+            commands.entity(e).remove::<ShowAfter>();
         }
     }
 }
