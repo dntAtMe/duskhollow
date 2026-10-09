@@ -65,8 +65,11 @@ impl ItemData {
     }
 
     fn template(&self, entry: u32) -> Option<&ItemTemplate> {
-        dusk_formats::legacy_note("item", entry);
-        self.items.get(&(entry as i64))
+        let t = self.items.get(&(entry as i64));
+        if let Some(t) = t.filter(|_| dusk_formats::legacy_log_enabled()) {
+            dusk_formats::legacy_note("item", format!("{entry} {}", t.name));
+        }
+        t
     }
 
     fn max_stack(&self, entry: u32) -> u32 {

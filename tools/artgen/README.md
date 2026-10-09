@@ -28,8 +28,8 @@ cargo run -p dusk_client -- --art custom         # play with the custom player s
 ```
 
 Output follows the original sprite-script format (`scripts/player/...txt` + sheet PNG), so the
-engine renders it exactly like original sprites. The client mirrors `custom_assets/content` and
-`custom_assets/scripts` into its own subfolders of the extracted assets at startup.
+engine renders it exactly like original sprites. The client reads `custom_assets/` directly (its
+default asset source) and indexes every file under `custom_assets/content` by bare name.
 
 | File | Content |
 |---|---|

@@ -252,7 +252,7 @@ pub fn start_casts(
             }
         };
         let Some(spell) = world.spells.get(&(req.spell as i64)) else { continue };
-        if (req.spell as i64) < dusk_formats::custom::CUSTOM_SPELL_FIRST {
+        if (req.spell as i64) < dusk_formats::custom::CUSTOM_SPELL_FIRST && dusk_formats::legacy_log_enabled() {
             dusk_formats::legacy_note("spell", format!("{} {}", req.spell, spell.name));
         }
         if dead {

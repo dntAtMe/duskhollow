@@ -254,8 +254,12 @@ pub fn spawn_npcs(
         let spawns = world.spawns.get(&map).cloned().unwrap_or_default();
         for s in spawns {
             let Some(t) = world.npc_templates.get(&s.entry).cloned() else { continue };
-            if s.entry < dusk_formats::custom::CUSTOM_NPC_FIRST {
-                dusk_formats::legacy_note("npc_template", s.entry);
+            // Legacy templates on our maps (legacy maps use nothing else).
+            let map_name = &world.maps[&map].name;
+            if s.entry < dusk_formats::custom::CUSTOM_NPC_FIRST
+                && map_name.starts_with(dusk_formats::custom::CUSTOM_MAP_PREFIX)
+            {
+                dusk_formats::legacy_note("npc_template", format!("{} {} on {map_name}", s.entry, t.name));
             }
             let id = world.alloc_id();
             let lo = t.min_level.max(1) as u32;

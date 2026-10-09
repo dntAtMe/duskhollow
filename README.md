@@ -34,7 +34,7 @@ cargo run -p dusk_client -- custom_duskhollow --art custom   # or straight in
 ## Setup
 
 ```bash
-# 1. Unpack a legacy data pack into ./assets
+# 1. Unpack a legacy data pack into ./assets (or point DUSK_LEGACY at an unpacked one)
 cargo run -p dusk_extract --release -- <DATA_DIR>
 
 # 2a. Main menu: Play (offline, the client runs the server embedded; pick a name, class and
@@ -60,6 +60,8 @@ Controls: `WASD` move, left-click an enemy to target it (spells land on it, no w
 Menus: arrows / `Tab` move, `Left` / `Right` adjust, `Enter` picks, `Esc` goes back; the mouse works too.
 
 Settings (Options menu: volumes, fullscreen / window size, VSync, interface scale, FPS counter, screen shake, hit-stop, custom art, plus the last name / class / map / servers) live in `settings.ini`: `%APPDATA%\Duskhollow\` on Windows, `$XDG_CONFIG_HOME/duskhollow/` or `~/.config/duskhollow/` elsewhere, or `DUSK_SETTINGS=<file>`. A menu launch applies them at start-up; command-line and debug launches ignore them until changed in game. Custom art takes effect after a restart (the menu launch defaults it to on; `--art` / `DUSK_ART` override).
+
+Our content (`custom_assets/`) is the default asset source; files of the legacy data pack load through a second source, `legacy://` (`DUSK_LEGACY`, else `DUSK_ASSETS`, else `./assets`). `DUSK_LEGACY_LOG=1` prints each distinct legacy access once (`[legacy] ...` on stderr).
 
 Debug aids (env vars; any of them except the `DUSK_MENU*` ones skips the menu): `DUSK_MENU=main|play|join|options|connecting` opens a menu screen (`DUSK_MENU_TAB=0..3` picks the options tab; combine with `DUSK_SCREENSHOT`), `DUSK_MENU=pause|pause_options` starts the game and opens the game menu after `DUSK_MENU_AT` seconds (default 3), `DUSK_MENU=cycle` runs Play -> game -> Quit to Menu `DUSK_MENU_CYCLES` times (`DUSK_MENU_JOIN=HOST:PORT` joins instead), `DUSK_SCREENSHOT=out.png` (+ `DUSK_SCREENSHOT_AT=secs`), `DUSK_AUTOPLAY=1`, `DUSK_OPEN_BOOK=1`, `DUSK_TOOLTIP_SLOT=n`, `DUSK_OPEN=character,inventory,abilities,journal` (+ `DUSK_OPEN_AT=secs`), `DUSK_ESC=n` (press `Esc` n times from `DUSK_ESC_AT`, logging what each did), `DUSK_CHAR_TAB=combat|skills`, `DUSK_HINT=<hint title>`, `DUSK_LOW_HP_TEST=1`, `DUSK_CHAT=text` (say `text`, then leave it typed in the input). Demo director: `DUSK_DIALOGUE_TEST=<npc entry>` (walk up and talk), `DUSK_QUEST_TEST=<stage>` (start the run at `wolves[:N]`, `wolves_ready`, `warden_offered`, `warden`, `warden_ready` or `end`), `DUSK_BOSS_TEST=1`, `DUSK_TITLE_TEST=1`, `DUSK_END_TEST=1`.
 

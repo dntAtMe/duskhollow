@@ -126,9 +126,10 @@ shared formulas `dusk_formats::spell`.
 Our own player skills live in `custom_assets/data/spells.txt` (entries ≥ 50000, `[entry]` sections
 of `key=value` mirroring `spell_template`; format in `dusk_formats::custom::parse_spells`) and are
 merged into the spell tables of server and client. `custom_assets/data/class_spells.txt`
-(`class spell` lines) appends them to each class's legacy starting spells. Visuals reuse legacy
-`spell_visual` rows (`visual=<spell entry>`) and kits by id (`impact_kit=`, `traveling_kit=`,
-`go_kit=` ...); icons come from `python -I tools/artgen/icons.py --custom-spells`
+(`class spell` lines) appends them to each class's legacy starting spells (both read through
+`dusk_formats::content::{spells, rules}`). Visuals are in `custom_assets/data/spell_visuals.txt`
+(`[spell N]` sections, `dusk_formats::content::visuals`): they reuse legacy `spell_visual` rows
+(`visual=<spell entry>`) and kits by id (`impact_kit=`, `traveling_kit=`, `go_kit=` ...); icons come from `python -I tools/artgen/icons.py --custom-spells`
 (`content/custom/icons/spells/`, custom-only names, so they show with and without `--art custom`).
 
 Aura type **100 ModifyStrainGainPct** is ours: data3 percent applied to positive gaze strain gains
