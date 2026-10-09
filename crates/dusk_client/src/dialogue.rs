@@ -31,17 +31,33 @@ impl Plugin for DialoguePlugin {
             .init_resource::<Dialogue>()
             .init_resource::<Modal>()
             .init_resource::<QuestMarkers>()
-            .add_systems(Startup, spawn_window.after(crate::combat_ui::load_font))
-            .add_systems(PreUpdate, capture_keyboard.after(InputSystems).after(crate::chat::type_chat))
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_window)
+            .add_systems(
+                OnEnter(crate::state::AppState::Connecting),
+                (
+                    crate::state::reset::<InteractTarget>,
+                    crate::state::reset::<Dialogue>,
+                    crate::state::reset::<Modal>,
+                    crate::state::reset::<QuestMarkers>,
+                ),
+            )
+            .add_systems(
+                PreUpdate,
+                capture_keyboard.after(InputSystems).after(crate::chat::type_chat).run_if(crate::state::in_game),
+            )
             .add_systems(
                 Update,
                 (
                     (click_npc, approach, receive, keys, choice_clicks, auto_close).chain(),
                     (render, type_on).chain(),
                     head_markers,
-                ),
+                )
+                    .run_if(crate::state::in_game),
             )
-            .add_systems(Update, debug_talk.run_if(|| std::env::var_os("DUSK_DIALOGUE_TEST").is_some()));
+            .add_systems(
+                Update,
+                debug_talk.run_if(|| std::env::var_os("DUSK_DIALOGUE_TEST").is_some()).run_if(crate::state::in_game),
+            );
     }
 }
 

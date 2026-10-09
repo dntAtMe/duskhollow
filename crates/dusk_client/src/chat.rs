@@ -26,14 +26,19 @@ impl Plugin for ChatPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ChatLog>()
             .add_message::<ChatSystemLine>()
-            .add_systems(Startup, spawn_chat.after(crate::combat_ui::load_font))
-            .add_systems(PreUpdate, type_chat.after(InputSystems))
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_chat)
+            .add_systems(OnEnter(crate::state::AppState::Connecting), crate::state::reset::<ChatLog>)
+            .add_systems(PreUpdate, type_chat.after(InputSystems).run_if(crate::state::in_game))
             .add_systems(
                 Update,
                 ((collect_lines, buttons, wheel_scroll), (render_log, render_input), (spawn_bubbles, place_bubbles))
-                    .chain(),
+                    .chain()
+                    .run_if(crate::state::in_game),
             )
-            .add_systems(Update, debug_chat.run_if(|| std::env::var_os("DUSK_CHAT").is_some()));
+            .add_systems(
+                Update,
+                debug_chat.run_if(|| std::env::var_os("DUSK_CHAT").is_some()).run_if(crate::state::in_game),
+            );
     }
 }
 

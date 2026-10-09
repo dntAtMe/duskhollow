@@ -61,19 +61,40 @@ impl Plugin for FeelPlugin {
         app.init_resource::<Shake>()
             .init_resource::<MapAge>()
             .init_resource::<Impacts>()
+            .init_resource::<FeelSettings>()
+            .add_systems(
+                OnEnter(crate::state::AppState::Connecting),
+                (crate::state::reset::<Shake>, crate::state::reset::<Impacts>),
+            )
             .add_systems(Startup, (make_dust_texture, make_spark_texture))
             .add_systems(
                 Update,
                 (
-                    (on_hits, fire_impacts, on_deaths, rise_new_units, footsteps, delayed_dust).chain(),
+                    (on_hits, fire_impacts, on_deaths, rise_new_units, footsteps, delayed_dust)
+                        .chain()
+                        .run_if(crate::state::in_game),
                     (tick_tints, animate_dust, animate_sparks, show_after).chain(),
-                    follow_camera.after(crate::player::move_player),
+                    follow_camera.after(crate::player::move_player).run_if(crate::state::in_game),
                 ),
             )
             .add_systems(
                 PostUpdate,
                 hide_until_shown.before(bevy::camera::visibility::VisibilitySystems::VisibilityPropagate),
             );
+    }
+}
+
+/// Player switches (Options menu): camera shake and hit-stop on top of the `SHAKE` / `HITSTOP`
+/// compile-time switches.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct FeelSettings {
+    pub shake: bool,
+    pub hitstop: bool,
+}
+
+impl Default for FeelSettings {
+    fn default() -> Self {
+        Self { shake: true, hitstop: true }
     }
 }
 
@@ -338,6 +359,7 @@ fn fire_impacts(
     time: Res<Time>,
     mut impacts: ResMut<Impacts>,
     mut shake: ResMut<Shake>,
+    feel: Res<FeelSettings>,
     spark: Option<Res<SparkTexture>>,
     mut units: Query<&mut Unit>,
 ) {
@@ -362,7 +384,7 @@ fn fire_impacts(
         };
         let from = ae.and_then(|a| units.get(a).ok()).map(|u| u.pos);
         let Ok(mut tu) = units.get_mut(te) else { continue };
-        if HITSTOP && stop > 0.0 {
+        if HITSTOP && feel.hitstop && stop > 0.0 {
             tu.hitstop = stop;
         }
         let away = from.map_or(Vec2::ZERO, |p| (iso::to_screen(tu.pos) - iso::to_screen(p)).normalize_or_zero());
@@ -377,7 +399,7 @@ fn fire_impacts(
             let seed = (time.elapsed_secs() * 1000.0) as u32 ^ te.index_u32().wrapping_mul(7919);
             spawn_sparks(&mut commands, tex, pos, chest, away, crit, seed);
         }
-        if HITSTOP && stop > 0.0 {
+        if HITSTOP && feel.hitstop && stop > 0.0 {
             if let Some(Ok(mut au)) = ae.map(|a| units.get_mut(a)) {
                 au.hitstop = stop;
             }
@@ -618,6 +640,7 @@ pub fn tick_tints(
 fn follow_camera(
     time: Res<Time>,
     modal: Res<Modal>,
+    feel: Res<FeelSettings>,
     mut shake: ResMut<Shake>,
     player: Query<&Unit, With<Player>>,
     mut camera: Query<&mut Transform, With<MainCamera>>,
@@ -646,7 +669,7 @@ fn follow_camera(
     shake.look = Some(look);
     shake.trauma = (shake.trauma - TRAUMA_DECAY * dt).max(0.0);
     let mut offset = Vec2::ZERO;
-    if shake.trauma > 0.0 && !modal.dialogue && !modal.card {
+    if shake.trauma > 0.0 && feel.shake && !modal.dialogue && !modal.card {
         let t = time.elapsed_secs() * 40.0;
         let n = Vec2::new((t * 1.3).sin() + (t * 2.9).sin() * 0.5, (t * 1.7).cos() + (t * 3.3).sin() * 0.5) / 1.5;
         offset = n * SHAKE_PX * shake.trauma * shake.trauma;

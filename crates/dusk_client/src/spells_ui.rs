@@ -21,7 +21,16 @@ impl Plugin for SpellsUiPlugin {
             .init_resource::<ActionBar>()
             .init_resource::<Held>()
             .init_resource::<BookTab>()
-            .add_systems(Startup, spawn_ui.after(crate::combat_ui::load_font))
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_ui)
+            .add_systems(
+                OnEnter(crate::state::AppState::Connecting),
+                (
+                    crate::state::reset::<Spellbook>,
+                    crate::state::reset::<ActionBar>,
+                    crate::state::reset::<Held>,
+                    crate::state::reset::<BookTab>,
+                ),
+            )
             .add_systems(
                 Update,
                 (
@@ -30,10 +39,17 @@ impl Plugin for SpellsUiPlugin {
                     (refresh_slots, update_cooldowns, update_cast_bar, update_errors, update_tooltip, follow_held),
                     (toggle_book, rebuild_book, update_aura_rows),
                 )
-                    .chain(),
+                    .chain()
+                    .run_if(crate::state::in_game),
             )
-            .add_systems(Update, autocast.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()))
-            .add_systems(Update, open_book_once.run_if(|| std::env::var_os("DUSK_OPEN_BOOK").is_some()));
+            .add_systems(
+                Update,
+                autocast.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()).run_if(crate::state::in_game),
+            )
+            .add_systems(
+                Update,
+                open_book_once.run_if(|| std::env::var_os("DUSK_OPEN_BOOK").is_some()).run_if(crate::state::in_game),
+            );
     }
 }
 
@@ -77,6 +93,11 @@ pub struct Spellbook {
 }
 
 impl Spellbook {
+    /// Our own cast is running (Esc cancels it).
+    pub fn is_casting(&self) -> bool {
+        self.casting.is_some()
+    }
+
     fn remaining(&self, spell: SpellId, now: f32) -> (f32, f32) {
         let left = |(s, d): (f32, f32)| ((s + d - now).max(0.0), d);
         let cd = self.cooldowns.get(&spell).copied().map(left).unwrap_or((0.0, 0.0));

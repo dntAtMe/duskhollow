@@ -8,6 +8,7 @@ use crate::{
     items_ui::ItemNet,
     map_render::CurrentMap,
     player::{Player, PlayerMotion},
+    state::{Session, in_game, in_session},
     unit::{self, Dead, Health, Level, Targeted, Unit},
 };
 use bevy::prelude::*;
@@ -22,25 +23,30 @@ const SEND_INTERVAL: f32 = 0.1;
 /// Remote units further than this from their target snap instead of sliding.
 const SNAP_DISTANCE: f32 = 6.0;
 
-pub struct NetPlugin {
-    pub addr: String,
-    pub name: String,
-    pub class: u8,
-}
+/// Mirrors the server while a session is live ([`crate::state`]). The connection itself is
+/// opened by the main menu or, for command-line launches, by `main` ([`begin_session`]).
+pub struct NetPlugin;
 
 impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
-        let conn = dusk_protocol::net::connect(&self.addr)
-            .unwrap_or_else(|e| panic!("cannot connect to {}: {e} (is dusk_server running?)", self.addr));
-        conn.send(ClientMsg::Hello { protocol: PROTOCOL_VERSION, name: self.name.clone(), class: self.class });
-        info!("connected to {}", self.addr);
-        app.insert_resource(Net { conn, my_id: None, entities: HashMap::new() })
-            .insert_resource(PlayerState { name: self.name.clone(), speed_mult: 1.0, ..default() })
-            .add_message::<SpellNet>()
-            .add_message::<CombatNet>()
-            .add_message::<DirectorNet>()
-            .add_systems(Update, (receive, send_movement, interpolate_remote).chain());
+        app.add_message::<SpellNet>().add_message::<CombatNet>().add_message::<DirectorNet>().add_systems(
+            Update,
+            (
+                receive.run_if(in_session.and_then(resource_exists::<Net>)),
+                (send_movement, interpolate_remote).run_if(in_game),
+            )
+                .chain(),
+        );
     }
+}
+
+/// Starts a session on an open connection: says `Hello` and installs [`Net`] + [`PlayerState`].
+/// The server answers with `Welcome` (the game starts) or `Rejected`.
+pub fn begin_session(commands: &mut Commands, conn: ClientConnection, name: &str, class: u8) {
+    conn.send(ClientMsg::Hello { protocol: PROTOCOL_VERSION, name: name.to_string(), class });
+    info!("connected to {} as {name} (class {class})", conn.peer);
+    commands.insert_resource(Net { conn, my_id: None, entities: HashMap::new() });
+    commands.insert_resource(PlayerState { name: name.to_string(), speed_mult: 1.0, ..default() });
 }
 
 #[derive(Resource)]
@@ -126,7 +132,7 @@ fn receive(
     mut targets: Query<&mut NetTarget>,
     mut units: Query<(&mut Unit, &mut Health)>,
     roots: Query<Entity, (With<Unit>, Without<ChildOf>)>,
-    mut exit: MessageWriter<AppExit>,
+    mut session: Session,
     mut spell_out: MessageWriter<SpellNet>,
     mut item_out: MessageWriter<ItemNet>,
     mut combat_out: MessageWriter<CombatNet>,
@@ -140,7 +146,7 @@ fn receive(
             Err(TryRecvError::Empty) => break,
             Err(TryRecvError::Disconnected) => {
                 error!("disconnected from server");
-                exit.write(AppExit::error());
+                session.lost("The connection to the server was lost.");
                 return;
             }
         };
@@ -160,10 +166,15 @@ fn receive(
                     commands.entity(e).insert((Player, PlayerMotion { orientation, moving: false }));
                     net.entities.insert(your_id, e);
                 }
+                // The rest of the queue is read in game, once the HUD exists.
+                if session.welcomed() {
+                    return;
+                }
             }
             ServerMsg::Rejected { reason } => {
                 error!("server rejected us: {reason}");
-                exit.write(AppExit::error());
+                session.lost(&format!("The server turned you away: {reason}"));
+                return;
             }
             ServerMsg::Spawn(info) => {
                 if Some(info.id) == net.my_id {

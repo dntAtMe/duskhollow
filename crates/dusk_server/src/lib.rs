@@ -1,5 +1,6 @@
 //! Authoritative game server (headless Bevy), usable standalone (`main.rs`) or
-//! embedded in the client for offline play ([`spawn_embedded`]).
+//! embedded in the client for offline play ([`spawn_embedded`], or [`EmbeddedServer`] when it
+//! has to be stopped again).
 
 pub mod ai;
 pub mod combat;
@@ -96,4 +97,64 @@ pub fn spawn_embedded(config: ServerConfig) -> anyhow::Result<SocketAddr> {
     })?;
     ready_rx.recv()??;
     Ok(addr)
+}
+
+/// An embedded server that can be shut down: [`EmbeddedServer::stop`] (or dropping it) ends the
+/// server loop, closes every client connection and frees the port.
+pub struct EmbeddedServer {
+    pub addr: SocketAddr,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl EmbeddedServer {
+    /// Like [`spawn_embedded`], but keeps a handle to stop the server again (the client's
+    /// "Quit to menu").
+    pub fn start(config: ServerConfig) -> anyhow::Result<Self> {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let (rx, addr) = dusk_protocol::net::listen("127.0.0.1:0")?;
+        let stop = std::sync::Arc::new(AtomicBool::new(false));
+        let flag = stop.clone();
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+        let thread = std::thread::Builder::new().name("embedded-server".into()).spawn(move || {
+            match build_app(&config, net::Acceptor(rx)) {
+                Ok(mut app) => {
+                    app.add_systems(Last, move |mut exit: MessageWriter<AppExit>| {
+                        if flag.load(Ordering::Relaxed) {
+                            exit.write(AppExit::Success);
+                        }
+                    });
+                    let _ = ready_tx.send(Ok(()));
+                    app.run();
+                    info!("embedded server stopped");
+                }
+                Err(e) => {
+                    let _ = ready_tx.send(Err(e));
+                }
+            }
+        })?;
+        ready_rx.recv()??;
+        Ok(Self { addr, stop, thread: Some(thread) })
+    }
+
+    /// Stops the server loop and waits for it to wind down.
+    pub fn stop(mut self) {
+        self.shutdown();
+    }
+
+    fn shutdown(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(t) = self.thread.take() {
+            let _ = t.join();
+            // The accept thread blocks in `accept`; one last connection lets it notice that the
+            // server is gone (its channel is closed) and release the port.
+            let _ = std::net::TcpStream::connect_timeout(&self.addr, Duration::from_millis(200));
+        }
+    }
+}
+
+impl Drop for EmbeddedServer {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
 }

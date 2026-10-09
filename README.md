@@ -20,7 +20,8 @@ clear it. Help Ysolde of Lowshade with the glarewolves in the Red Fields, then p
 to rest at the Glare Gate while the Eye opens wide.
 
 ```bash
-cargo run -p dusk_client -- custom_duskhollow --art custom
+cargo run -p dusk_client            # main menu: Play starts the vale offline
+cargo run -p dusk_client -- custom_duskhollow --art custom   # or straight in
 ```
 
 | | |
@@ -36,11 +37,13 @@ cargo run -p dusk_client -- custom_duskhollow --art custom
 # 1. Unpack a legacy data pack into ./assets
 cargo run -p dusk_extract --release -- <DATA_DIR>
 
-# 2a. Offline: the client runs the server embedded (optionally pick a start map / class 1-4)
+# 2a. Main menu: Play (offline, the client runs the server embedded; pick a name, class and
+#     start map), Join Server, Options
 cargo run -p dusk_client
+# ...or skip the menu: any map / --connect / --name / --class argument starts the game directly
 cargo run -p dusk_client -- goblin_cave --class 2
 
-# 2b. Online: start the server, then any number of clients
+# 2b. Online: start the server, then any number of clients (menu: Join Server, or directly)
 cargo run -p dusk_server
 cargo run -p dusk_server -- --start-map goblin_cave   # optional: different start map
 cargo run -p dusk_client -- --connect 127.0.0.1:16383 --name Alice
@@ -52,9 +55,13 @@ cargo run -p dusk_protocol --example bot
 cargo run -p dusk_protocol --example quest_bot
 ```
 
-Controls: `WASD` move, left-click an enemy to target it (spells land on it, no walking), right-click or double-click to walk up and auto-attack, `Tab` / `Shift+Tab` cycle nearby enemies, `1`-`0` `-` `=` cast from the action bar, `P` Abilities window (click a spell, then a slot to place it; right-click a slot to clear), `Esc` cancel cast / clear target, `Enter` chat (`Enter` send, `Esc` cancel, `/help`), mouse wheel over chat / minimap scrolls / zooms, numpad `+`/`-` minimap zoom, `M` toggle music, `N` toggle sound effects, `I` Inventory (click gear to equip, potions to drink; shift + right-click destroys), `C` Character window (click a slot to unequip), left-click a corpse with a pouch over it to loot. Click (left or right) a friendly NPC to walk up and talk: `1`-`4` or click picks a reply, `Esc` closes.
+Controls: `WASD` move, left-click an enemy to target it (spells land on it, no walking), right-click or double-click to walk up and auto-attack, `Tab` / `Shift+Tab` cycle nearby enemies, `1`-`0` `-` `=` cast from the action bar, `P` Abilities window (click a spell, then a slot to place it; right-click a slot to clear), `Esc` cancel cast / clear target / close the dialogue, else the game menu (Resume, Options, Quit to Menu, Quit Game; the world keeps running behind it), `Enter` chat (`Enter` send, `Esc` cancel, `/help`), mouse wheel over chat / minimap scrolls / zooms, numpad `+`/`-` minimap zoom, `M` toggle music, `N` toggle sound effects, `I` Inventory (click gear to equip, potions to drink; shift + right-click destroys), `C` Character window (click a slot to unequip), left-click a corpse with a pouch over it to loot. Click (left or right) a friendly NPC to walk up and talk: `1`-`4` or click picks a reply, `Esc` closes.
 
-Debug aids (env vars): `DUSK_SCREENSHOT=out.png` (+ `DUSK_SCREENSHOT_AT=secs`), `DUSK_AUTOPLAY=1`, `DUSK_OPEN_BOOK=1`, `DUSK_TOOLTIP_SLOT=n`, `DUSK_CHAT=text` (say `text`, then leave it typed in the input). Demo director: `DUSK_DIALOGUE_TEST=<npc entry>` (walk up and talk), `DUSK_QUEST_TEST=<stage>` (start the run at `wolves[:N]`, `wolves_ready`, `warden_offered`, `warden`, `warden_ready` or `end`), `DUSK_BOSS_TEST=1`, `DUSK_TITLE_TEST=1`, `DUSK_END_TEST=1`.
+Menus: arrows / `Tab` move, `Left` / `Right` adjust, `Enter` picks, `Esc` goes back; the mouse works too.
+
+Settings (Options menu: volumes, fullscreen / window size, VSync, interface scale, FPS counter, screen shake, hit-stop, custom art, plus the last name / class / map / servers) live in `settings.ini`: `%APPDATA%\Duskhollow\` on Windows, `$XDG_CONFIG_HOME/duskhollow/` or `~/.config/duskhollow/` elsewhere, or `DUSK_SETTINGS=<file>`. A menu launch applies them at start-up; command-line and debug launches ignore them until changed in game. Custom art takes effect after a restart (the menu launch defaults it to on; `--art` / `DUSK_ART` override).
+
+Debug aids (env vars; any of them except `DUSK_MENU` skips the menu): `DUSK_MENU=main|play|join|options|connecting` opens a menu screen (combine with `DUSK_SCREENSHOT`), `DUSK_MENU=pause|pause_options` starts the game and opens the game menu after `DUSK_MENU_AT` seconds (default 3), `DUSK_SCREENSHOT=out.png` (+ `DUSK_SCREENSHOT_AT=secs`), `DUSK_AUTOPLAY=1`, `DUSK_OPEN_BOOK=1`, `DUSK_TOOLTIP_SLOT=n`, `DUSK_CHAT=text` (say `text`, then leave it typed in the input). Demo director: `DUSK_DIALOGUE_TEST=<npc entry>` (walk up and talk), `DUSK_QUEST_TEST=<stage>` (start the run at `wolves[:N]`, `wolves_ready`, `warden_offered`, `warden`, `warden_ready` or `end`), `DUSK_BOSS_TEST=1`, `DUSK_TITLE_TEST=1`, `DUSK_END_TEST=1`.
 
 ## Workspace
 

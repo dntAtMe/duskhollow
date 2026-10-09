@@ -37,8 +37,11 @@ impl Plugin for GazePlugin {
         app.init_resource::<GazeView>()
             .add_message::<GazeNet>()
             .add_plugins(Material2dPlugin::<GradeMaterial>::default())
-            .add_systems(Startup, (spawn_grade, spawn_hud.after(crate::combat_ui::load_font)))
-            .add_systems(Update, (apply_net, load_cover, update_hud, update_screen_fx).chain())
+            .add_systems(Startup, spawn_grade)
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_hud)
+            .add_systems(OnEnter(crate::state::AppState::Connecting), crate::state::reset::<GazeView>)
+            .add_systems(Update, (apply_net, update_hud, update_screen_fx).chain().run_if(crate::state::in_game))
+            .add_systems(Update, load_cover)
             .add_systems(PostUpdate, update_grade.after(particles::debug_camera));
     }
 }

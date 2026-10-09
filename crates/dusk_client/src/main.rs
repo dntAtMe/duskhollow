@@ -1,10 +1,13 @@
 //! Duskhollow client (Bevy).
 //!
 //! ```text
+//! dusk_client                                                 main menu (Play offline, Join, Options)
 //! dusk_client [MAP] [--class N] [--art custom]                offline: embedded server, start on MAP
 //! dusk_client --connect [HOST:PORT] [--name NAME] [--class N] online, world from dusk_server
 //! ```
-//! Classes are `player_class_stats.Class` 1..=4.
+//! Classes are `player_class_stats.Class` 1..=4. Any game argument, or a debug variable
+//! (`DUSK_SCREENSHOT`, `DUSK_AUTOPLAY`, `DUSK_*_TEST`...), skips the menu and starts the game
+//! directly, as before the menu existed; `DUSK_MENU` forces the menu (see `menu`).
 
 mod audio;
 mod chat;
@@ -20,19 +23,24 @@ mod iso;
 mod items_ui;
 mod lights;
 mod map_render;
+mod menu;
 mod minimap;
 mod nameplates;
 mod net;
 mod paper_doll;
 mod particles;
 mod player;
+mod settings;
 mod spell_fx;
 mod spell_particles;
 mod spells_ui;
+mod state;
 mod ui_input;
 mod unit;
 
 use bevy::prelude::*;
+use bevy::window::{MonitorSelection, PresentMode, WindowMode};
+use state::Launch;
 
 enum Mode {
     /// Start map for the embedded server (`None` = original start point).
@@ -48,11 +56,13 @@ struct Args {
     mode: Mode,
     name: String,
     class: u8,
+    /// A map, `--connect`, `--name` or `--class` was given.
+    game_args: bool,
 }
 
 fn parse_args() -> Args {
     let mut args = std::env::args().skip(1).peekable();
-    let (mut map, mut addr, mut name, mut class) = (None, None, None, 1);
+    let (mut map, mut addr, mut name, mut class, mut game_args) = (None, None, None, 1, false);
     while let Some(a) = args.next() {
         match a.as_str() {
             "--connect" => {
@@ -62,14 +72,24 @@ fn parse_args() -> Args {
                 } else {
                     format!("127.0.0.1:{}", dusk_protocol::DEFAULT_PORT)
                 });
+                game_args = true;
             }
-            "--name" => name = args.next(),
-            "--class" => class = args.next().and_then(|c| c.parse().ok()).unwrap_or(1),
-            // Read by `GameData::load` (custom player art); consume its value here.
+            "--name" => {
+                name = args.next();
+                game_args = true;
+            }
+            "--class" => {
+                class = args.next().and_then(|c| c.parse().ok()).unwrap_or(1);
+                game_args = true;
+            }
+            // Read by `GameData::load_with` (custom player art); consume its value here.
             "--art" => {
                 args.next();
             }
-            _ => map = Some(a),
+            _ => {
+                map = Some(a);
+                game_args = true;
+            }
         }
     }
     Args {
@@ -79,32 +99,70 @@ fn parse_args() -> Args {
         },
         name: name.unwrap_or_else(|| format!("Player{}", std::process::id() % 1000)),
         class,
+        game_args,
     }
+}
+
+/// Environment variables that do not mean "start the game directly".
+const MENU_SAFE_VARS: [&str; 11] = [
+    "DUSK_ASSETS",
+    "DUSK_CUSTOM_ASSETS",
+    "DUSK_ART",
+    "DUSK_AUDIO_LOG",
+    "DUSK_MUSIC_VOLUME",
+    "DUSK_SFX_VOLUME",
+    "DUSK_SETTINGS",
+    "DUSK_MENU_AT",
+    "DUSK_MENU_TAB",
+    "DUSK_MENU_CYCLES",
+    "DUSK_MENU",
+];
+
+fn launch_mode(args: &Args) -> Launch {
+    match std::env::var("DUSK_MENU").ok().as_deref() {
+        Some("pause" | "pause_options") => return Launch::Direct,
+        Some(_) => return Launch::Menu,
+        None => {}
+    }
+    let debug = std::env::vars().any(|(k, _)| {
+        k.starts_with("DUSK_") && !MENU_SAFE_VARS.contains(&k.as_str()) && !k.starts_with("DUSK_SCREENSHOT_")
+    });
+    if args.game_args || debug { Launch::Direct } else { Launch::Menu }
 }
 
 fn main() -> AppExit {
     let root = dusk_formats::assets_root();
-    let game_data =
-        data::GameData::load(&root).expect("failed to load game data (run `cargo run -p dusk_extract` first)");
+    let args = parse_args();
+    let launch = launch_mode(&args);
+    let settings = settings::Settings::load();
+    let menu_launch = launch.is_menu();
+    let game_data = data::GameData::load_with(&root, menu_launch.then_some(settings.custom_art))
+        .expect("failed to load game data (run `cargo run -p dusk_extract` first)");
+
+    // A menu launch opens the window as the player left it; the command line keeps 1280x720.
+    let mut window = Window { title: "Duskhollow".into(), resolution: (1280, 720).into(), ..default() };
+    if menu_launch {
+        window.resolution = settings.resolution.into();
+        window.present_mode = if settings.vsync { PresentMode::AutoVsync } else { PresentMode::AutoNoVsync };
+        if settings.fullscreen {
+            window.mode = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
+        }
+    }
 
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
             .set(AssetPlugin { file_path: root.to_string_lossy().into_owned(), ..default() })
-            .set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Duskhollow".into(),
-                    resolution: (1280, 720).into(),
-                    ..default()
-                }),
-                ..default()
-            })
+            .set(WindowPlugin { primary_window: Some(window), ..default() })
             // Pixel art: no filtering.
             .set(ImagePlugin::default_nearest()),
     )
     .insert_resource(ClearColor(Color::BLACK))
     .insert_resource(game_data)
+    .insert_resource(launch)
+    .insert_resource(settings)
     .init_resource::<map_render::CurrentMap>()
+    .add_plugins((state::StatePlugin, settings::SettingsPlugin, menu::MenuPlugin, net::NetPlugin))
     .add_plugins((map_render::MapRenderPlugin, unit::UnitPlugin, player::PlayerPlugin, combat_ui::CombatUiPlugin))
     .add_plugins((spells_ui::SpellsUiPlugin, spell_fx::SpellFxPlugin, audio::AudioPlugin))
     .add_plugins((ui_input::UiInputPlugin, hud::HudPlugin, chat::ChatPlugin))
@@ -114,15 +172,23 @@ fn main() -> AppExit {
     .add_plugins((dialogue::DialoguePlugin, director_ui::DirectorUiPlugin, feel::FeelPlugin))
     .add_systems(Update, auto_screenshot.run_if(|| std::env::var_os("DUSK_SCREENSHOT").is_some()));
 
-    let args = parse_args();
-    let addr = match args.mode {
-        Mode::Online { addr } => addr,
-        Mode::Offline { map } => {
-            let config = dusk_server::ServerConfig { assets: root.clone(), start_map: map };
-            dusk_server::spawn_embedded(config).expect("failed to start embedded server").to_string()
+    if !menu_launch {
+        // As before the menu: connect now (offline: embedded server first), fail loudly.
+        let (addr, server) = match args.mode {
+            Mode::Online { addr } => (addr, None),
+            Mode::Offline { map } => {
+                let config = dusk_server::ServerConfig { assets: root.clone(), start_map: map };
+                let server = dusk_server::EmbeddedServer::start(config).expect("failed to start embedded server");
+                (server.addr.to_string(), Some(server))
+            }
+        };
+        let conn = dusk_protocol::net::connect(&addr)
+            .unwrap_or_else(|e| panic!("cannot connect to {addr}: {e} (is dusk_server running?)"));
+        app.insert_resource(state::DirectConnect(Some((conn, args.name, args.class))));
+        if let Some(server) = server {
+            app.insert_resource(state::OfflineServer(server));
         }
-    };
-    app.add_plugins(net::NetPlugin { addr, name: args.name, class: args.class });
+    }
     app.run()
 }
 

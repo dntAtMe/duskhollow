@@ -29,8 +29,11 @@ pub struct MinimapPlugin;
 impl Plugin for MinimapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MinimapZoom>()
-            .add_systems(Startup, spawn_minimap.after(crate::combat_ui::load_font))
-            .add_systems(Update, (setup_main_camera, zoom, follow_player, update_dots, bake_fade).chain());
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_minimap)
+            .add_systems(
+                Update,
+                (setup_main_camera, zoom, follow_player, update_dots, bake_fade).chain().run_if(crate::state::in_game),
+            );
     }
 }
 

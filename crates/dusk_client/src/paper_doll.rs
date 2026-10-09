@@ -21,7 +21,9 @@ pub struct PaperDollPlugin;
 
 impl Plugin for PaperDollPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Appearances>().add_systems(Update, (attach_gear, rebuild_layers).chain());
+        app.init_resource::<Appearances>()
+            .add_systems(Update, (attach_gear.run_if(crate::state::in_game), rebuild_layers).chain())
+            .add_systems(OnEnter(crate::state::AppState::Connecting), crate::state::reset::<Appearances>);
     }
 }
 

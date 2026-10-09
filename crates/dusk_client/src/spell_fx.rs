@@ -21,8 +21,22 @@ pub struct SpellFxPlugin;
 impl Plugin for SpellFxPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<KeyQueue>()
-            .add_systems(Update, (on_spell_events, fly_projectiles, delayed_impacts, play_flipbooks, luma_key).chain())
-            .add_systems(Update, fx_test.run_if(|| std::env::var_os("DUSK_FX_TEST").is_some()));
+            .add_systems(
+                Update,
+                (
+                    on_spell_events.run_if(crate::state::in_game),
+                    fly_projectiles,
+                    delayed_impacts,
+                    play_flipbooks,
+                    luma_key,
+                )
+                    .chain(),
+            )
+            .add_systems(OnEnter(crate::state::AppState::Connecting), crate::state::reset::<KeyQueue>)
+            .add_systems(
+                Update,
+                fx_test.run_if(|| std::env::var_os("DUSK_FX_TEST").is_some()).run_if(crate::state::in_game),
+            );
     }
 }
 

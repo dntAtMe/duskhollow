@@ -32,7 +32,9 @@ impl Plugin for ItemsUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ItemsState>()
             .add_message::<ItemNet>()
-            .add_systems(Startup, (load_item_db, spawn_windows.after(crate::combat_ui::load_font)))
+            .add_systems(Startup, load_item_db)
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_windows)
+            .add_systems(OnEnter(crate::state::AppState::Connecting), crate::state::reset::<ItemsState>)
             .add_systems(
                 Update,
                 (
@@ -41,10 +43,19 @@ impl Plugin for ItemsUiPlugin {
                     (refresh_slots, refresh_character, refresh_loot_window, update_tooltip, update_log),
                     (close_far_loot, loot_markers),
                 )
-                    .chain(),
+                    .chain()
+                    .run_if(crate::state::in_game),
             )
-            .add_systems(Update, auto_loot.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()))
-            .add_systems(Update, open_windows_once.run_if(|| std::env::var_os("DUSK_OPEN_INVENTORY").is_some()));
+            .add_systems(
+                Update,
+                auto_loot.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()).run_if(crate::state::in_game),
+            )
+            .add_systems(
+                Update,
+                open_windows_once
+                    .run_if(|| std::env::var_os("DUSK_OPEN_INVENTORY").is_some())
+                    .run_if(crate::state::in_game),
+            );
     }
 }
 
@@ -99,6 +110,13 @@ impl Default for ItemsState {
             lootable: default(),
             log: default(),
         }
+    }
+}
+
+impl ItemsState {
+    /// The loot window is open (Esc closes it).
+    pub fn loot_open(&self) -> bool {
+        self.loot.is_some()
     }
 }
 

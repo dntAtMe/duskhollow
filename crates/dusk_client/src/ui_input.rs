@@ -12,7 +12,9 @@ pub struct UiInputPlugin;
 
 impl Plugin for UiInputPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<UiInputCaptured>().add_systems(PreUpdate, update_pointer.after(UiSystems::Focus));
+        app.init_resource::<UiInputCaptured>()
+            .add_systems(OnEnter(crate::state::AppState::Connecting), crate::state::reset::<UiInputCaptured>)
+            .add_systems(PreUpdate, update_pointer.after(UiSystems::Focus));
     }
 }
 

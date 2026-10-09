@@ -18,7 +18,7 @@ impl Plugin for PlayerPlugin {
         app.add_systems(Startup, |mut commands: Commands| {
             commands.spawn((Camera2d, MainCamera));
         })
-        .add_systems(Update, move_player);
+        .add_systems(Update, move_player.run_if(crate::state::in_game));
     }
 }
 

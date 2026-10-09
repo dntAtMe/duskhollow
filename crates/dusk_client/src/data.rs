@@ -116,10 +116,14 @@ fn custom_hotspots(root: &Path) -> Vec<(String, (i32, i32))> {
 }
 
 impl GameData {
-    pub fn load(root: &Path) -> anyhow::Result<Self> {
+    /// `custom_art`: the menu's "custom art" setting, used when neither `--art` nor `DUSK_ART`
+    /// is given (`None`: off, as for command-line launches).
+    pub fn load_with(root: &Path, custom_art: Option<bool>) -> anyhow::Result<Self> {
         let mut index = FileIndex::load(root.join("file_index.txt"))?;
-        let art_requested = std::env::var("DUSK_ART").is_ok_and(|v| v == "custom")
-            || std::env::args().collect::<Vec<_>>().windows(2).any(|w| w[0] == "--art" && w[1] == "custom");
+        let args: Vec<String> = std::env::args().collect();
+        let art_arg = args.windows(2).find(|w| w[0] == "--art").map(|w| w[1] == "custom");
+        let art_env = std::env::var("DUSK_ART").ok().map(|v| v == "custom");
+        let art_requested = art_arg.or(art_env).or(custom_art).unwrap_or(false);
         let custom = install_custom_assets(root, &mut index, art_requested);
         let db = GameDb::open(root.join("game.db"))?;
         let custom_npcs = dusk_formats::custom::load_npc_templates(&dusk_formats::custom_assets_root());

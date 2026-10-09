@@ -24,8 +24,13 @@ impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Portraits>()
             .add_systems(PreStartup, load_config)
-            .add_systems(Startup, spawn_hud.after(crate::combat_ui::load_font))
-            .add_systems(Update, (update_player_frame, update_target_frame, update_xp_bar, bake_portraits).chain());
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_hud)
+            .add_systems(
+                Update,
+                (update_player_frame, update_target_frame, update_xp_bar, bake_portraits)
+                    .chain()
+                    .run_if(crate::state::in_game),
+            );
     }
 }
 

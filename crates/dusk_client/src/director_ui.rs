@@ -26,7 +26,11 @@ impl Plugin for DirectorUiPlugin {
         app.init_resource::<Quests>()
             .init_resource::<Boss>()
             .init_resource::<Cards>()
-            .add_systems(Startup, spawn_ui.after(crate::combat_ui::load_font))
+            .add_systems(OnEnter(crate::state::AppState::InGame), spawn_ui)
+            .add_systems(
+                OnEnter(crate::state::AppState::Connecting),
+                (crate::state::reset::<Quests>, crate::state::reset::<Boss>, crate::state::reset::<Cards>),
+            )
             .add_systems(
                 Update,
                 (
@@ -35,7 +39,8 @@ impl Plugin for DirectorUiPlugin {
                     update_boss_bar,
                     (start_title, animate_title, show_end_card, animate_end_card).chain(),
                 )
-                    .chain(),
+                    .chain()
+                    .run_if(crate::state::in_game),
             );
     }
 }

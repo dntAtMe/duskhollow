@@ -29,8 +29,11 @@ pub struct SpellParticlesPlugin;
 
 impl Plugin for SpellParticlesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (spawn_kit_particles, follow_units, fly).chain())
-            .add_systems(Update, fx_test.run_if(|| std::env::var_os("DUSK_FX_TEST").is_some()));
+        app.add_systems(Update, (spawn_kit_particles.run_if(crate::state::in_game), follow_units, fly).chain())
+            .add_systems(
+                Update,
+                fx_test.run_if(|| std::env::var_os("DUSK_FX_TEST").is_some()).run_if(crate::state::in_game),
+            );
     }
 }
 

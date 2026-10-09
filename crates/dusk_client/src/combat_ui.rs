@@ -17,11 +17,18 @@ pub struct CombatUiPlugin;
 
 impl Plugin for CombatUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (load_font, spawn_hud).chain())
-            .add_systems(Startup, spawn_target_ring)
-            .add_systems(Update, (click_target, tab_target, sync_targeted, animate_floating_text, update_death_notice))
-            .add_systems(PostUpdate, follow_target_ring)
-            .add_systems(Update, autoplay.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()));
+        app.add_systems(Startup, load_font)
+            .add_systems(OnEnter(crate::state::AppState::InGame), (spawn_hud, spawn_target_ring))
+            .add_systems(
+                Update,
+                (click_target, tab_target, sync_targeted, update_death_notice).run_if(crate::state::in_game),
+            )
+            .add_systems(Update, animate_floating_text)
+            .add_systems(PostUpdate, follow_target_ring.run_if(crate::state::in_game))
+            .add_systems(
+                Update,
+                autoplay.run_if(|| std::env::var_os("DUSK_AUTOPLAY").is_some()).run_if(crate::state::in_game),
+            );
     }
 }
 

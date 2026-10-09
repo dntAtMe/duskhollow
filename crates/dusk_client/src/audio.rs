@@ -53,18 +53,20 @@ impl Plugin for AudioPlugin {
             .init_resource::<Proximity>()
             .init_resource::<SfxQueue>()
             .init_resource::<Rng>()
+            .init_resource::<Listener>()
             .add_message::<PlaySfx>()
             .add_systems(Startup, setup)
             .add_systems(
                 Update,
                 (
-                    toggle_keys,
+                    update_listener,
+                    toggle_keys.run_if(crate::state::in_game),
                     on_map_loaded,
                     update_regions,
                     drive_tracks,
                     drive_proximity,
-                    combat_sounds,
-                    spell_sounds,
+                    combat_sounds.run_if(crate::state::in_game),
+                    spell_sounds.run_if(crate::state::in_game),
                     ui_sounds,
                     play_sfx,
                     fade_notice,
@@ -85,6 +87,8 @@ pub struct AudioSettings {
     pub sfx_on: bool,
     pub music_volume: f32,
     pub sfx_volume: f32,
+    /// Scales both (the main menu's master volume; 1 by default).
+    pub master_volume: f32,
     /// `DUSK_AUDIO_LOG`: log every started sound at info level.
     pub log: bool,
 }
@@ -97,6 +101,7 @@ impl Default for AudioSettings {
             sfx_on: true,
             music_volume: 0.15,
             sfx_volume: 0.20,
+            master_volume: 1.0,
             log: std::env::var_os("DUSK_AUDIO_LOG").is_some(),
         }
     }
@@ -130,11 +135,11 @@ impl AudioSettings {
     }
 
     fn music_gain(&self) -> f32 {
-        if self.music_on { self.music_volume } else { 0.0 }
+        if self.music_on { self.music_volume * self.master_volume } else { 0.0 }
     }
 
     fn sfx_gain(&self) -> f32 {
-        if self.sfx_on { self.sfx_volume } else { 0.0 }
+        if self.sfx_on { self.sfx_volume * self.master_volume } else { 0.0 }
     }
 
     fn log(&self, what: std::fmt::Arguments) {
@@ -148,6 +153,25 @@ impl AudioSettings {
 
 #[derive(Resource, Default)]
 struct SoundDb(SoundTables);
+
+/// Where the ears are (cells): the player, else (main menu) the middle of the view.
+#[derive(Resource, Default)]
+pub struct Listener(pub Option<Vec2>);
+
+fn update_listener(
+    player: Query<&Unit, With<Player>>,
+    camera: Query<&Transform, With<crate::player::MainCamera>>,
+    mut listener: ResMut<Listener>,
+) {
+    let at = player
+        .single()
+        .ok()
+        .map(|u| u.pos)
+        .or_else(|| camera.single().ok().map(|t| crate::iso::to_cell(t.translation.truncate())));
+    if listener.0 != at {
+        listener.0 = at;
+    }
+}
 
 fn setup(mut commands: Commands, data: Res<GameData>, mut settings: ResMut<AudioSettings>) {
     if let Ok(text) = std::fs::read_to_string(data.root.join("config.ini")) {
@@ -453,15 +477,15 @@ fn update_regions(
     settings: Res<AudioSettings>,
     mut rng: ResMut<Rng>,
     mut music: ResMut<Music>,
-    player: Query<&Unit, With<Player>>,
+    listener: Res<Listener>,
 ) {
     music.check -= time.delta_secs();
     if music.check > 0.0 && !music.dirty {
         return;
     }
     music.check = REGION_CHECK;
-    let Ok(unit) = player.single() else { return };
-    let key = music.region.at(unit.pos.x, unit.pos.y);
+    let Some(pos) = listener.0 else { return };
+    let key = music.region.at(pos.x, pos.y);
     if !music.dirty {
         // DESIGN: zone-less chunks (borders, unpainted terrain) keep whatever plays, and a new
         // region must hold for two checks, so walking along a border does not flip-flop.
@@ -608,9 +632,9 @@ fn drive_proximity(
     settings: Res<AudioSettings>,
     mut proximity: ResMut<Proximity>,
     mut sinks: Query<&mut AudioSink, With<ProximityVoice>>,
-    player: Query<&Unit, With<Player>>,
+    listener: Res<Listener>,
 ) {
-    let Ok(listener) = player.single().map(|u| u.pos) else { return };
+    let Some(listener) = listener.0 else { return };
     proximity.check -= time.delta_secs();
     let recheck = proximity.check <= 0.0;
     if recheck {
@@ -814,7 +838,7 @@ fn spell_sounds(
 
 /// Button clicks, target selection and level-up alerts.
 fn ui_sounds(
-    state: Res<PlayerState>,
+    state: Option<Res<PlayerState>>,
     mut last_level: Local<u32>,
     buttons: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
     targeted: Query<(), Added<Targeted>>,
@@ -826,10 +850,11 @@ fn ui_sounds(
     if !targeted.is_empty() {
         out.write(PlaySfx::ui(builtin::TARGET_OPEN));
     }
-    if *last_level > 0 && state.level > *last_level {
+    let level = state.map_or(0, |s| s.level);
+    if *last_level > 0 && level > *last_level {
         out.write(PlaySfx::ui(builtin::LEVEL_UP));
     }
-    *last_level = state.level;
+    *last_level = level;
 }
 
 // ---------------------------------------------------------------- keys + notice
