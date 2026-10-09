@@ -203,7 +203,7 @@ fn resolve_esc(
     book: Res<crate::spells_ui::Spellbook>,
     windows: Res<Windows>,
     dialogue: Res<Dialogue>,
-    state: Res<PlayerState>,
+    state: Option<Res<PlayerState>>,
     menu: Query<(&Interaction, &MicroButton), Changed<Interaction>>,
     mut esc: ResMut<EscAction>,
 ) {
@@ -216,13 +216,13 @@ fn resolve_esc(
             EscAction::TextInput
         } else if modal.card {
             EscAction::Card
-        } else if book.is_casting() && !state.dead {
+        } else if book.is_casting() && state.as_ref().is_some_and(|s| !s.dead) {
             EscAction::CancelCast
         } else if let Some(top) = windows.top() {
             EscAction::CloseWindow(top)
         } else if dialogue.is_open() {
             EscAction::CloseDialogue
-        } else if state.target.is_some() {
+        } else if state.as_ref().is_some_and(|s| s.target.is_some()) {
             EscAction::ClearTarget
         } else {
             EscAction::Unhandled
@@ -761,7 +761,7 @@ fn cursor_icon(
     camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     captured: Res<UiInputCaptured>,
     data: Res<GameData>,
-    net: Res<Net>,
+    net: Option<Res<Net>>,
     buttons: Query<(&Interaction, &InheritedVisibility), With<Button>>,
     living: Query<(Entity, &Unit, &Npc, &Transform), (Without<Dead>, Without<Player>)>,
     corpses: Query<(Entity, &Unit, &Transform), With<Dead>>,
@@ -785,7 +785,7 @@ fn cursor_icon(
                     let inside = (at.x - feet.x).abs() <= 26.0 * u.scale
                         && at.y >= feet.y - 16.0
                         && at.y <= feet.y + 40.0 * u.scale;
-                    inside && net.entity_id(e).is_some_and(|id| loot.is_lootable(id))
+                    inside && net.as_ref().and_then(|n| n.entity_id(e)).is_some_and(|id| loot.is_lootable(id))
                 });
                 if over_loot {
                     icon = SystemCursorIcon::Grab;
