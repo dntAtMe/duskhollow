@@ -14,31 +14,21 @@ pub struct SpriteFx {
     pub hotspots: HashMap<String, (i32, i32)>,
     /// (lowercase sprite name prefix, cells roofed beyond the back cell).
     pub roofs: Vec<(String, (i32, i32))>,
-    /// Zone id -> darkness (0..1). Stream 0 only: Stream B replaces it with `MapInfo.darkness`.
-    pub zone_night: HashMap<u32, f32>,
 }
 
+/// Every `sprite_fx.txt`, `hotspots.txt` and `roofs.txt` under `content/`.
 pub fn load(root: &Path) -> anyhow::Result<SpriteFx> {
-    let db = super::legacy_db()?;
-    crate::legacy_note("game.db", "sprite_psi, sprite_light, sprite_hotspot, zone_template.night_pct");
-    let mut psi = db.sprite_psi()?;
-    let mut lights = db.sprite_lights()?;
-    let mut hotspots = db.sprite_hotspots()?;
-    let (own_psi, own_lights) = parse_custom_fx(&metadata(root, "sprite_fx.txt"));
-    for (k, v) in own_psi {
-        psi.entry(k).or_default().push(v);
+    let mut fx = SpriteFx::default();
+    let (psi, lights) = parse_custom_fx(&metadata(root, "sprite_fx.txt"));
+    for (k, v) in psi {
+        fx.psi.entry(k).or_default().push(v);
     }
-    for (k, v) in own_lights {
-        lights.entry(k).or_default().push(v);
+    for (k, v) in lights {
+        fx.lights.entry(k).or_default().push(v);
     }
-    hotspots.extend(parse_hotspots(&metadata(root, "hotspots.txt")));
-    Ok(SpriteFx {
-        psi,
-        lights,
-        hotspots,
-        roofs: parse_roofs(&metadata(root, "roofs.txt")),
-        zone_night: db.zone_night_pct()?,
-    })
+    fx.hotspots.extend(parse_hotspots(&metadata(root, "hotspots.txt")));
+    fx.roofs = parse_roofs(&metadata(root, "roofs.txt"));
+    Ok(fx)
 }
 
 /// Every file called `file_name` under `content/` (metadata written next to the art by
@@ -89,5 +79,18 @@ mod tests {
     fn hotspots_and_roofs() {
         assert_eq!(parse_hotspots("A.png 3 -4\n# c\nbad\n"), [("a.png".to_string(), (3, -4))]);
         assert_eq!(parse_roofs("# c\nroof House_ 2 1\n"), [("house_".to_string(), (2, 1))]);
+    }
+
+    /// Every shipped emitter names a particle system of `data/particles.txt`.
+    #[test]
+    fn shipped_emitters_resolve() {
+        let root = crate::content_root();
+        let fx = load(&root).unwrap();
+        let particles = super::super::particles::load(&root).unwrap();
+        assert!(fx.psi.contains_key("green_firefly.psi"), "glade fireflies");
+        for (sprite, e) in fx.psi.iter().flat_map(|(k, v)| v.iter().map(move |e| (k, e))) {
+            assert!(particles.contains_key(&e.psi), "{sprite}: particles {}", e.psi);
+        }
+        assert!(!fx.lights.is_empty());
     }
 }

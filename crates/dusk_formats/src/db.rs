@@ -45,6 +45,8 @@ pub struct MapInfo {
     pub start: (f32, f32),
     /// New characters start on this map (at `start`) unless told otherwise.
     pub default: bool,
+    /// Darkness over the map, 0 (none) ..= 1 (black outside the lights).
+    pub darkness: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -176,6 +178,7 @@ impl GameDb {
             ambience: text(r, "ambience"),
             start: (real(r, "start_x"), real(r, "start_y")),
             default: false,
+            darkness: 0.0,
         })
     }
 

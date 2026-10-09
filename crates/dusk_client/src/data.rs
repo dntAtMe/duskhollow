@@ -30,11 +30,9 @@ pub struct GameData {
     /// Roof sprites from `roofs.txt`: (lowercase name prefix, cells roofed beyond the back cell).
     pub roofs: Vec<(String, IVec2)>,
     pub spell_visuals: HashMap<i64, SpellVisual>,
-    /// `sprite_psi` / `sprite_light` by lowercase sprite filename.
+    /// Map sprite particle emitters / lights (`sprite_fx.txt`) by lowercase sprite filename.
     pub sprite_psi: HashMap<String, Vec<SpritePsi>>,
     pub sprite_lights: HashMap<String, Vec<SpriteLight>>,
-    /// `zone_template.night_pct` by zone id.
-    pub zone_night: HashMap<u32, f32>,
     /// Particle systems by `content::particles::key`.
     particles: HashMap<String, ParticleSystemInfo>,
     flipbooks: Mutex<HashMap<String, Option<Arc<SpriteAnim>>>>,
@@ -85,7 +83,6 @@ impl GameData {
             spell_visuals,
             sprite_psi: fx.psi,
             sprite_lights: fx.lights,
-            zone_night: fx.zone_night,
             particles: content::particles::load(root)?,
             flipbooks: default(),
             image_sizes: default(),
@@ -107,14 +104,9 @@ impl GameData {
         dusk_formats::find_file(&self.root, rel)
     }
 
-    /// Particle system by name (`campfire.psi` or `campfire`).
+    /// Particle system of `data/particles.txt` by name (`campfire`, `.psi` suffix ignored).
     pub fn particle_system(&self, name: &str) -> Option<ParticleSystemInfo> {
-        let key = content::particles::key(name);
-        let info = self.particles.get(&key).copied();
-        if info.is_some() {
-            dusk_formats::legacy_note("particles", &key);
-        }
-        info
+        self.particles.get(&content::particles::key(name)).copied()
     }
 
     /// Loads a `.sa` flipbook by name (`content::visuals::flipbook_path`: ours first), cached.
