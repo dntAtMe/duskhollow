@@ -162,3 +162,90 @@ Fresh clone with no legacy folder and no `DUSK_ASSETS`/`DUSK_LEGACY`: `cargo bui
 
 ## 5. Visible changes
 Legacy maps gone (default server start → Duskhollow); legacy class skills gone (replaced by our own per class); new item names, our base set and a smaller affix pool; all combat/UI/spell sounds procedural; new UI font (check overflows); re-authored particles and glows; per-map darkness; "Custom art" and "Legacy maps" options removed.
+
+## Runtime legacy inventory (Stream 0)
+
+Recorded with `DUSK_LEGACY_LOG=1` (each distinct legacy access printed once as `[legacy] kind: what` on
+stderr) on `custom_duskhollow` and `custom_glade` with `--art custom`: arrival, `DUSK_AUTOPLAY=1` fights
+(autoplay also casts the action bar) for classes 1-4 on both maps, `DUSK_DIALOGUE_TEST=50010` (Lowshade,
+cairn fire), `DUSK_BOSS_TEST=1`, `DUSK_OPEN=character,inventory,abilities,journal`, `DUSK_OPEN_BOOK=1`,
+plus the quest bot against a standalone server. Re-run the same set after each stream; whatever a
+stream owns must be gone from the log.
+
+**Load time (every launch).** `game.db` tables: `map, teleport_names` + `npc` (maps); `npc_template,
+npc_models, npc_models_junkloot`; `spell_template`; `spell_visual, spell_visual_kit`; `player_class_stats,
+player_exp_levels, player_create_spell, player_create_item, player_desirable_armor, player_desirable_stats`;
+`item_template, affix_template, loot, material_chance_weapon, material_chance_armor`; `sprite_psi,
+sprite_light, sprite_hotspot, zone_template.night_pct`; `zone_template, area_template, npc_sounds,
+sprite_proximity_sound`. Files: `file_index.txt`, `scripts/particles/*.psi` (whole directory), the 13
+legacy `maps/*.map` (server).
+
+**Runtime (our maps).**
+| Kind | Seen |
+|---|---|
+| Fonts | `Friz Quadrata Regular.ttf`, `Friz Quadrata Bold.ttf` |
+| Light textures | `content/misc/light_source.png`, `content/misc/shader_light.png` |
+| Text | `scripts/sprite/portrait_offset.txt` (always read by the HUD); `scripts/text/help.txt` on `/help`; `config.ini` when present |
+| NPC templates | glade: 2 Antling, 8 Spiderite, 13 Crazed One, 14 Venomous One |
+| Spells cast | legacy class skills 9 Holy Wrath, 10 Radiance, 13 Mighty Blow, 27 Ignite, 29 Fireball, 31 Chains of Ice, 43 Sinister Strike, 46 Entangling Shot, 60 Mark Target, 69 Holy Bolt, 77 Rejuvenation, 79 Plague; NPC spells 229 Rend (Alpha), 67 Harrowing Strike (Corvin; 275 War Stomp did not fire in these runs). Auto attacks 81/82 and potions 89/95 are not logged (no cast request) but are still legacy |
+| Items | starters 13-20, 23, 25; glade junk 50, 53, 54; generated gear (7376, 7377, 10429, 11026, 13827, 13926, 19176, 19376, 19427 ...) |
+| Particles | campfire, small_light_embers (cairn fires), green_firefly (glade), casting_fire, casting_frost, casting_holy, cheapshot, entangleshot, fireball, holybolt, scorch |
+| Kits, our spells | 50001: 18 impact (slash_002c), 153 aura (disarm.psi); 50002: 179 impact (slash_002b); 50003: 15 impact (water_001), 61 aura (wind_003b); 50004: 6 go (wind_003a), 129 impact (slash_001); 50005: 199 go (earth_002a); 50006: 78 traveling (cheapshot.psi), 132 impact (slash_001); 50007: 119 casting (casting_fire.psi), 122 traveling (scorch.psi), 47 impact (effect_004); 50008: 105 casting, 55 traveling (entangleshot.psi), 126 impact (slash_001); 50009: 119 casting, 98 impact (light_003); 50010: 158 impact (effect_003); 229 Rend: 179 |
+| Kits, legacy skills | 13, 14, 17, 32, 33, 38, 42, 52, 81, 90, 99, 113, 114, 119, 121, 125 (go away with the legacy class skills) |
+| Sounds, builtin | attack_hit_var01..05.wav, attack_sword_normal_{s,m,m2,h}.ogg, dodge_default.wav, swishverb4.ogg, attack_metal_case.ogg, e3_attack_hardhit01..03.ogg, vdamage3_mlb_4.ogg, alert_levelup_a.ogg, window_open_a.ogg, window_target_open_a.ogg |
+| Sounds, kits of our spells | skill_dpatk1_hit.wav, e3_attack_insecthit04.ogg, attack_book_normal_critical.ogg, skill_symbolofvalkyrie.wav, item_att_big_sword.ogg, skill_bleeding_shot.wav, swish_2weapon_02.ogg, magic_cast_fire.ogg, magic_fire_point_fire2.wav, skill_explosivearrow.wav, squish_3.ogg, arrow_fire1.ogg, skill_warpoweratk_hit_a.ogg, skill_heal_poison.wav, skill_mighty_blow_fire.ogg (plus the legacy-skill kit sounds) |
+| Sounds, glade NPC voices | shulack_ranger_attack_01/02, shulack_ranger_damage_01, shulack_wizard_damage_01/02, ratman_voice_05_damage, starcrab_voice_02_idle/03_damage/04_die, e3_frillfaimam_die |
+
+No legacy sprite scripts, sheets, portraits, icons, UI art or `.sa` scripts were read with `--art custom`
+(flipbooks now always come from `scripts/override/animation` first).
+
+### Final contract (as implemented)
+Every loader takes our content root (`dusk_formats::content_root()`); legacy access stays inside the
+bodies (`content::legacy_db()`, `legacy_root()`).
+```rust
+// dusk_formats (lib.rs)
+pub fn content_root() -> PathBuf;  pub fn legacy_root() -> PathBuf;  pub fn assets_root() -> PathBuf; // = legacy_root
+pub const LEGACY_SOURCE: &str = "legacy://";
+pub fn legacy_log_enabled() -> bool;  pub fn legacy_note(kind: &str, what: impl Display);
+pub fn fs_path(rel: &str) -> PathBuf;                        // legacy://x -> legacy_root/x (logged), else content_root/x
+pub fn find_file(root: &Path, rel: &str) -> Option<PathBuf>; // root/rel, else legacy_root/rel (logged)
+FileIndex::load_legacy() -> FileIndex;  FileIndex::load_prefixed(path, prefix) -> io::Result<FileIndex>
+// content::sections: as planned, plus Section::id_int(&self) -> Option<i64>
+// content::rules
+pub fn load(root: &Path) -> anyhow::Result<Rules>; // Rules { class_stats: HashMap<(i64,i64),ClassStats>, exp_levels: Vec<ExpLevel>,
+//   class_spells: HashMap<i64,Vec<i64>>, start_items: HashMap<i64,Vec<(i64,i64)>>, class_armor: HashMap<i64,Vec<i64>>,
+//   desirable_stats: HashMap<i64,Vec<i64>>, class_weapons: HashMap<i64,Vec<i64>> }
+// content::npcs
+pub fn load(root: &Path) -> anyhow::Result<Npcs>; // Npcs { templates: HashMap<i64,NpcTemplate>, models: HashMap<i64,NpcModel>,
+//   loot: HashMap<i64,NpcLoot> /* by template entry */, junk: HashMap<i64,Vec<i64>> /* by model id */ }
+// content::spells
+pub fn load(root: &Path) -> anyhow::Result<HashMap<i64, SpellTemplate>>;
+// content::items
+pub fn load(root: &Path) -> anyhow::Result<ItemTables>; // ItemTables { items, affixes, loot_tables: HashMap<i64,Vec<LootRow>>,
+//   grid: HashMap<(i64,i64),Vec<i64>>, materials: HashMap<(bool,i64,i64),f32> /* Stream 0 only, A drops it */ }
+pub fn generated_grid(items: &HashMap<i64, ItemTemplate>) -> HashMap<(i64, i64), Vec<i64>>;
+// content::maps
+pub fn load(root: &Path) -> anyhow::Result<Vec<MapInfo>>; // MapInfo gains `default: bool`; the default map's `start` is the start spot
+pub fn spawns(root: &Path, map: &MapInfo) -> Vec<NpcSpawn>;
+pub fn default_map(maps: &[MapInfo]) -> Option<&MapInfo>;
+pub fn map_file(root: &Path, name: &str, ext: &str) -> Option<PathBuf>; // ours, else legacy
+pub const CUSTOM_MAP_FIRST: i64 = 10_000;
+// content::visuals (KitAnim, VisualKit, SpellVisual, CustomVisual live here; spell.rs re-exports the first three)
+pub fn load(root: &Path, spells: &HashMap<i64, SpellTemplate>) -> anyhow::Result<HashMap<i64, SpellVisual>>; // keys ⊆ spells
+pub fn flipbook_path(root: &Path, name: &str) -> Option<PathBuf>;
+pub fn parse_spell_visuals(sections: &[Section]) -> anyhow::Result<HashMap<i64, CustomVisual>>;
+pub const SPELL_VISUAL_KEYS: &[&str];  pub fn unit_anim_id(v: &str) -> i64;
+// content::particles
+pub fn load(root: &Path) -> anyhow::Result<HashMap<String, ParticleSystemInfo>>; pub fn key(name: &str) -> String; // lowercase, no .psi
+// content::sprite_fx
+pub fn load(root: &Path) -> anyhow::Result<SpriteFx>; // SpriteFx { psi, lights, hotspots: HashMap<String,(i32,i32)>,
+//   roofs: Vec<(String,(i32,i32))>, zone_night: HashMap<u32,f32> /* Stream 0 only, B replaces with MapInfo.darkness */ }
+// content::sounds
+pub fn load(root: &Path) -> anyhow::Result<SoundTables>;
+```
+Client: `GameData.root` is the content root; `GameData::{fs_path, find_file, particle_system}`;
+`asset_path()` returns content-relative paths or `legacy://...` (Bevy source `legacy` registered in
+`main.rs`, logging reader). `ServerConfig.assets` is the content root. Removed: `custom::install`,
+`custom::merge_spells`, `CustomSpell`, `custom_assets_root()`, `FileIndex::resolve_path`;
+`custom::parse_spells` returns `Vec<SpellTemplate>`. Deviations from the planned signatures:
+`ItemTables.materials`, `SpriteFx.zone_night`, `MapInfo.default`, `maps::map_file`, `items::generated_grid`.
