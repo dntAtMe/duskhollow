@@ -1,0 +1,407 @@
+# Random enchantments (dusk_formats::content::items): "<Prefix> <Item> of (the) <Noun>".
+#   name   "Noun" or "Prefix Noun" (the noun is one word)
+#   noun=1 "of the Noun", else "of Noun"
+#   level  required-level band the affix rolls in
+#   stat=<key>:<factor>  per-level factor: amount = factor x (1 + level/8) x quality
+#          (green 1, blue 1.25, gold 1.5, purple 2; Health and Mana x10)
+# Ids: theme x 10 + band (1 levels 1-5, 2 6-13, 3 14-19, 4 20-25).
+
+# strength
+[11]
+name=Hauler
+noun=1
+level=1-5
+stat=strength:1.7
+
+[12]
+name=Steady Hauler
+noun=1
+level=6-13
+stat=strength:2.1
+
+[13]
+name=Grim Hauler
+noun=1
+level=14-19
+stat=strength:2.5
+
+[14]
+name=Unblinking Hauler
+noun=1
+level=20-25
+stat=strength:3.0
+
+# agility
+[21]
+name=Gleaner
+noun=1
+level=1-5
+stat=agility:1.7
+
+[22]
+name=Steady Gleaner
+noun=1
+level=6-13
+stat=agility:2.1
+
+[23]
+name=Grim Gleaner
+noun=1
+level=14-19
+stat=agility:2.5
+
+[24]
+name=Unblinking Gleaner
+noun=1
+level=20-25
+stat=agility:3.0
+
+# willpower
+[31]
+name=Vigil
+noun=1
+level=1-5
+stat=willpower:1.7
+
+[32]
+name=Steady Vigil
+noun=1
+level=6-13
+stat=willpower:2.1
+
+[33]
+name=Grim Vigil
+noun=1
+level=14-19
+stat=willpower:2.5
+
+[34]
+name=Unblinking Vigil
+noun=1
+level=20-25
+stat=willpower:3.0
+
+# intelligence
+[41]
+name=Lamplighter
+noun=1
+level=1-5
+stat=intelligence:1.7
+
+[42]
+name=Steady Lamplighter
+noun=1
+level=6-13
+stat=intelligence:2.1
+
+[43]
+name=Grim Lamplighter
+noun=1
+level=14-19
+stat=intelligence:2.5
+
+[44]
+name=Unblinking Lamplighter
+noun=1
+level=20-25
+stat=intelligence:3.0
+
+# courage
+[51]
+name=Ender
+noun=1
+level=1-5
+stat=courage:1.7
+
+[52]
+name=Steady Ender
+noun=1
+level=6-13
+stat=courage:2.1
+
+[53]
+name=Grim Ender
+noun=1
+level=14-19
+stat=courage:2.5
+
+[54]
+name=Unblinking Ender
+noun=1
+level=20-25
+stat=courage:3.0
+
+# health
+[61]
+name=Warden
+noun=1
+level=1-5
+stat=health:1.7
+
+[62]
+name=Steady Warden
+noun=1
+level=6-13
+stat=health:2.1
+
+[63]
+name=Grim Warden
+noun=1
+level=14-19
+stat=health:2.5
+
+[64]
+name=Unblinking Warden
+noun=1
+level=20-25
+stat=health:3.0
+
+# mana
+[71]
+name=Embers
+noun=0
+level=1-5
+stat=mana:1.7
+
+[72]
+name=Steady Embers
+noun=0
+level=6-13
+stat=mana:2.1
+
+[73]
+name=Grim Embers
+noun=0
+level=14-19
+stat=mana:2.5
+
+[74]
+name=Unblinking Embers
+noun=0
+level=20-25
+stat=mana:3.0
+
+# armor
+[81]
+name=Overhang
+noun=1
+level=1-5
+stat=armor:1.7
+
+[82]
+name=Steady Overhang
+noun=1
+level=6-13
+stat=armor:2.1
+
+[83]
+name=Grim Overhang
+noun=1
+level=14-19
+stat=armor:2.5
+
+[84]
+name=Unblinking Overhang
+noun=1
+level=20-25
+stat=armor:3.0
+
+# regeneration
+[91]
+name=Cairns
+noun=0
+level=1-5
+stat=regeneration:1.7
+
+[92]
+name=Steady Cairns
+noun=0
+level=6-13
+stat=regeneration:2.1
+
+[93]
+name=Grim Cairns
+noun=0
+level=14-19
+stat=regeneration:2.5
+
+[94]
+name=Unblinking Cairns
+noun=0
+level=20-25
+stat=regeneration:3.0
+
+# meditate
+[101]
+name=Stillness
+noun=0
+level=1-5
+stat=meditate:1.7
+
+[102]
+name=Steady Stillness
+noun=0
+level=6-13
+stat=meditate:2.1
+
+[103]
+name=Grim Stillness
+noun=0
+level=14-19
+stat=meditate:2.5
+
+[104]
+name=Unblinking Stillness
+noun=0
+level=20-25
+stat=meditate:3.0
+
+# weapon_value
+[111]
+name=Whetstone
+noun=1
+level=1-5
+stat=weapon_value:0.28
+
+[112]
+name=Steady Whetstone
+noun=1
+level=6-13
+stat=weapon_value:0.36
+
+[113]
+name=Grim Whetstone
+noun=1
+level=14-19
+stat=weapon_value:0.43
+
+[114]
+name=Unblinking Whetstone
+noun=1
+level=20-25
+stat=weapon_value:0.5
+
+# ranged_weapon_value
+[121]
+name=Fletcher
+noun=1
+level=1-5
+stat=ranged_weapon_value:0.57
+
+[122]
+name=Steady Fletcher
+noun=1
+level=6-13
+stat=ranged_weapon_value:0.7
+
+[123]
+name=Grim Fletcher
+noun=1
+level=14-19
+stat=ranged_weapon_value:0.85
+
+[124]
+name=Unblinking Fletcher
+noun=1
+level=20-25
+stat=ranged_weapon_value:1.0
+
+# melee_crit
+[131]
+name=Sickle
+noun=1
+level=1-5
+stat=melee_crit:0.57
+
+[132]
+name=Steady Sickle
+noun=1
+level=6-13
+stat=melee_crit:0.7
+
+[133]
+name=Grim Sickle
+noun=1
+level=14-19
+stat=melee_crit:0.85
+
+[134]
+name=Unblinking Sickle
+noun=1
+level=20-25
+stat=melee_crit:1.0
+
+# spell_crit
+[141]
+name=Brazier
+noun=1
+level=1-5
+stat=spell_crit:0.57
+
+[142]
+name=Steady Brazier
+noun=1
+level=6-13
+stat=spell_crit:0.7
+
+[143]
+name=Grim Brazier
+noun=1
+level=14-19
+stat=spell_crit:0.85
+
+[144]
+name=Unblinking Brazier
+noun=1
+level=20-25
+stat=spell_crit:1.0
+
+# dodge
+[151]
+name=Fox
+noun=1
+level=1-5
+stat=dodge:1.7
+
+[152]
+name=Steady Fox
+noun=1
+level=6-13
+stat=dodge:2.1
+
+[153]
+name=Grim Fox
+noun=1
+level=14-19
+stat=dodge:2.5
+
+[154]
+name=Unblinking Fox
+noun=1
+level=20-25
+stat=dodge:3.0
+
+# resist_shadow
+[161]
+name=Shade
+noun=1
+level=1-5
+stat=resist_shadow:1.7
+
+[162]
+name=Steady Shade
+noun=1
+level=6-13
+stat=resist_shadow:2.1
+
+[163]
+name=Grim Shade
+noun=1
+level=14-19
+stat=resist_shadow:2.5
+
+[164]
+name=Unblinking Shade
+noun=1
+level=20-25
+stat=resist_shadow:3.0

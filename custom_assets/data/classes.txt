@@ -1,0 +1,96 @@
+# The four kinds of Ender (dusk_formats::content::rules). Section id = class id.
+#   hp mana strength agility willpower intelligence courage: formulas over clvl (the level)
+#   armor=    families (cloth leather mail plate robe) or armour type numbers; basic cloth is
+#             always allowed
+#   weapons=  axe bow mace sword staff dagger wand, and shield
+#   stats=    stat keys this class's loot favours (affixes are picked among them 3 times in 4)
+#   start_item=<item>,<count>   what a new character carries (gear is put on), in order
+#
+# Health and mana grow a little faster than linear: base x clvl x (59 + clvl) / 60.
+
+[1]
+name=Vanguard
+role=Steel and stubbornness
+hp=75*clvl*(59+clvl)/60
+mana=30*clvl*(59+clvl)/60
+strength=15
+agility=10
+willpower=5
+intelligence=5
+courage=15
+armor=leather,mail,plate
+weapons=axe,mace,sword,dagger,shield
+stats=health,mana,armor,strength,courage,regeneration,weapon_value,melee_crit,dodge,block,resist_shadow
+start_item=1,5
+start_item=2,5
+start_item=10,1
+start_item=11,1
+start_item=12,1
+start_item=13,1
+start_item=14,1
+start_item=15,1
+
+[2]
+name=Emberwright
+role=Cairn fire, carried
+hp=40*clvl*(59+clvl)/60
+mana=70*clvl*(59+clvl)/60
+strength=5
+agility=5
+willpower=15
+intelligence=20
+courage=10
+armor=cloth,robe
+weapons=staff,wand
+stats=health,mana,armor,willpower,intelligence,courage,regeneration,meditate,spell_crit,resist_shadow
+start_item=1,5
+start_item=2,5
+start_item=10,1
+start_item=11,1
+start_item=12,1
+start_item=13,1
+start_item=18,1
+
+[3]
+name=Cutthroat
+role=Knives and hooks
+hp=60*clvl*(59+clvl)/60
+mana=45*clvl*(59+clvl)/60
+strength=10
+agility=15
+willpower=10
+intelligence=10
+courage=10
+armor=leather,mail
+weapons=bow,dagger
+stats=health,mana,armor,strength,agility,courage,regeneration,weapon_value,ranged_weapon_value,melee_crit,ranged_crit,dodge,resist_shadow
+start_item=1,5
+start_item=2,5
+start_item=10,1
+start_item=11,1
+start_item=12,1
+start_item=13,1
+start_item=16,1
+start_item=17,1
+
+[4]
+name=Ashpriest
+role=Ember prayers
+hp=45*clvl*(59+clvl)/60
+mana=65*clvl*(59+clvl)/60
+strength=10
+agility=5
+willpower=20
+intelligence=15
+courage=5
+armor=cloth,robe
+weapons=staff,mace,shield
+stats=health,mana,armor,willpower,intelligence,courage,regeneration,meditate,spell_crit,dodge,resist_shadow
+start_item=1,5
+start_item=2,5
+start_item=10,1
+start_item=11,1
+start_item=12,1
+start_item=13,1
+start_item=14,1
+start_item=19,1

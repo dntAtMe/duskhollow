@@ -29,7 +29,7 @@ pub(crate) fn real(row: &Row, col: &str) -> f32 {
 
 pub(crate) fn text(row: &Row, col: &str) -> String {
     match row.get_ref(col) {
-        Ok(ValueRef::Text(t)) => String::from_utf8_lossy(t).into_owned(),
+        Ok(ValueRef::Text(t)) => String::from_utf8_lossy(t).trim().to_string(),
         Ok(ValueRef::Integer(i)) => i.to_string(),
         _ => String::new(),
     }
@@ -38,14 +38,18 @@ pub(crate) fn text(row: &Row, col: &str) -> String {
 #[derive(Debug, Clone)]
 pub struct MapInfo {
     pub id: i64,
+    /// File name of `maps/<name>.map`.
     pub name: String,
-    /// Comma-separated list of tracks in the original.
+    /// Display name.
+    pub title: String,
+    /// Tracks (empty = the whole soundtrack).
     pub music: Vec<String>,
     pub ambience: String,
+    /// Cells; the `arrival` marker of our maps ((0, 0) = none).
     pub start: (f32, f32),
     /// New characters start on this map (at `start`) unless told otherwise.
     pub default: bool,
-    /// Darkness over the map, 0 (none) ..= 1 (black outside the lights).
+    /// 0 = full light .. 1 = black.
     pub darkness: f32,
 }
 
@@ -178,6 +182,7 @@ impl GameDb {
             ambience: text(r, "ambience"),
             start: (real(r, "start_x"), real(r, "start_y")),
             default: false,
+            title: text(r, "name"),
             darkness: 0.0,
         })
     }
@@ -297,5 +302,221 @@ fn spawn(r: &Row) -> NpcSpawn {
         respawn_time: int(r, "respawn_time"),
         movement_type: int(r, "movement_type"),
         wander_distance: int(r, "wander_distance"),
+    }
+}
+
+// ---------------------------------------------------------------- legacy readers kept for the
+// legacy tests (`tests/real_assets.rs`); gameplay reads `crate::content` only.
+
+use crate::item::{Affix, ItemTemplate, LootRow, NpcLoot};
+use crate::spell::{SpellEffect, SpellTemplate};
+
+fn collect<T>(db: &GameDb, sql: &str, f: impl Fn(&Row) -> T) -> rusqlite::Result<Vec<T>> {
+    let mut stmt = db.conn().prepare(sql)?;
+    let rows = stmt.query_map([], |r| Ok(f(r)))?;
+    rows.collect()
+}
+
+impl GameDb {
+    pub fn items(&self) -> rusqlite::Result<HashMap<i64, ItemTemplate>> {
+        let v = collect(self, "SELECT * FROM item_template", |r| ItemTemplate {
+            entry: int(r, "entry"),
+            name: text(r, "name"),
+            icon: text(r, "icon"),
+            sound: text(r, "icon_sound"),
+            model: text(r, "model"),
+            required_level: int(r, "required_level"),
+            weapon_type: int(r, "weapon_type"),
+            armor_type: int(r, "armor_type"),
+            equip_type: int(r, "equip_type"),
+            weapon_material: int(r, "weapon_material"),
+            num_sockets: int(r, "num_sockets"),
+            quality: int(r, "quality"),
+            item_level: int(r, "item_level"),
+            durability: int(r, "durability"),
+            sell_price: real(r, "sell_price").round() as i64,
+            stack_count: int(r, "stack_count"),
+            required_class: int(r, "required_class"),
+            flags: int(r, "flags"),
+            generated: int(r, "generated") != 0,
+            spells: (1..=5).map(|i| int(r, &format!("spell_{i}"))).filter(|s| *s > 0).collect(),
+            stats: (1..=10)
+                .map(|i| (int(r, &format!("stat_type{i}")), int(r, &format!("stat_value{i}"))))
+                .filter(|(t, v)| *t > 0 && *v != 0)
+                .collect(),
+            description: text(r, "description"),
+        })?;
+        Ok(v.into_iter().map(|t| (t.entry, t)).collect())
+    }
+
+    pub fn affixes(&self) -> rusqlite::Result<HashMap<i64, Affix>> {
+        let v = collect(self, "SELECT * FROM affix_template", |r| Affix {
+            entry: int(r, "entry"),
+            name: text(r, "name"),
+            single_noun: int(r, "name_single_noun") != 0,
+            min_level: int(r, "min_level"),
+            max_level: int(r, "max_level"),
+            stats: (1..=5)
+                .map(|i| (int(r, &format!("stat_type{i}")), real(r, &format!("stat_value{i}"))))
+                .filter(|(t, v)| *t > 0 && *v > 0.0)
+                .collect(),
+        })?;
+        Ok(v.into_iter().map(|a| (a.entry, a)).collect())
+    }
+
+    /// `player_create_item`: class -> (item, count), in table order.
+    pub fn starting_items(&self) -> rusqlite::Result<HashMap<i64, Vec<(i64, i64)>>> {
+        let mut out: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
+        for (c, i, n) in collect(self, "SELECT * FROM player_create_item", |r| {
+            (int(r, "class"), int(r, "item"), int(r, "count").max(1))
+        })? {
+            out.entry(c).or_default().push((i, n));
+        }
+        Ok(out)
+    }
+
+    /// `loot` grouped by `lootId`.
+    pub fn loot_tables(&self) -> rusqlite::Result<HashMap<i64, Vec<LootRow>>> {
+        let mut out: HashMap<i64, Vec<LootRow>> = HashMap::new();
+        for row in collect(self, "SELECT * FROM loot", |r| LootRow {
+            loot_id: int(r, "lootId"),
+            item: int(r, "item"),
+            chance: real(r, "chance"),
+            count_min: int(r, "count_min").max(1),
+            count_max: int(r, "count_max").max(int(r, "count_min")).max(1),
+            conditional: int(r, "condition1") != 0 || int(r, "condition2") != 0,
+        })? {
+            out.entry(row.loot_id).or_default().push(row);
+        }
+        Ok(out)
+    }
+
+    /// `npc_models_junkloot`: npc model -> junk item entries.
+    pub fn junk_loot(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
+        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
+        for (m, i) in
+            collect(self, "SELECT * FROM npc_models_junkloot", |r| (int(r, "model_id"), int(r, "item_entry")))?
+        {
+            out.entry(m).or_default().push(i);
+        }
+        Ok(out)
+    }
+
+    pub fn npc_loot(&self) -> rusqlite::Result<HashMap<i64, NpcLoot>> {
+        let v = collect(self, "SELECT * FROM npc_template", |r| {
+            let chance = |c: &str| match r.get_ref(c) {
+                Ok(ValueRef::Null) => -1.0,
+                Ok(ValueRef::Text(t)) if t.is_empty() => -1.0,
+                _ => real(r, c),
+            };
+            let default_neg = |c: &str| match r.get_ref(c) {
+                Ok(ValueRef::Integer(i)) => i,
+                Ok(ValueRef::Real(f)) => f as i64,
+                _ => -1,
+            };
+            (
+                int(r, "entry"),
+                NpcLoot {
+                    chances: ["green", "blue", "gold", "purple"].map(|q| chance(&format!("loot_{q}_chance"))),
+                    custom_loot: default_neg("custom_loot"),
+                    gold_ratio: default_neg("custom_gold_ratio"),
+                },
+            )
+        })?;
+        Ok(v.into_iter().collect())
+    }
+
+    /// `player_desirable_armor`: class -> armour types.
+    pub fn class_armor(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
+        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
+        for (c, a) in collect(self, "SELECT DISTINCT class_id, armor_type FROM player_desirable_armor", |r| {
+            (int(r, "class_id"), int(r, "armor_type"))
+        })? {
+            out.entry(c).or_default().push(a);
+        }
+        Ok(out)
+    }
+
+    /// `player_desirable_stats`: class -> stats worth rolling on that class's loot.
+    pub fn class_desirable_stats(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
+        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
+        for (c, s) in
+            collect(self, "SELECT * FROM player_desirable_stats", |r| (int(r, "class_id"), int(r, "stat_id")))?
+        {
+            out.entry(c).or_default().push(s);
+        }
+        Ok(out)
+    }
+
+    /// `material_chance_weapon` / `material_chance_armor`: (level, material or armour type) -> percent.
+    pub fn material_chances(&self) -> rusqlite::Result<HashMap<(bool, i64, i64), f32>> {
+        let mut out = HashMap::new();
+        for (l, m, c) in collect(self, "SELECT * FROM material_chance_weapon", |r| {
+            (int(r, "level"), int(r, "weapon_material"), real(r, "chance"))
+        })? {
+            out.insert((true, l, m), c);
+        }
+        for (l, a, c) in collect(self, "SELECT * FROM material_chance_armor", |r| {
+            (int(r, "level"), int(r, "armor_type"), real(r, "chance"))
+        })? {
+            out.insert((false, l, a), c);
+        }
+        Ok(out)
+    }
+}
+
+impl GameDb {
+    pub fn spells(&self) -> rusqlite::Result<HashMap<i64, SpellTemplate>> {
+        let mut stmt = self.conn().prepare("SELECT * FROM spell_template")?;
+        let rows = stmt.query_map([], |r| {
+            let effects = (1..=3)
+                .filter_map(|i| {
+                    let kind = int(r, &format!("effect{i}"));
+                    (kind != 0).then(|| SpellEffect {
+                        kind,
+                        data: [1, 2, 3].map(|d| int(r, &format!("effect{i}_data{d}"))),
+                        target: int(r, &format!("effect{i}_targetType")),
+                        radius: int(r, &format!("effect{i}_radius")),
+                        positive: int(r, &format!("effect{i}_positive")) != 0,
+                        formula: text(r, &format!("effect{i}_scale_formula")),
+                    })
+                })
+                .collect();
+            Ok(SpellTemplate {
+                entry: int(r, "entry"),
+                name: text(r, "name"),
+                icon: text(r, "icon"),
+                description: text(r, "description"),
+                aura_description: text(r, "aura_description"),
+                mana_formula: text(r, "mana_formula"),
+                mana_pct: int(r, "mana_pct"),
+                effects,
+                attributes: int(r, "attributes"),
+                cast_time_ms: int(r, "cast_time"),
+                cooldown_ms: int(r, "cooldown"),
+                cast_interrupt_flags: int(r, "cast_interrupt_flags"),
+                school: int(r, "cast_school"),
+                duration_ms: int(r, "duration"),
+                duration_formula: text(r, "duration_formula"),
+                speed: int(r, "speed"),
+                range: int(r, "range"),
+                interval_ms: int(r, "interval"),
+                required_equipment: int(r, "required_equipment"),
+                abilities_tab: int(r, "abilities_tab"),
+            })
+        })?;
+        rows.map(|r| r.map(|s| (s.entry, s))).collect()
+    }
+
+    /// `player_create_spell`: class -> starting spells.
+    pub fn class_spells(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
+        let mut stmt = self.conn().prepare("SELECT class, spell FROM player_create_spell ORDER BY class, spell")?;
+        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
+        let rows = stmt.query_map([], |r| Ok((int(r, "class"), int(r, "spell"))))?;
+        for row in rows {
+            let (c, s) = row?;
+            out.entry(c).or_default().push(s);
+        }
+        Ok(out)
     }
 }

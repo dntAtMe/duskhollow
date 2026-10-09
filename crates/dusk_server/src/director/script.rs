@@ -17,7 +17,7 @@ pub mod entry {
 pub const RED_FIELDS: u32 = 1;
 pub const WARDEN: u32 = 2;
 pub const WOLVES_NEEDED: u32 = 4;
-/// Ember draughts: `item_template` 1 (Minor Life Potion), three of them.
+/// Ember draughts: item 1 of `data/items.txt`, three of them.
 pub const EMBER_DRAUGHT: u32 = 1;
 pub const EMBER_DRAUGHTS: u32 = 3;
 /// Gold for putting Corvin down.

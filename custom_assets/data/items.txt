@@ -1,0 +1,319 @@
+# Hand-made items (dusk_formats::content::items). Section id = item entry.
+#   1-99 consumables and quest items, 10-19 starter gear, 100-199 junk, 1000-9999 named items.
+#   Random gear is generated from data/item_bases.txt (entries 100000+).
+# Keys: name icon model (paper-doll script, scripts/player/custom) equip_type (head neck chest
+#   belt legs feet hands ring weapon shield ranged) weapon_type (axe bow mace sword staff dagger
+#   wand) armor_type (1 cloth, 2-4 leather, 5-8 mail, 9-11 plate, 12-15 robe; shields 4-8)
+#   material (weapon tier: 1-7 metals, 8-14 woods) quality (junk common green blue gold purple)
+#   required_level item_level (junk: matched to the killed NPC's level) stack spell (on use)
+#   stat=<key>:<amount> sell_price flags (quest_item ...) description
+
+# --- consumables ---
+
+# The common remedy, brewed over cairn fire. Also the reward of Ysolde's first errand.
+[1]
+name=Ember Draught
+icon=icon_item_potion_hp02_1.png
+quality=common
+stack=5
+spell=50110
+sell_price=5
+description=Brewed over a cairn fire. Warm going down; the warmth stays a while.
+
+[2]
+name=Lamp Tonic
+icon=icon_item_potion_mp02_1.png
+quality=common
+stack=5
+spell=50111
+sell_price=5
+description=Bitter oil the lamp-keepers drink to keep their own wick lit.
+
+# --- starter gear ---
+
+[10]
+name=Sacking Wraps
+icon=icon_item_rb_glove_c01.png
+model=cloth_gloves
+equip_type=hands
+armor_type=1
+sell_price=2
+
+[11]
+name=Patched Breeches
+icon=icon_item_rb_pants_c01.png
+model=cloth_pants
+equip_type=legs
+armor_type=1
+sell_price=3
+
+[12]
+name=Rag Sandals
+icon=icon_item_rb_shoes_c01.png
+model=cloth_sandals
+equip_type=feet
+armor_type=1
+sell_price=2
+
+[13]
+name=Lightworker's Shirt
+icon=icon_item_rb_torso_c01.png
+model=cloth_shirt
+equip_type=chest
+armor_type=1
+sell_price=3
+
+[14]
+name=Plank Buckler
+icon=icon_item_shield_c01.png
+model=buckler
+equip_type=shield
+armor_type=4
+sell_price=18
+
+[15]
+name=Notched Shortsword
+icon=icon_item_sword_c01.png
+model=shortsword
+equip_type=weapon
+weapon_type=sword
+material=1
+sell_price=10
+
+[16]
+name=Gorge Shortbow
+icon=icon_item_bow_c01.png
+model=shortbow
+equip_type=ranged
+weapon_type=bow
+material=8
+sell_price=5
+
+[17]
+name=Skinning Knife
+icon=icon_item_dagger_c01.png
+model=dagger
+equip_type=weapon
+weapon_type=dagger
+material=1
+sell_price=10
+
+[18]
+name=Cairnwood Staff
+icon=icon_item_staff_c01.png
+model=staff_grey
+equip_type=weapon
+weapon_type=staff
+material=8
+sell_price=4
+
+[19]
+name=Knotted Club
+icon=icon_item_mace_c01.png
+model=club
+equip_type=weapon
+weapon_type=mace
+material=1
+sell_price=12
+
+# --- junk (grey; sold for coin) ---
+
+# glarewolves
+[100]
+name=Matted Glarewolf Pelt
+icon=icon_item_leather01.png
+quality=junk
+item_level=1
+stack=5
+sell_price=2
+
+[101]
+name=Glarewolf Fang
+icon=icon_item_tooth01.png
+quality=junk
+item_level=2
+stack=5
+sell_price=3
+
+[102]
+name=Clouded Wolf Eye
+icon=icon_item_stone06.png
+quality=junk
+item_level=3
+stack=5
+sell_price=5
+
+# the Stooped
+[103]
+name=Bent Sickle Blade
+icon=icon_item_nipper02.png
+quality=junk
+item_level=3
+stack=5
+sell_price=5
+
+[104]
+name=Fistful of Red Grain
+icon=icon_item_dish01.png
+quality=junk
+item_level=3
+stack=5
+sell_price=4
+
+[105]
+name=Sun-bleached Rag
+icon=icon_item_leather03.png
+quality=junk
+item_level=4
+stack=5
+sell_price=6
+
+# the hollowed Warden
+[106]
+name=Rusted Gate Key
+icon=icon_item_key02.png
+quality=junk
+item_level=4
+stack=5
+sell_price=8
+
+[107]
+name=Tarnished Post Badge
+icon=icon_item_coin01.png
+quality=junk
+item_level=4
+stack=5
+sell_price=9
+
+[108]
+name=Dented Visor Plate
+icon=icon_item_metal01.png
+quality=junk
+item_level=4
+stack=5
+sell_price=7
+
+# gnawers
+[110]
+name=Gnawed Bone
+icon=icon_item_bone01.png
+quality=junk
+item_level=1
+stack=5
+sell_price=1
+
+[111]
+name=Pocket of Shiny Stones
+icon=icon_item_stone01.png
+quality=junk
+item_level=1
+stack=5
+sell_price=2
+
+[112]
+name=Bent Trinket
+icon=icon_item_junk_humanoid_j02.png
+quality=junk
+item_level=2
+stack=5
+sell_price=3
+
+# thatch spinners
+[113]
+name=Tangle of Spinner Silk
+icon=icon_item_hair05.png
+quality=junk
+item_level=1
+stack=5
+sell_price=2
+
+[114]
+name=Chitin Leg
+icon=icon_item_leg02.png
+quality=junk
+item_level=1
+stack=5
+sell_price=1
+
+[115]
+name=Sour Venom Sac
+icon=icon_item_blood01.png
+quality=junk
+item_level=2
+stack=5
+sell_price=3
+
+# pit crawlers
+[116]
+name=Crawler Mandible
+icon=icon_item_claw01.png
+quality=junk
+item_level=1
+stack=5
+sell_price=2
+
+[117]
+name=Grit Scale
+icon=icon_item_scale01.png
+quality=junk
+item_level=1
+stack=5
+sell_price=1
+
+[118]
+name=Crawler Shell Shard
+icon=icon_item_junk_bug_j01.png
+quality=junk
+item_level=2
+stack=5
+sell_price=3
+
+# --- named items ---
+
+# Warden Corvin (data/loot.txt [loot 1])
+[1001]
+name=Gatewatch Mace
+icon=icon_item_mace_l01.png
+model=mace
+equip_type=weapon
+weapon_type=mace
+material=2
+quality=blue
+required_level=4
+stat=strength:3
+stat=courage:2
+sell_price=60
+description=Thirty-one years at the gate, and the head is still true.
+
+[1002]
+name=Thirty-One Winters
+icon=icon_item_ring_e01.png
+equip_type=ring
+quality=gold
+required_level=4
+stat=health:24
+stat=courage:3
+sell_price=80
+description=A plain band, worn thin on the inside.
+
+[1003]
+name=Post Gorget
+icon=icon_item_necklace_l01.png
+equip_type=neck
+quality=blue
+required_level=3
+stat=armor:12
+stat=willpower:2
+sell_price=50
+
+# Glarewolf Alpha (data/loot.txt [loot 2])
+[1004]
+name=Alpha's Fang Charm
+icon=icon_item_necklace_r01.png
+equip_type=neck
+quality=green
+required_level=2
+stat=agility:2
+stat=strength:1
+sell_price=25
+description=Strung on gut. It still smells of the fields.

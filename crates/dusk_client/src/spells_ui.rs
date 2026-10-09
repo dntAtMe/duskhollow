@@ -79,7 +79,7 @@ const SLOT_Y: f32 = 13.0;
 const SLOT_SIZE: f32 = 37.0;
 
 /// Auto attacks are driven by clicking enemies, not by the bar.
-pub const AUTO_SPELLS: [SpellId; 2] = [81, 82];
+pub const AUTO_SPELLS: [SpellId; 2] = [50100, 50101];
 
 const GOLD: Color = Color::srgb(0.95, 0.82, 0.45);
 const GREY: Color = Color::srgb(0.75, 0.72, 0.66);
@@ -487,7 +487,8 @@ fn cast(
                 return;
             }
         },
-        // Friendly spells land on ourselves until friendly targeting exists.
+        // The server lands friendly spells on the target if it is a friend, else on us.
+        target::FRIENDLY | target::ANY => state.target,
         _ => None,
     };
     net.send(ClientMsg::CastSpell { spell, target });

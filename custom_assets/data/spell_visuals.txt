@@ -283,3 +283,52 @@ casting=warden_wind_up
 go=ground_slam
 aura=stun_ring
 go_anim=cast
+
+# Mandible Nip (glade crawler bite)
+[spell 51004]
+impact=melee_hit
+go_anim=swing
+
+# Hurled Brand
+[spell 50011]
+casting=fire_cast
+traveling=ember_trail
+impact=ember_burst
+go_anim=swing
+cast_anim=cast
+
+# Scatter the Coals
+[spell 50012]
+traveling=ember_trail
+impact=ember_burst
+go_anim=swing
+
+# Blinding Flare
+[spell 50013]
+casting=fire_cast
+impact=ember_warmth
+aura=stun_ring
+go_anim=cast
+cast_anim=cast
+
+# Between the Ribs
+[spell 50014]
+impact=bleed_hit
+go_anim=swing
+
+# Ember Prayer
+[spell 50015]
+casting=fire_cast
+impact=ember_warmth
+go_anim=cast
+cast_anim=cast
+
+# Ash Ward
+[spell 50016]
+impact=veil
+go_anim=cast
+
+# Set Your Feet
+[spell 50017]
+impact=veil
+go_anim=block

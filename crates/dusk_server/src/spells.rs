@@ -95,8 +95,8 @@ impl Auras {
         c
     }
 
-    /// Percent modifier to damage taken (ModifyDmgReceivedPct).
-    fn damage_taken_pct(&self) -> i32 {
+    /// Percent modifier to damage taken (ModifyDmgReceivedPct), spells and melee alike.
+    pub fn damage_taken_pct(&self) -> i32 {
         self.0.iter().filter(|a| a.kind == aura::MODIFY_DMG_RECEIVED_PCT).map(|a| a.value).sum()
     }
 
@@ -173,7 +173,7 @@ struct Pending {
     targets: Vec<Entity>,
 }
 
-/// Per-NPC spell timers from `npc_template.spell_N_*`.
+/// Per-NPC spell timers from the template's `spellN=` slots.
 #[derive(Component)]
 pub struct NpcSpells(pub Vec<NpcSpellState>);
 
@@ -252,9 +252,6 @@ pub fn start_casts(
             }
         };
         let Some(spell) = world.spells.get(&(req.spell as i64)) else { continue };
-        if (req.spell as i64) < dusk_formats::custom::CUSTOM_SPELL_FIRST && dusk_formats::legacy_log_enabled() {
-            dusk_formats::legacy_note("spell", format!("{} {}", req.spell, spell.name));
-        }
         if dead {
             continue;
         }
@@ -691,7 +688,9 @@ fn apply_one(
             let interval = if spell.interval_ms > 0 { spell.interval_ms as f32 / 1000.0 } else { 1.0 };
             let value = match kind {
                 // Periodic totals are spread over the ticks unless the tooltip says "every".
-                aura::PERIODIC_DAMAGE | aura::PERIODIC_HEAL if !spell.description.contains("every") => {
+                aura::PERIODIC_DAMAGE | aura::PERIODIC_HEAL | aura::PERIODIC_MANA
+                    if !spell.description.contains("every") =>
+                {
                     let ticks = (duration / interval).floor().max(1.0);
                     (value / ticks as f64).ceil()
                 }
@@ -782,15 +781,28 @@ fn break_on_damage(auras: Option<Mut<Auras>>, outbox: &mut Outbox, scope: Scope,
 }
 
 /// Aura durations and periodic ticks.
+#[allow(clippy::type_complexity)]
 pub fn tick_auras(
     mut commands: Commands,
     time: Res<Time>,
+    world: Res<GameWorld>,
     mut outbox: ResMut<Outbox>,
-    mut units: Query<(Entity, &NetId, &OnMap, &Motion, &mut Stats, &mut Auras, Has<Dead>, Has<Npc>, Has<Evading>)>,
+    mut units: Query<(
+        Entity,
+        &NetId,
+        &OnMap,
+        &Motion,
+        &mut Stats,
+        &mut Auras,
+        Has<Dead>,
+        Has<Npc>,
+        Has<Evading>,
+        Option<&Player>,
+    )>,
     attacking: Query<(), With<Attacking>>,
 ) {
     let dt = time.delta_secs();
-    for (e, id, map, m, mut s, mut auras, dead, is_npc, evading) in &mut units {
+    for (e, id, map, m, mut s, mut auras, dead, is_npc, evading, player) in &mut units {
         if dead {
             for a in auras.0.drain(..) {
                 outbox.push(Scope::Near(map.0, m.pos), ServerMsg::AuraRemove { target: id.0, spell: a.spell });
@@ -798,9 +810,10 @@ pub fn tick_auras(
             continue;
         }
         let mut health_changed = false;
+        let mut mana_changed = false;
         for a in auras.0.iter_mut() {
             a.remaining -= dt;
-            if !matches!(a.kind, aura::PERIODIC_DAMAGE | aura::PERIODIC_HEAL) {
+            if !matches!(a.kind, aura::PERIODIC_DAMAGE | aura::PERIODIC_HEAL | aura::PERIODIC_MANA) {
                 continue;
             }
             a.tick_timer -= dt;
@@ -809,6 +822,11 @@ pub fn tick_auras(
                 a.tick_timer += a.interval;
                 let heal = a.kind == aura::PERIODIC_HEAL;
                 let amount = a.value.max(1);
+                if a.kind == aura::PERIODIC_MANA {
+                    s.mana = (s.mana + amount).min(s.max_mana);
+                    mana_changed = true;
+                    continue;
+                }
                 if heal {
                     s.hp = (s.hp + amount).min(s.max_hp);
                 } else if !evading {
@@ -834,6 +852,9 @@ pub fn tick_auras(
         }
         if health_changed {
             outbox.push(Scope::Near(map.0, m.pos), ServerMsg::Health { id: id.0, hp: s.hp, max_hp: s.max_hp });
+        }
+        if let Some(p) = player.filter(|_| mana_changed) {
+            outbox.push(Scope::To(e), player_stats_msg(&world, p, &s));
         }
         auras.0.retain(|a| {
             if a.remaining <= 0.0 {
@@ -944,9 +965,6 @@ mod skill_tests {
 
     impl Sim {
         fn new() -> Option<Self> {
-            if !dusk_formats::legacy_root().join("game.db").exists() {
-                return None;
-            }
             let root = dusk_formats::content_root();
             let world = GameWorld::load(&root, Some("custom_duskhollow")).unwrap();
             let (map, start) = world.start;
@@ -1016,18 +1034,22 @@ mod skill_tests {
 
         /// Casts with a fresh spellbook and full mana, then runs `secs`; returns what was sent.
         fn cast(&mut self, spell: SpellId, target: Option<Entity>, secs: f32) -> Vec<ServerMsg> {
+            self.request(spell, target, secs, false)
+        }
+
+        /// Like [`Sim::cast`], as if from using an item (potions).
+        fn use_item(&mut self, spell: SpellId, secs: f32) -> Vec<ServerMsg> {
+            self.request(spell, Some(self.player), secs, true)
+        }
+
+        fn request(&mut self, spell: SpellId, target: Option<Entity>, secs: f32, from_item: bool) -> Vec<ServerMsg> {
             let w = self.app.world_mut();
             let known = w.get::<Spellbook>(self.player).unwrap().known.clone();
             w.entity_mut(self.player).insert(Spellbook::new(known));
             let mut s = w.get_mut::<Stats>(self.player).unwrap();
             s.mana = s.max_mana;
             w.resource_mut::<Outbox>().0.clear();
-            w.resource_mut::<CastRequests>().0.push(CastRequest {
-                caster: self.player,
-                spell,
-                target,
-                from_item: false,
-            });
+            w.resource_mut::<CastRequests>().0.push(CastRequest { caster: self.player, spell, target, from_item });
             self.run(secs);
             self.app.world_mut().resource_mut::<Outbox>().0.drain(..).map(|(_, m)| m).collect()
         }
@@ -1174,5 +1196,105 @@ mod skill_tests {
         println!("strain over 6 s: bare {bare:.2}, veiled {veiled:.2}");
         assert!(bare > 1.0, "the arrival point is under open sky");
         assert!((veiled / bare - 0.5).abs() < 0.05, "bare {bare}, veiled {veiled}");
+    }
+
+    #[test]
+    fn class_kit_skills_land() {
+        let Some(mut sim) = Sim::new() else { return };
+        let (a, b, far) = (sim.wolf(20, 3.0), sim.wolf(21, 4.0), sim.wolf(22, 7.5));
+
+        // Hurled Brand: 1.8 s cast, a brand in flight, one fire hit.
+        let m = sim.cast(50011, Some(a), 2.6);
+        assert!(errors(&m).is_empty(), "{:?}", errors(&m));
+        let h = hits(&m, 50011, 20);
+        println!("Hurled Brand: {h:?}");
+        assert!(h.len() == 1 && h[0].0 > 0);
+
+        // Scatter the Coals: the target takes the throw and the burst, its neighbour (1 cell
+        // away) the burst, the far one nothing; both slowed.
+        let m = sim.cast(50012, Some(a), 1.0);
+        println!("Scatter the Coals: {:?} {:?}", hits(&m, 50012, 20), hits(&m, 50012, 21));
+        assert_eq!((hits(&m, 50012, 20).len(), hits(&m, 50012, 21).len(), hits(&m, 50012, 22).len()), (2, 1, 0));
+        assert!((sim.control(b).speed_mult - 0.7).abs() < 1e-3);
+
+        // Blinding Flare: out of the fight until hit.
+        let m = sim.cast(50013, Some(far), 1.5);
+        assert!(aura_applied(&m, 50013, 22) && sim.control(far).stunned);
+        sim.cast(50011, Some(far), 3.0);
+        assert!(!sim.control(far).stunned, "damage breaks the flare");
+        for e in [a, b, far] {
+            sim.despawn(e);
+        }
+
+        // Between the Ribs: one heavy cut.
+        let wolf = sim.wolf(23, 1.0);
+        let m = sim.cast(50014, Some(wolf), 0.2);
+        println!("Between the Ribs: {:?}", hits(&m, 50014, 23));
+        assert_eq!(hits(&m, 50014, 23).len(), 1);
+
+        // Ember Prayer without a friendly target heals the caster.
+        sim.app.world_mut().get_mut::<Stats>(sim.player).unwrap().hp = 10;
+        let m = sim.cast(50015, Some(wolf), 2.0);
+        let h = hits(&m, 50015, 1);
+        println!("Ember Prayer: {h:?}");
+        assert!(h.len() == 1 && h[0].1 && sim.hp(sim.player) > 10);
+
+        // Ash Ward and Set Your Feet: less damage taken, Set Your Feet also slows.
+        let m = sim.cast(50016, None, 0.1);
+        assert!(aura_applied(&m, 50016, 1));
+        let m = sim.cast(50017, None, 0.1);
+        assert!(aura_applied(&m, 50017, 1));
+        let auras = sim.app.world().get::<Auras>(sim.player).unwrap();
+        assert_eq!(auras.damage_taken_pct(), -55);
+        assert!((sim.control(sim.player).speed_mult - 0.7).abs() < 1e-3);
+        sim.despawn(wolf);
+    }
+
+    #[test]
+    fn potions_and_npc_spells() {
+        let Some(mut sim) = Sim::new() else { return };
+        // Ember Draught: 9 health every 2 s for 20 s, without knowing the spell.
+        sim.app.world_mut().entity_mut(sim.player).insert(Spellbook::new(vec![]));
+        sim.app.world_mut().get_mut::<Stats>(sim.player).unwrap().hp = 1;
+        let m = sim.use_item(50110, 20.5);
+        let h = hits(&m, 50110, 1);
+        assert_eq!(h.len(), 10, "{h:?}");
+        assert!(h.iter().all(|&(a, heal)| a == 9 && heal));
+        let max_hp = sim.app.world().get::<Stats>(sim.player).unwrap().max_hp;
+        assert_eq!(sim.hp(sim.player), 91.min(max_hp));
+        // Lamp Tonic: 11 mana every 2 s.
+        sim.app.world_mut().entity_mut(sim.player).insert(Spellbook::new(vec![]));
+        let m = {
+            let w = sim.app.world_mut();
+            w.resource_mut::<Outbox>().0.clear();
+            w.resource_mut::<CastRequests>().0.push(CastRequest {
+                caster: sim.player,
+                spell: 50111,
+                target: Some(sim.player),
+                from_item: true,
+            });
+            let mut s = w.get_mut::<Stats>(sim.player).unwrap();
+            (s.mana, s.max_mana) = (0, 500);
+            sim.run(6.5);
+            sim.app.world_mut().resource_mut::<Outbox>().0.drain(..).map(|(_, m)| m).collect::<Vec<_>>()
+        };
+        assert!(aura_applied(&m, 50111, 1));
+        let mana = sim.app.world().get::<Stats>(sim.player).unwrap().mana;
+        assert_eq!(mana, 33, "3 ticks of 11");
+        assert!(m.iter().any(|m| matches!(m, ServerMsg::PlayerStats { .. })));
+
+        // The NPC spells, cast by the player for the test.
+        let known: Vec<SpellId> = vec![51001, 51002, 51003, 51004];
+        sim.app.world_mut().entity_mut(sim.player).insert(Spellbook::new(known));
+        let wolf = sim.wolf(30, 1.0);
+        let m = sim.cast(51001, Some(wolf), 8.5);
+        println!("Rend: {:?}", hits(&m, 51001, 30));
+        assert_eq!(hits(&m, 51001, 30).len(), 4, "a bleed of 4 ticks");
+        let m = sim.cast(51002, Some(wolf), 0.2);
+        assert!(hits(&m, 51002, 30).len() == 1 && aura_applied(&m, 51002, 30));
+        let m = sim.cast(51004, Some(wolf), 0.5);
+        assert_eq!(hits(&m, 51004, 30).len(), 1);
+        let m = sim.cast(51003, None, 0.7);
+        assert!(aura_applied(&m, 51003, 30) && sim.control(wolf).stunned);
     }
 }

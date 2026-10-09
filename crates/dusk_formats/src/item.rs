@@ -1,18 +1,29 @@
-//! Items: `item_template`, `affix_template`, loot tables and the item stat formulas.
+//! Items: templates, affixes, loot rows and the item stat formulas.
 //!
-//! The database only stores *what* an item is (slot, weapon/armour type, material,
-//! quality, required level); the numbers the tooltips show ("%d Weapon Value",
-//! "%d Armor Value", "Equip: Increases your %s by %d.") were computed by the original
-//! `Shared/ItemDefiner.cpp`, which we have not recovered. The formulas below are therefore
-//! DESIGN, tuned against the existing combat curves (see `docs/items.md`). They live here
-//! so the server (stats) and the client (tooltips) can never disagree.
+//! The data (`data/items.txt`, `data/item_bases.txt`, `data/affixes.txt`, `data/loot.txt`, read by
+//! `crate::content::items`) only says *what* an item is (slot, weapon/armour type, material,
+//! quality, required level); the numbers the tooltips show (weapon value, armour, affix bonuses)
+//! come from the DESIGN formulas below (see `docs/items.md`). They live here so the server
+//! (stats) and the client (tooltips) can never disagree.
 
-use crate::db::GameDb;
-use rusqlite::{Row, types::ValueRef};
 use std::collections::HashMap;
 
 /// `item_template.equip_type` (names from the client's `EquipType` enum strings / item names).
 pub mod equip {
+    /// `equip_type=` names in the data files.
+    pub const NAMES: [(&str, i64); 11] = [
+        ("head", HEAD),
+        ("neck", NECK),
+        ("chest", CHEST),
+        ("belt", BELT),
+        ("legs", LEGS),
+        ("feet", FEET),
+        ("hands", HANDS),
+        ("ring", RING),
+        ("weapon", WEAPON),
+        ("shield", SHIELD),
+        ("ranged", RANGED),
+    ];
     pub const HEAD: i64 = 1;
     pub const NECK: i64 = 2;
     pub const CHEST: i64 = 3;
@@ -35,6 +46,19 @@ pub mod weapon {
     pub const STAFF: i64 = 5;
     pub const DAGGER: i64 = 6;
     pub const WAND: i64 = 7;
+    /// Not a `weapon_type` of any item: in a class's weapon list it allows shields.
+    pub const SHIELD: i64 = 10;
+    /// `weapon_type=` / class `weapons=` names in the data files.
+    pub const NAMES: [(&str, i64); 8] = [
+        ("axe", AXE),
+        ("bow", BOW),
+        ("mace", MACE),
+        ("sword", SWORD),
+        ("staff", STAFF),
+        ("dagger", DAGGER),
+        ("wand", WAND),
+        ("shield", SHIELD),
+    ];
 }
 
 /// `item_template.quality`. Loot chances in `npc_template` are named green/blue/gold/purple,
@@ -46,6 +70,20 @@ pub mod quality {
     pub const BLUE: i64 = 4;
     pub const GOLD: i64 = 5;
     pub const PURPLE: i64 = 6;
+    /// `quality=` names in the data files.
+    pub const NAMES: [(&str, i64); 6] =
+        [("junk", JUNK), ("common", COMMON), ("green", GREEN), ("blue", BLUE), ("gold", GOLD), ("purple", PURPLE)];
+}
+
+/// Armour families of `armor_type` for class `armor=` lists: `cloth` 1, `leather` 2-4, `mail`
+/// 5-8, `plate` 9-11, `robe` 12-15.
+pub const ARMOR_FAMILIES: [(&str, std::ops::RangeInclusive<i64>); 5] =
+    [("cloth", 1..=1), ("leather", 2..=4), ("mail", 5..=8), ("plate", 9..=11), ("robe", 12..=15)];
+
+/// A number, or a name from `names`.
+pub fn lookup(names: &[(&str, i64)], v: &str) -> Option<i64> {
+    let v = v.trim();
+    v.parse().ok().or_else(|| names.iter().find(|(n, _)| *n == v).map(|(_, id)| *id))
 }
 
 /// `Stat` enum ids used by `stat_typeN` / affixes (see `docs/combat.md`).
@@ -72,7 +110,39 @@ pub mod stat {
     pub const RESIST_SHADOW: i64 = 23;
     pub const RESIST_HOLY: i64 = 24;
 
-    /// Display name, as in `scripts/text/stats/<Name>.txt` / the original tooltips.
+    /// `stat=` keys in the data files (items, affixes, class stats).
+    pub const KEYS: [(&str, i64); 23] = [
+        ("mana", MANA),
+        ("health", HEALTH),
+        ("armor", ARMOR_VALUE),
+        ("strength", STRENGTH),
+        ("agility", AGILITY),
+        ("willpower", WILLPOWER),
+        ("intelligence", INTELLIGENCE),
+        ("courage", COURAGE),
+        ("regeneration", REGENERATION),
+        ("meditate", MEDITATE),
+        ("weapon_value", WEAPON_VALUE),
+        ("melee_speed", 12),
+        ("ranged_weapon_value", RANGED_WEAPON_VALUE),
+        ("ranged_speed", 14),
+        ("melee_crit", MELEE_CRITICAL),
+        ("ranged_crit", RANGED_CRITICAL),
+        ("spell_crit", SPELL_CRITICAL),
+        ("dodge", DODGE_RATING),
+        ("block", BLOCK_RATING),
+        ("resist_frost", RESIST_FROST),
+        ("resist_fire", RESIST_FIRE),
+        ("resist_shadow", RESIST_SHADOW),
+        ("resist_holy", RESIST_HOLY),
+    ];
+
+    /// A stat id by key (or number).
+    pub fn from_key(k: &str) -> Option<i64> {
+        super::lookup(&KEYS, k)
+    }
+
+    /// Display name, as in the tooltips.
     pub fn name(stat: i64) -> &'static str {
         match stat {
             1 => "Mana",
@@ -230,14 +300,14 @@ pub mod flags {
     pub const GOLD_VALUE_SCALES: i64 = 64;
 }
 
-/// `affix_template`: a random "<prefix> <item> of (the) <noun>" enchantment.
+/// A random "<prefix> <item> of (the) <noun>" enchantment (`data/affixes.txt`).
 /// `stats` values are per-level scaling factors, not flat amounts (1.5..3.0 for attributes,
 /// ~0.3..0.5 for Weapon Value), growing with the affix's level band.
 #[derive(Debug, Clone, Default)]
 pub struct Affix {
     pub entry: i64,
     pub name: String,
-    /// `name_single_noun = 1` -> "of the X", else "of X".
+    /// `noun=1` -> "of the X", else "of X".
     pub single_noun: bool,
     pub min_level: i64,
     pub max_level: i64,
@@ -396,18 +466,23 @@ fn add_bonus(v: &mut Vec<(i64, i32)>, stat: i64, amount: i32) {
     }
 }
 
-/// Class restrictions. Weapons and shields: the class descriptions on the character screen
-/// (TEXT: "Can use Shields and Melee weapons", "Staves and Wands", "Bows and Daggers",
-/// "Shields, Staves and Maces"). Body armour: `player_desirable_armor` (DB; we treat the
-/// "desirable" list as the allowed list, DESIGN) plus basic cloth (armor_type 1) for everyone,
-/// since every class starts in it.
-pub fn class_can_use(class: i64, t: &ItemTemplate, allowed_armor: &HashMap<i64, Vec<i64>>) -> bool {
+/// Class restrictions (`data/classes.txt`): weapons and shields from the class's `weapons=` list
+/// (`weapon::SHIELD` allows shields), body armour from its `armor=` list plus basic cloth
+/// (armor_type 1) for everyone, since every class starts in it. Classes missing from the
+/// lists may use anything.
+pub fn class_can_use(
+    class: i64,
+    t: &ItemTemplate,
+    allowed_armor: &HashMap<i64, Vec<i64>>,
+    allowed_weapons: &HashMap<i64, Vec<i64>>,
+) -> bool {
     if t.required_class > 0 && t.required_class != class {
         return false;
     }
+    let weapons = allowed_weapons.get(&class);
     match t.equip_type {
-        equip::WEAPON | equip::RANGED => !(1..=4).contains(&class) || class_weapons(class).contains(&t.weapon_type),
-        equip::SHIELD => matches!(class, 1 | 4),
+        equip::WEAPON | equip::RANGED => weapons.is_none_or(|w| w.contains(&t.weapon_type)),
+        equip::SHIELD => weapons.is_none_or(|w| w.contains(&weapon::SHIELD)),
         equip::HEAD | equip::CHEST | equip::LEGS | equip::FEET | equip::HANDS => {
             t.armor_type <= 1 || allowed_armor.get(&class).is_none_or(|v| v.contains(&t.armor_type))
         }
@@ -415,18 +490,22 @@ pub fn class_can_use(class: i64, t: &ItemTemplate, allowed_armor: &HashMap<i64, 
     }
 }
 
-/// Weapon types a class may wield (main hand and ranged); empty for unknown classes.
-pub fn class_weapons(class: i64) -> &'static [i64] {
-    match class {
-        1 => &[weapon::AXE, weapon::MACE, weapon::SWORD, weapon::DAGGER],
-        2 => &[weapon::STAFF, weapon::WAND],
-        3 => &[weapon::BOW, weapon::DAGGER],
-        4 => &[weapon::STAFF, weapon::MACE],
-        _ => &[],
-    }
+/// First generated item entry.
+pub const GRID_FIRST: i64 = 100_000;
+
+/// Entry of a generated item: base `N` of `data/item_bases.txt`, quality 2..=6, level 1..=99.
+pub fn grid_entry(base: i64, quality: i64, level: i64) -> i64 {
+    GRID_FIRST + base * 1000 + quality * 100 + level
 }
 
-/// One `loot` row (`lootId` = `npc_template.custom_loot`).
+/// (base, quality, level) of a generated entry ([`grid_entry`]).
+pub fn grid_parts(entry: i64) -> Option<(i64, i64, i64)> {
+    let rest = entry.checked_sub(GRID_FIRST).filter(|r| *r >= 1000)?;
+    let (base, q, level) = (rest / 1000, rest % 1000 / 100, rest % 100);
+    ((quality::COMMON..=quality::PURPLE).contains(&q) && (1..=99).contains(&level)).then_some((base, q, level))
+}
+
+/// One row of a loot table (`data/loot.txt`, `[loot N]` = an NPC's `loot=N`).
 #[derive(Debug, Clone)]
 pub struct LootRow {
     pub loot_id: i64,
@@ -435,198 +514,18 @@ pub struct LootRow {
     pub chance: f32,
     pub count_min: i64,
     pub count_max: i64,
-    /// Has quest/state conditions (`condition1`/`condition2`), which need quests.
+    /// Gated by quest/state conditions (legacy tables only; ours have none).
     pub conditional: bool,
 }
 
-/// Loot-related `npc_template` columns (`-1` = default).
+/// Loot settings of an NPC template (`-1` = default).
 #[derive(Debug, Clone, Copy)]
 pub struct NpcLoot {
-    /// Percent chances for green / blue / gold / purple drops (`loot_*_chance`), -1 = default.
+    /// Percent chances for green / blue / gold / purple drops (`loot_chances=`), -1 = default.
     pub chances: [f32; 4],
     pub custom_loot: i64,
     /// Percent of the default gold drop, -1 = default (100).
     pub gold_ratio: i64,
-}
-
-fn int(row: &Row, col: &str) -> i64 {
-    match row.get_ref(col) {
-        Ok(ValueRef::Integer(i)) => i,
-        Ok(ValueRef::Real(f)) => f as i64,
-        Ok(ValueRef::Text(t)) => std::str::from_utf8(t).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0),
-        _ => 0,
-    }
-}
-
-fn real(row: &Row, col: &str) -> f32 {
-    match row.get_ref(col) {
-        Ok(ValueRef::Integer(i)) => i as f32,
-        Ok(ValueRef::Real(f)) => f as f32,
-        Ok(ValueRef::Text(t)) => std::str::from_utf8(t).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0.0),
-        _ => 0.0,
-    }
-}
-
-fn text(row: &Row, col: &str) -> String {
-    match row.get_ref(col) {
-        Ok(ValueRef::Text(t)) => String::from_utf8_lossy(t).trim().to_string(),
-        Ok(ValueRef::Integer(i)) => i.to_string(),
-        _ => String::new(),
-    }
-}
-
-fn collect<T>(db: &GameDb, sql: &str, f: impl Fn(&Row) -> T) -> rusqlite::Result<Vec<T>> {
-    let mut stmt = db.conn().prepare(sql)?;
-    let rows = stmt.query_map([], |r| Ok(f(r)))?;
-    rows.collect()
-}
-
-impl GameDb {
-    pub fn items(&self) -> rusqlite::Result<HashMap<i64, ItemTemplate>> {
-        let v = collect(self, "SELECT * FROM item_template", |r| ItemTemplate {
-            entry: int(r, "entry"),
-            name: text(r, "name"),
-            icon: text(r, "icon"),
-            sound: text(r, "icon_sound"),
-            model: text(r, "model"),
-            required_level: int(r, "required_level"),
-            weapon_type: int(r, "weapon_type"),
-            armor_type: int(r, "armor_type"),
-            equip_type: int(r, "equip_type"),
-            weapon_material: int(r, "weapon_material"),
-            num_sockets: int(r, "num_sockets"),
-            quality: int(r, "quality"),
-            item_level: int(r, "item_level"),
-            durability: int(r, "durability"),
-            sell_price: real(r, "sell_price").round() as i64,
-            stack_count: int(r, "stack_count"),
-            required_class: int(r, "required_class"),
-            flags: int(r, "flags"),
-            generated: int(r, "generated") != 0,
-            spells: (1..=5).map(|i| int(r, &format!("spell_{i}"))).filter(|s| *s > 0).collect(),
-            stats: (1..=10)
-                .map(|i| (int(r, &format!("stat_type{i}")), int(r, &format!("stat_value{i}"))))
-                .filter(|(t, v)| *t > 0 && *v != 0)
-                .collect(),
-            description: text(r, "description"),
-        })?;
-        Ok(v.into_iter().map(|t| (t.entry, t)).collect())
-    }
-
-    pub fn affixes(&self) -> rusqlite::Result<HashMap<i64, Affix>> {
-        let v = collect(self, "SELECT * FROM affix_template", |r| Affix {
-            entry: int(r, "entry"),
-            name: text(r, "name"),
-            single_noun: int(r, "name_single_noun") != 0,
-            min_level: int(r, "min_level"),
-            max_level: int(r, "max_level"),
-            stats: (1..=5)
-                .map(|i| (int(r, &format!("stat_type{i}")), real(r, &format!("stat_value{i}"))))
-                .filter(|(t, v)| *t > 0 && *v > 0.0)
-                .collect(),
-        })?;
-        Ok(v.into_iter().map(|a| (a.entry, a)).collect())
-    }
-
-    /// `player_create_item`: class -> (item, count), in table order.
-    pub fn starting_items(&self) -> rusqlite::Result<HashMap<i64, Vec<(i64, i64)>>> {
-        let mut out: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
-        for (c, i, n) in collect(self, "SELECT * FROM player_create_item", |r| {
-            (int(r, "class"), int(r, "item"), int(r, "count").max(1))
-        })? {
-            out.entry(c).or_default().push((i, n));
-        }
-        Ok(out)
-    }
-
-    /// `loot` grouped by `lootId`.
-    pub fn loot_tables(&self) -> rusqlite::Result<HashMap<i64, Vec<LootRow>>> {
-        let mut out: HashMap<i64, Vec<LootRow>> = HashMap::new();
-        for row in collect(self, "SELECT * FROM loot", |r| LootRow {
-            loot_id: int(r, "lootId"),
-            item: int(r, "item"),
-            chance: real(r, "chance"),
-            count_min: int(r, "count_min").max(1),
-            count_max: int(r, "count_max").max(int(r, "count_min")).max(1),
-            conditional: int(r, "condition1") != 0 || int(r, "condition2") != 0,
-        })? {
-            out.entry(row.loot_id).or_default().push(row);
-        }
-        Ok(out)
-    }
-
-    /// `npc_models_junkloot`: npc model -> junk item entries.
-    pub fn junk_loot(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
-        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
-        for (m, i) in
-            collect(self, "SELECT * FROM npc_models_junkloot", |r| (int(r, "model_id"), int(r, "item_entry")))?
-        {
-            out.entry(m).or_default().push(i);
-        }
-        Ok(out)
-    }
-
-    pub fn npc_loot(&self) -> rusqlite::Result<HashMap<i64, NpcLoot>> {
-        let v = collect(self, "SELECT * FROM npc_template", |r| {
-            let chance = |c: &str| match r.get_ref(c) {
-                Ok(ValueRef::Null) => -1.0,
-                Ok(ValueRef::Text(t)) if t.is_empty() => -1.0,
-                _ => real(r, c),
-            };
-            let default_neg = |c: &str| match r.get_ref(c) {
-                Ok(ValueRef::Integer(i)) => i,
-                Ok(ValueRef::Real(f)) => f as i64,
-                _ => -1,
-            };
-            (
-                int(r, "entry"),
-                NpcLoot {
-                    chances: ["green", "blue", "gold", "purple"].map(|q| chance(&format!("loot_{q}_chance"))),
-                    custom_loot: default_neg("custom_loot"),
-                    gold_ratio: default_neg("custom_gold_ratio"),
-                },
-            )
-        })?;
-        Ok(v.into_iter().collect())
-    }
-
-    /// `player_desirable_armor`: class -> armour types.
-    pub fn class_armor(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
-        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
-        for (c, a) in collect(self, "SELECT DISTINCT class_id, armor_type FROM player_desirable_armor", |r| {
-            (int(r, "class_id"), int(r, "armor_type"))
-        })? {
-            out.entry(c).or_default().push(a);
-        }
-        Ok(out)
-    }
-
-    /// `player_desirable_stats`: class -> stats worth rolling on that class's loot.
-    pub fn class_desirable_stats(&self) -> rusqlite::Result<HashMap<i64, Vec<i64>>> {
-        let mut out: HashMap<i64, Vec<i64>> = HashMap::new();
-        for (c, s) in
-            collect(self, "SELECT * FROM player_desirable_stats", |r| (int(r, "class_id"), int(r, "stat_id")))?
-        {
-            out.entry(c).or_default().push(s);
-        }
-        Ok(out)
-    }
-
-    /// `material_chance_weapon` / `material_chance_armor`: (level, material or armour type) -> percent.
-    pub fn material_chances(&self) -> rusqlite::Result<HashMap<(bool, i64, i64), f32>> {
-        let mut out = HashMap::new();
-        for (l, m, c) in collect(self, "SELECT * FROM material_chance_weapon", |r| {
-            (int(r, "level"), int(r, "weapon_material"), real(r, "chance"))
-        })? {
-            out.insert((true, l, m), c);
-        }
-        for (l, a, c) in collect(self, "SELECT * FROM material_chance_armor", |r| {
-            (int(r, "level"), int(r, "armor_type"), real(r, "chance"))
-        })? {
-            out.insert((false, l, a), c);
-        }
-        Ok(out)
-    }
 }
 
 #[cfg(test)]
@@ -686,14 +585,36 @@ mod tests {
     #[test]
     fn class_rules() {
         let armor = HashMap::from([(2, vec![1, 12, 13, 14, 15])]);
+        let weapons = HashMap::from([(2, vec![weapon::STAFF, weapon::WAND]), (3, vec![weapon::BOW, weapon::DAGGER])]);
         let mut bow = tmpl(equip::RANGED, 1);
         bow.weapon_type = weapon::BOW;
-        assert!(class_can_use(3, &bow, &armor));
-        assert!(!class_can_use(2, &bow, &armor));
+        assert!(class_can_use(3, &bow, &armor, &weapons));
+        assert!(!class_can_use(2, &bow, &armor, &weapons));
         let mut plate = tmpl(equip::CHEST, 1);
         plate.armor_type = 9;
-        assert!(!class_can_use(2, &plate, &armor));
+        assert!(!class_can_use(2, &plate, &armor, &weapons));
         plate.armor_type = 1;
-        assert!(class_can_use(2, &plate, &armor));
+        assert!(class_can_use(2, &plate, &armor, &weapons));
+        let shield = tmpl(equip::SHIELD, 1);
+        assert!(!class_can_use(3, &shield, &armor, &weapons));
+        assert!(class_can_use(1, &shield, &armor, &weapons), "unlisted classes use anything");
+    }
+
+    #[test]
+    fn grid_entries_round_trip() {
+        for (b, q, l) in [(1, 2, 1), (130, 6, 25), (77, 4, 13)] {
+            assert_eq!(grid_parts(grid_entry(b, q, l)), Some((b, q, l)));
+        }
+        assert_eq!(grid_entry(3, 4, 5), 103_405);
+        assert_eq!(grid_parts(1), None);
+        assert_eq!(grid_parts(100_150), None);
+    }
+
+    #[test]
+    fn names_resolve() {
+        assert_eq!(lookup(&equip::NAMES, "ranged"), Some(equip::RANGED));
+        assert_eq!(lookup(&weapon::NAMES, "7"), Some(weapon::WAND));
+        assert_eq!(lookup(&quality::NAMES, "nope"), None);
+        assert_eq!((stat::from_key("spell_crit"), stat::from_key("resist_holy")), (Some(17), Some(24)));
     }
 }
