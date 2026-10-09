@@ -36,6 +36,7 @@ pub fn load(root: &Path) -> anyhow::Result<Vec<MapInfo>> {
             ambience: String::new(),
             start: (0.0, 0.0),
             default: false,
+            darkness: 0.0,
         });
     }
     Ok(maps)

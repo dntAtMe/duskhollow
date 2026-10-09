@@ -1,54 +1,34 @@
-//! `scripts/particles/*.psi` — particle systems, plus a faithful CPU simulation of them.
+//! Particle systems (`data/particles.txt`, parsed by `content::particles`) and their CPU
+//! simulation.
 //!
-//! The file is the 128-byte `hgeParticleSystemInfo` of the HGE engine's particle editor
-//! (little-endian, no header). The legacy client does not use HGE at runtime: its own
-//! `ParticleSystem` (SFML vertex array) re-implements HGE's update rules with a few
-//! differences. Everything below is verified against the client binary:
-//!
-//! - `ParticleSystemInfo_loadFromFile` (0x4e0b90): field order and the `sprite` decoding.
-//! - `ParticleSystem_ctor` (0x4f51a0): texture `particles.png` (4x4 grid of 32x32 cells).
-//! - `ParticleSystem_update` (0x4f5880), `ParticleSystem_spawnParticle` (0x4f5ee0): rules.
-//! - `ParticleSystem_draw` (0x4f5e70): SFML `BlendAdd` when additive, else default alpha.
-//! - `ParticleSystem_setPosition` (0x4f5700), `ParticleSystem_move` (0x4f54d0).
-//!
-//! ```text
-//! off  type  field                    notes
-//!   0  u32   sprite                   bits 0-1: column, bits 2-15: row of a 32x32 cell in
-//!                                     particles.png; bits 16+: HGE blend (4 = additive,
-//!                                     6 = alpha blend). Client: additive = (v & 0xffff0000) != 0x60000
-//!   4  i32   emission                 particles per second
-//!   8  f32   lifetime                 system lifetime, <= 0 = forever (all shipped files: -1)
-//!  12  f32   particle_life_min/max    seconds (min may exceed max; uniform in between)
-//!  20  f32   direction                radians, 0 = up (screen), clockwise
-//!  24  f32   spread                   radians, full cone width
-//!  28  u32   relative                 add the emitter's movement direction to `direction`
-//!  32  f32   speed_min/max            px/s
-//!  40  f32   gravity_min/max          px/s^2 along screen +y (down)
-//!  48  f32   radial_accel_min/max     px/s^2 away from the emitter
-//!  56  f32   tangential_accel_min/max px/s^2 perpendicular to the radial direction
-//!  64  f32   size_start/end/var       multiples of 32 px
-//!  76  f32   spin_start/end/var       simulated but never rendered by the client
-//!  88  f32x4 color_start              RGBA 0..1
-//! 104  f32x4 color_end
-//! 120  f32   color_var, alpha_var     0..1: how far towards *_end the start value may be randomised
-//! ```
+//! Model (one emitter, up to [`MAX_PARTICLES`] live particles):
+//! - `emission` particles per second for `lifetime` seconds (<= 0: until stopped), each living
+//!   `particle_life_min..max` seconds.
+//! - Launch angle: `direction` (radians, 0 = up on screen, clockwise) +- `spread / 2`;
+//!   `relative` adds the emitter's direction of movement. Speed in px/s.
+//! - Accelerations (px/s^2): `gravity` along screen +y (down), `radial` away from the emitter,
+//!   `tangential` perpendicular to that.
+//! - Size (multiples of [`CELL`] px), spin and colour interpolate linearly from the start value to
+//!   the end value over the particle's life; `*_var` (0..1) randomises how far towards the end
+//!   value a particle may start.
+//! - Drawn as a [`CELL`]-px quad of one atlas cell of [`TEXTURE`] (4x4 grid), additive or alpha
+//!   blended.
 
 use std::f32::consts::FRAC_PI_2;
-use std::path::Path;
 
-/// Size of a `.psi` file / `hgeParticleSystemInfo`.
-pub const PSI_SIZE: usize = 128;
-/// `ParticleSystem::MaxParticles` (asserted in `spawnParticle`).
+/// Live particles per system at most.
 pub const MAX_PARTICLES: usize = 500;
-/// Texture shared by every particle system.
-pub const TEXTURE: &str = "particles.png";
+/// Texture atlas shared by every particle system (4x4 cells of [`CELL`] px).
+pub const TEXTURE: &str = "fx_particles.png";
 /// Side of one particle cell in [`TEXTURE`], also the on-screen size of a particle at size 1.0.
 pub const CELL: f32 = 32.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ParticleSystemInfo {
-    /// Raw `sprite` word (frame + HGE blend flags).
-    pub sprite: u32,
+    /// Atlas cell, 0..15 (row-major in a 4x4 grid).
+    pub cell: u32,
+    /// Additive blending (else plain alpha blending).
+    pub blend_add: bool,
     pub emission: i32,
     pub lifetime: f32,
     pub particle_life_min: f32,
@@ -77,57 +57,18 @@ pub struct ParticleSystemInfo {
 }
 
 impl ParticleSystemInfo {
-    pub fn parse(data: &[u8]) -> anyhow::Result<Self> {
-        anyhow::ensure!(data.len() >= PSI_SIZE, "psi too short: {} bytes", data.len());
-        let u = |i: usize| u32::from_le_bytes(data[i * 4..i * 4 + 4].try_into().unwrap());
-        let f = |i: usize| f32::from_bits(u(i));
-        Ok(Self {
-            sprite: u(0),
-            emission: u(1) as i32,
-            lifetime: f(2),
-            particle_life_min: f(3),
-            particle_life_max: f(4),
-            direction: f(5),
-            spread: f(6),
-            relative: u(7) != 0,
-            speed_min: f(8),
-            speed_max: f(9),
-            gravity_min: f(10),
-            gravity_max: f(11),
-            radial_accel_min: f(12),
-            radial_accel_max: f(13),
-            tangential_accel_min: f(14),
-            tangential_accel_max: f(15),
-            size_start: f(16),
-            size_end: f(17),
-            size_var: f(18),
-            spin_start: f(19),
-            spin_end: f(20),
-            spin_var: f(21),
-            color_start: [f(22), f(23), f(24), f(25)],
-            color_end: [f(26), f(27), f(28), f(29)],
-            color_var: f(30),
-            alpha_var: f(31),
-        })
-    }
-
-    pub fn load(path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        Self::parse(&std::fs::read(path)?)
-    }
-
-    /// Additive (`sf::BlendAdd`) or plain alpha blending. The client tests
-    /// `(sprite & 0xffff0000) != 0x60000`, i.e. everything but HGE `BLEND_ALPHABLEND|ZWRITE`.
+    /// Additive or plain alpha blending.
     pub fn additive(&self) -> bool {
-        self.sprite & 0xffff_0000 != 0x6_0000
+        self.blend_add
     }
 
-    /// Top-left pixel of the particle's 32x32 cell in [`TEXTURE`].
+    /// Top-left pixel of the particle's cell in [`TEXTURE`].
     pub fn texture_origin(&self) -> (u32, u32) {
-        ((self.sprite & 3) * 32, ((self.sprite >> 2) & 0x3fff) * 32)
+        ((self.cell % 4) * CELL as u32, (self.cell / 4 % 4) * CELL as u32)
     }
 }
 
-/// One live particle (`0x54` bytes in the client; same fields).
+/// One live particle.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Particle {
     pub gravity: f32,
@@ -148,14 +89,13 @@ pub struct Particle {
 }
 
 impl Particle {
-    /// Vertex colour as the client builds it: `(u8)(int)(c * 255)` per channel. Values
-    /// stay inside 0..1 for all shipped files (linear interpolation between start and end).
+    /// Vertex colour, 0..255 per channel (clamped).
     pub fn rgba8(&self) -> [u8; 4] {
-        self.color.map(|c| (c * 255.0) as i32 as u8)
+        self.color.map(|c| (c.clamp(0.0, 1.0) * 255.0) as u8)
     }
 }
 
-/// Small deterministic PRNG (the client uses a `std::mt19937` behind `randomFloat`, 0x4f5000).
+/// Small deterministic PRNG (xorshift64*).
 #[derive(Debug, Clone)]
 pub struct Rng(u64);
 
@@ -164,7 +104,7 @@ impl Rng {
         Self(seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1)
     }
 
-    /// Uniform in `[a, b)` (`b < a` allowed). Returns `a` when `a == b` like `randomFloat`.
+    /// Uniform in `[a, b)` (`b < a` allowed); `a` when `a == b`.
     pub fn range(&mut self, a: f32, b: f32) -> f32 {
         if a == b {
             return a;
@@ -178,19 +118,19 @@ impl Rng {
     }
 }
 
-/// Port of the client's `ParticleSystem`. Positions are in pixels with y pointing down
-/// (SFML screen space); callers convert to their own world space.
+/// A running particle system. Positions are in pixels with y pointing down (screen space);
+/// callers convert to their own world space.
 #[derive(Debug, Clone)]
 pub struct ParticleSystem {
     pub info: ParticleSystemInfo,
     pub particles: Vec<Particle>,
-    /// Emitter position (`0x14c`) and the position before the last move (`0x154`).
+    /// Emitter position and the position before the last move.
     pub location: [f32; 2],
     pub prev_location: [f32; 2],
-    /// Seconds since creation (`0xbc`).
+    /// Seconds since creation.
     pub age: f32,
     emission_residue: f32,
-    /// No new particles once set (`0xc0`); live ones finish their life.
+    /// No new particles once set; live ones finish their life.
     pub stopped: bool,
     rng: Rng,
 }
@@ -209,7 +149,7 @@ impl ParticleSystem {
         }
     }
 
-    /// `setPosition(moveParticles, x, y)`. With `move_particles` the live particles are
+    /// Moves the emitter. With `move_particles` the live particles are
     /// translated too (effect attached to a sprite/unit); without, they stay where they
     /// were emitted (projectile trails).
     pub fn set_position(&mut self, x: f32, y: f32, move_particles: bool) {
@@ -232,8 +172,7 @@ impl ParticleSystem {
         self.location = [x, y];
     }
 
-    /// True once nothing is alive and nothing more will be emitted (the kit-finished
-    /// test of the spell visual code, 0x500d00).
+    /// True once nothing is alive and nothing more will be emitted.
     pub fn finished(&self) -> bool {
         if !self.particles.is_empty() {
             return false;
@@ -264,8 +203,7 @@ impl ParticleSystem {
             if p.age >= p.terminal_age {
                 return false;
             }
-            // Radial unit vector (the client uses the 0x5f3759df fast inverse square root;
-            // a particle exactly on the emitter gets a zero vector there too).
+            // Radial unit vector (zero for a particle exactly on the emitter).
             let (dx, dy) = (p.pos[0] - lx, p.pos[1] - ly);
             let len2 = dx * dx + dy * dy;
             let inv = if len2 > 0.0 { len2.sqrt().recip() } else { 0.0 };
@@ -287,7 +225,6 @@ impl ParticleSystem {
     fn spawn(&mut self) {
         let i = self.info;
         let r = &mut self.rng;
-        // The client clears this guard only through `stopped`/`lifetime`; keep it identical.
         if i.lifetime <= 0.0 {
             if ((self.age as i32) as f32) > 1.0 && self.particles.is_empty() && self.stopped {
                 return;
@@ -301,7 +238,6 @@ impl ParticleSystem {
         }
         color[3] = r.range(i.color_start[3], i.color_start[3] + (i.color_end[3] - i.color_start[3]) * i.alpha_var);
         let terminal_age = r.range(i.particle_life_min, i.particle_life_max);
-        // Unlike HGE, no interpolation between the previous and current emitter position.
         let pos = [self.location[0] + r.range(-2.0, 2.0), self.location[1] + r.range(-2.0, 2.0)];
         let mut ang = i.direction - FRAC_PI_2 + r.range(0.0, i.spread) - i.spread * 0.5;
         if i.relative {
@@ -342,7 +278,8 @@ mod tests {
 
     fn info() -> ParticleSystemInfo {
         ParticleSystemInfo {
-            sprite: 0x4_000a,
+            cell: 10,
+            blend_add: true,
             emission: 100,
             lifetime: -1.0,
             particle_life_min: 0.5,
@@ -357,18 +294,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_roundtrip_layout() {
-        let mut b = vec![0u8; PSI_SIZE];
-        b[0..4].copy_from_slice(&0x6_0005u32.to_le_bytes());
-        b[4..8].copy_from_slice(&40i32.to_le_bytes());
-        b[28..32].copy_from_slice(&1u32.to_le_bytes());
-        b[64..68].copy_from_slice(&0.75f32.to_le_bytes());
-        b[124..128].copy_from_slice(&0.25f32.to_le_bytes());
-        let i = ParticleSystemInfo::parse(&b).unwrap();
-        assert_eq!((i.emission, i.relative, i.size_start, i.alpha_var), (40, true, 0.75, 0.25));
-        assert!(!i.additive());
-        assert_eq!(i.texture_origin(), (32, 32));
-        assert!(ParticleSystemInfo::parse(&b[..100]).is_err());
+    fn atlas_cells() {
+        let mut i = info();
+        assert_eq!(i.texture_origin(), (64, 64));
+        i.cell = 7;
+        assert_eq!(i.texture_origin(), (96, 32));
     }
 
     #[test]

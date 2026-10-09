@@ -6,7 +6,6 @@ use crate::{data::GameData, iso, lights, particles::FxMaterial};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 use dusk_formats::map::{FLAG_UNWALKABLE, MapFile, TERRAIN_CHUNK, WalkGrid};
-use std::collections::HashMap;
 
 pub struct MapRenderPlugin;
 
@@ -33,9 +32,6 @@ pub struct CurrentMap {
     pub floor: Vec<bool>,
     /// Default spawn point (db start or a walkable cell near the middle).
     pub start: Vec2,
-    /// Terrain chunk id -> `zone_template.id`.
-    pub zones: HashMap<u32, u32>,
-    pub terrain_width: u32,
 }
 
 impl CurrentMap {
@@ -45,15 +41,6 @@ impl CurrentMap {
 
     pub fn is_walkable(&self, cell: Vec2) -> bool {
         self.grid.is_walkable(cell.x, cell.y)
-    }
-
-    /// Zone of the 13x13 terrain chunk containing `cell`.
-    pub fn zone_at(&self, cell: Vec2) -> Option<u32> {
-        if cell.x < 0.0 || cell.y < 0.0 || self.terrain_width == 0 {
-            return None;
-        }
-        let (cx, cy) = (cell.x as u32 / TERRAIN_CHUNK, cell.y as u32 / TERRAIN_CHUNK);
-        self.zones.get(&(cy * self.terrain_width + cx)).copied()
     }
 }
 
@@ -91,17 +78,18 @@ fn load_map(
     current.id = info.as_ref().map(|i| i.id);
     current.grid = map.walk_grid();
     current.floor = vec![false; (map.size * map.size) as usize];
-    current.zones = map.zones.iter().copied().collect();
-    current.terrain_width = map.terrain_width();
 
     // Resolve each texture once: handle + pivot.
     let textures: Vec<Option<(Handle<Image>, Vec2)>> = map
         .textures
         .iter()
         .map(|name| {
+            if name.to_lowercase().ends_with(".psi") {
+                return None; // invisible sprite carrying only sprite_fx effects (fireflies)
+            }
             let rel = data.asset_path(name)?;
             if !rel.ends_with(".png") {
-                return None; // .psi: invisible sprite carrying only sprite_psi/sprite_light effects
+                return None;
             }
             Some((assets.load(rel), data.hotspot(name)?))
         })
@@ -185,7 +173,7 @@ fn load_map(
         .filter(|s| *s != Vec2::ZERO)
         .unwrap_or_else(|| first_walkable(&current));
     info!(
-        "map {} ({}x{}): {} cells, {} sprites, {} sprite effects, {} textures, {} terrain chunks, {} zones",
+        "map {} ({}x{}): {} cells, {} sprites, {} sprite effects, {} textures, {} terrain chunks",
         current.name,
         map.size,
         map.size,
@@ -194,7 +182,6 @@ fn load_map(
         effects,
         map.textures.len(),
         map.terrain.len(),
-        map.zones.len()
     );
     loaded.write(MapLoaded);
 }

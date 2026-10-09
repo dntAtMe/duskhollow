@@ -1,52 +1,285 @@
-# Visuals of our spells (dusk_formats::content::visuals), one `[spell <entry>]` section per spell
-# of data/spells.txt:
-#   visual=<legacy spell entry>   start from that spell's legacy visual
-#   traveling_kit impact_kit casting_kit go_kit aura_kit = <legacy visual kit id> (0 = none)
-#   go_anim / cast_anim = swing | cast | shoot | cast_alt (unit animation)
+# Spell visuals (dusk_formats::content::visuals, docs/visuals.md).
+#
+# [kit <name>]: one effect.
+#   anim anim_x anim_y anim_color anim_blend    .sa flipbook (scripts/override/animation); x = canvas
+#                                               left edge from the feet (+ = left), y = canvas bottom
+#                                               from the feet (+ = down, may use `height`);
+#                                               color = rrggbbaa tint; blend 0 = over everything
+#   anim2 anim2_x anim2_y anim2_color anim2_blend   optional second flipbook
+#   particles particles_x particles_y           particle system of data/particles.txt + offset
+#   sound                                       bare sound name (content/custom/sfx/<name>.wav)
+#   unit_glow ground_glow                       rrggbbaa; unit_glow colours a projectile orb
+#
+# [spell <entry>]: which kit plays when (every spell of data/spells.txt has one).
+#   casting     on the caster while casting (particles stop when the cast ends)
+#   go          on the caster when the spell is released
+#   traveling   rides the projectile
+#   impact      on each target (after the projectile's flight)
+#   aura        on a unit while the spell's aura is on it
+#   go_anim / cast_anim   unit animation: swing | cast | shoot | cast_alt | block | hit
 
+# --- kits: weapons ---------------------------------------------------------------------------
+
+[kit melee_hit]
+anim=slash_001.sa
+anim_x=47
+anim_y=30
+
+[kit bow_draw]
+sound=spell_bow_draw
+
+[kit arrow_flight]
+sound=spell_arrow_release
+unit_glow=b48c5aff
+
+[kit arrow_hit]
+anim=slash_001.sa
+anim_x=47
+anim_y=25
+sound=spell_arrow_hit
+
+[kit item_use]
+sound=item_use
+
+# --- kits: fighter ---------------------------------------------------------------------------
+
+[kit heavy_slash]
+anim=slash_002c.sa
+anim_x=47
+anim_y=23
+anim_blend=0
+sound=spell_heavy_slash
+
+[kit bleed_hit]
+anim=slash_002b.sa
+anim_x=47
+anim_y=25
+anim_blend=3
+particles=blood_spray
+particles_y=-height/2
+sound=spell_bleed_hit
+unit_glow=ff00007f
+ground_glow=8a0a0a7f
+
+[kit skull_crack]
+anim=water_001.sa
+anim_x=50
+anim_y=30
+anim_blend=0
+sound=spell_skull_crack
+
+[kit stun_ring]
+anim=wind_003b.sa
+anim_x=13
+anim_y=-height+20
+anim_blend=0
+
+[kit dash]
+anim=wind_003a.sa
+anim_x=23
+anim_y=5
+anim_blend=0
+particles=dash_dust
+sound=spell_dash
+unit_glow=c8501e3f
+ground_glow=c8501e7f
+
+[kit rundown_hit]
+anim=slash_001.sa
+anim_x=47
+anim_y=25
+sound=spell_blade_hit
+unit_glow=e0642a7f
+
+[kit ground_slam]
+anim=earth_002a.sa
+anim_x=93
+anim_y=33
+particles=slam_debris
+sound=spell_ground_slam
+ground_glow=b4461eff
+
+# --- kits: skirmisher ------------------------------------------------------------------------
+
+[kit knife_flight]
+particles=knife_trail
+particles_y=-20
+sound=spell_knife_throw
+ground_glow=8a1e1e7f
+
+[kit knife_hit]
+anim=slash_001.sa
+anim_x=50
+anim_y=25
+unit_glow=e0642a3f
+
+[kit hook_flight]
+particles=hook_trail
+particles_y=-20
+sound=spell_hook_throw
+ground_glow=8a1e2a7f
+
+[kit hook_hit]
+anim=slash_001.sa
+anim_x=50
+anim_y=25
+sound=spell_hook_hit
+
+# --- kits: fire ------------------------------------------------------------------------------
+
+[kit fire_cast]
+particles=fire_cast
+particles_y=-height
+sound=spell_fire_cast
+
+[kit ember_trail]
+particles=ember_trail
+particles_y=-25
+sound=spell_ember_whoosh
+ground_glow=e0642a3f
+
+[kit ember_burst]
+anim=effect_004.sa
+anim_x=48
+anim_y=18
+anim_blend=0
+particles=ember_sparks
+particles_y=-height/2
+sound=spell_ember_burst
+unit_glow=f08c283f
+
+[kit ember_warmth]
+anim=light_003.sa
+anim_x=23
+anim_y=-5
+anim_blend=0
+particles=ember_mend
+sound=spell_ember_heal
+unit_glow=f08c283f
+ground_glow=e0642a3f
+
+[kit veil]
+anim=effect_003.sa
+anim_x=23
+anim_y=-height/10
+anim_blend=0
+particles=ash_veil
+particles_y=-height/2
+sound=spell_veil
+
+# --- kits: the Warden ------------------------------------------------------------------------
+
+[kit warden_sweep]
+anim=slash_001.sa
+anim_x=45
+anim_y=19
+anim2=slash_001.sa
+anim2_x=47
+anim2_y=29
+sound=spell_warden_sweep
+ground_glow=8a1e2aff
+
+[kit warden_wind_up]
+sound=spell_warden_roar
+
+# --- spells ----------------------------------------------------------------------------------
+
+# Cairnbreaker
 [spell 50001]
-visual=14
+impact=heavy_slash
 go_anim=swing
 
+# Open Vein
 [spell 50002]
-visual=229
+impact=bleed_hit
 go_anim=swing
 
+# Skullcrack
 [spell 50003]
-impact_kit=15
-aura_kit=61
+impact=skull_crack
+aura=stun_ring
 go_anim=swing
 
+# Run Down
 [spell 50004]
-go_kit=6
-impact_kit=129
+go=dash
+impact=rundown_hit
 go_anim=swing
 
+# Clear the Row
 [spell 50005]
-go_kit=199
+go=ground_slam
 go_anim=swing
 
+# Flung Blade
 [spell 50006]
-traveling_kit=78
-impact_kit=132
+traveling=knife_flight
+impact=knife_hit
 go_anim=swing
 
+# Ember Bolt
 [spell 50007]
-visual=243
+casting=fire_cast
+traveling=ember_trail
+impact=ember_burst
 go_anim=swing
 cast_anim=cast
 
+# Drag-Hook
 [spell 50008]
-visual=46
+casting=bow_draw
+traveling=hook_flight
+impact=hook_hit
 go_anim=shoot
 cast_anim=shoot
 
+# Kept Ember
 [spell 50009]
-casting_kit=119
-impact_kit=98
+casting=fire_cast
+impact=ember_warmth
 go_anim=cast
 cast_anim=cast
 
+# Draw the Veil
 [spell 50010]
-impact_kit=158
+impact=veil
+go_anim=cast
+
+# Attack (auto attack, melee)
+[spell 50100]
+impact=melee_hit
+go_anim=swing
+
+# Shoot (auto attack, ranged)
+[spell 50101]
+casting=bow_draw
+traveling=arrow_flight
+impact=arrow_hit
+cast_anim=shoot
+
+# Ember Draught
+[spell 50110]
+impact=item_use
+go_anim=block
+
+# Lamp Tonic
+[spell 50111]
+impact=item_use
+go_anim=block
+
+# Rend (the Alpha)
+[spell 51001]
+impact=bleed_hit
+go_anim=swing
+
+# Harrowing Sweep (Corvin)
+[spell 51002]
+impact=warden_sweep
+go_anim=swing
+
+# Gate Slam (Corvin)
+[spell 51003]
+casting=warden_wind_up
+go=ground_slam
+aura=stun_ring
 go_anim=cast

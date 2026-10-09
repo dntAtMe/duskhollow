@@ -1,6 +1,6 @@
-//! Spell visuals from `spell_visual` / `spell_visual_kit`: unit cast/go animations,
-//! `.sa` flipbooks for projectiles and impacts. Kit particle systems live in `spell_particles`;
-//! kit sounds are not played yet. Projectiles with neither a flipbook nor a `.psi` get a glowing orb.
+//! Spell visuals (`data/spell_visuals.txt`): unit cast/go animations, `.sa` flipbooks for
+//! projectiles and impacts. Kit particle systems live in `spell_particles`, kit sounds in
+//! `audio`. Projectiles with neither a flipbook nor particles get a small orb (`unit_glow`).
 
 use crate::{
     data::GameData,
@@ -40,8 +40,8 @@ impl Plugin for SpellFxPlugin {
     }
 }
 
-/// Unit animation enum (client DB editor): 6 Cast, 7 Swing, 8 Hit, 9 Block, 10 CastAlt.
-/// 2 is what every bow skill (Auto Shot, Aimed/Stunning/Entangling Shot) uses: the shoot pose.
+/// Unit animation ids (`content::visuals::unit_anim_id`): 2 Shoot, 6 Cast, 7 Swing, 8 Hit,
+/// 9 Block, 10 CastAlt.
 fn unit_anim(id: i64) -> Option<&'static str> {
     match id {
         2 => Some("shoot"),
@@ -74,9 +74,9 @@ struct KeyQueue {
     done: HashSet<AssetId<Image>>,
 }
 
-/// The original drew most effect flipbooks with screen/additive blending over a black
-/// background. Sprites here alpha-blend, so fully opaque frames get alpha = brightness,
-/// which looks the same over the dark-ish world. Frames that already carry alpha are left alone.
+/// Effect flipbooks are drawn on opaque black (an additive look). Sprites here alpha-blend, so
+/// fully opaque frames get alpha = brightness, which looks the same over the dark-ish world.
+/// Frames that already carry alpha are left alone.
 fn luma_key(mut queue: ResMut<KeyQueue>, mut images: ResMut<Assets<Image>>) {
     let pending = std::mem::take(&mut queue.pending);
     for h in pending {
@@ -104,10 +104,8 @@ fn luma_key(mut queue: ResMut<KeyQueue>, mut images: ResMut<Assets<Image>>) {
     }
 }
 
-/// Draw scale of a `.sa` flipbook: `1 / sqrt(ratio)` (ratio is an area ratio). Fitted on all
-/// 137 kits in game.db: the kit's `spranim_x` equals the frames' horizontal centre times this
-/// (ratio 1: 0.98, 2: 0.72, 4: 0.45, 8: 0.36 measured) -- `1 / ratio` would put ratio-4 effects
-/// at a quarter of their size, off-centre.
+/// Draw scale of a `.sa` flipbook: `1 / sqrt(ratio)` (ratio is an area ratio). A kit's `anim_x`
+/// is the frames' horizontal centre times this.
 fn sa_scale(anim: &SpriteAnim) -> f32 {
     1.0 / (anim.ratio.max(1) as f32).sqrt()
 }
@@ -198,32 +196,6 @@ fn spawn_kit(
     }
 }
 
-/// `DUSK_LEGACY_LOG=1`: the legacy visual kits a spell plays.
-fn note_kits(spell: i64, visual: &dusk_formats::spell::SpellVisual) {
-    if !dusk_formats::legacy_log_enabled() {
-        return;
-    }
-    let slots = [
-        ("traveling", &visual.traveling),
-        ("impact", &visual.impact),
-        ("casting", &visual.casting),
-        ("go", &visual.go),
-        ("aura", &visual.aura_ontop),
-    ];
-    for (slot, kit) in slots {
-        if let Some(k) = kit {
-            let anims: Vec<&str> = k.anims.iter().map(|a| a.sa.as_str()).collect();
-            dusk_formats::legacy_note(
-                "kit",
-                format!(
-                    "{} (spell {spell} {slot}): anims {anims:?} psystem {:?} sound {:?} glow {}/{}",
-                    k.id, k.psystem, k.sound, k.unit_glow, k.ground_glow
-                ),
-            );
-        }
-    }
-}
-
 fn on_spell_events(
     mut commands: Commands,
     mut events: MessageReader<SpellNet>,
@@ -246,7 +218,6 @@ fn on_spell_events(
             }
             ServerMsg::SpellGo { caster, spell, targets, travel_ms } => {
                 let Some(visual) = data.spell_visuals.get(&(*spell as i64)) else { continue };
-                note_kits(*spell as i64, visual);
                 let caster_e = net.entities.get(caster).copied();
                 let target_es: Vec<Entity> = targets.iter().filter_map(|t| net.entities.get(t).copied()).collect();
                 let target_pos = target_es.first().and_then(|t| units.get(*t).ok()).map(|u| u.pos);
@@ -258,7 +229,7 @@ fn on_spell_events(
                         play_unit_anim(&mut u, anim);
                     }
                 }
-                // Go kit: plays on the caster as the spell is released (War Stomp's ground ring).
+                // Go kit: plays on the caster as the spell is released (Gate Slam's ground ring).
                 if let (Some(kit), Some(Ok(u))) = (&visual.go, caster_e.map(|e| units.get(e))) {
                     spawn_kit(&mut commands, &data, &assets, &mut queue, kit, u);
                 }
@@ -283,7 +254,7 @@ fn on_spell_events(
                                     true,
                                 );
                             }
-                            // Particle-only kits (Fireball...) are drawn by `spell_particles`: no orb.
+                            // Particle-only kits (Ember Bolt...) are drawn by `spell_particles`: no orb.
                             let has_psi = crate::spell_particles::kit_psi(&visual.traveling).is_some();
                             if spawned.is_none() && !has_psi {
                                 let glow = visual

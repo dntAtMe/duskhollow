@@ -1,7 +1,7 @@
 """Our own spell visual effects: `.sa` flipbooks and the particle texture atlas.
 
 Usage (from repo root):
-    python -I tools/artgen/spellfx.py              # all flipbooks + particles.png + previews
+    python -I tools/artgen/spellfx.py              # all flipbooks + fx_particles.png + previews
     python -I tools/artgen/spellfx.py cast_001.sa  # only some flipbooks (+ previews)
     python -I tools/artgen/spellfx.py --atlas      # only the particle atlas
 
@@ -10,21 +10,20 @@ particle bursts, rings, light columns, beams, lightning, slashes, whirlwinds... 
 float intensity field mapped through a short per-school palette ramp (black -> dark -> mid ->
 bright -> white-hot) with 4x4 Bayer ordered dithering, i.e. the oldschool "limited palette" look.
 
-Placement: the canvas position is fixed by game.db (`spell_visual_kit.spranim_x/y`), so for every
-original `scripts/animation/<name>.sa` we keep its ratio, canvas size, delay, loop range and frame
-count, and draw each frame into the bounding box the original frame occupied
-(`spellfx_layout.json`, measured by `spellfx_measure.py`: only boxes, a brightness envelope and a
-dominant colour). Frames are rendered at world resolution (canvas / ratio) and blown up by
-`ratio` with nearest neighbour, so they stay crisp at the client's 1/ratio draw scale.
+Placement: kits place a flipbook's canvas by `anim_x/anim_y` (`data/spell_visuals.txt`). Each
+`<name>.sa` keeps its ratio, canvas size, delay, loop range and frame count from
+`spellfx_layout.json` (our layout data: per-frame bounding boxes, a brightness envelope and a
+school ramp per flipbook), and each frame is drawn into its box. Frames are rendered at world
+resolution (canvas / ratio) and blown up by `ratio` with nearest neighbour, so they stay crisp at
+the client's 1/sqrt(ratio) draw scale.
 
-Output (used with `--art custom`):
-- `custom_assets/scripts/override/animation/<name>.sa` replaces the original script; its
-  `filename` is `sfx_<original filename>` so the frames have our own names:
+Output:
+- `custom_assets/scripts/override/animation/<name>.sa`, `filename=sfx_<name>`:
 - `custom_assets/content/custom/spellfx/sfx_*_<n>.png`: trimmed, palettized frames on opaque
   black (the client luma-keys those = additive look). Quest markers / arrows / the obelisk are
   drawn with real alpha instead.
-- `custom_assets/content/override/fx/particles.png`: 128x128 atlas of 16 white 32x32 particle
-  sprites (same slots as the original, `.psi` files pick cells by index), alpha in 5 dithered steps.
+- `custom_assets/content/custom/fx/fx_particles.png`: 128x128 atlas of 16 white 32x32 particle
+  sprites (`sprite=<cell>` in `data/particles.txt`), alpha in 5 dithered steps.
 - `custom_assets/preview/spellfx_*.png`: contact sheets (gitignored).
 """
 
@@ -47,7 +46,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LAYOUT = Path(__file__).with_name("spellfx_layout.json")
 OUT_FRAMES = ROOT / "custom_assets" / "content" / "custom" / "spellfx"
 OUT_SA = ROOT / "custom_assets" / "scripts" / "override" / "animation"
-OUT_ATLAS = ROOT / "custom_assets" / "content" / "override" / "fx" / "particles.png"
+OUT_ATLAS = ROOT / "custom_assets" / "content" / "custom" / "fx" / "fx_particles.png"
 PREVIEW = ROOT / "custom_assets" / "preview"
 TAU = 2 * math.pi
 
@@ -1229,7 +1228,7 @@ def build(name: str, lay: dict):
 
 
 def particle_atlas():
-    """16 white 32x32 sprites in the original's slots (the .psi files address cells by index):
+    """16 white 32x32 sprites (`data/particles.txt` picks cells by index):
     row 0: soft blob, sparkle cluster, 6-ray star, small burst
     row 1: thin X cross, solid star, 8-ray flare, small soft glow
     row 2: smoke clump, spiky starburst, bright flare, hollow ring
@@ -1340,7 +1339,7 @@ def main(argv):
     layout = json.loads(LAYOUT.read_text())
     if "--atlas" in argv or not argv:
         particle_atlas()
-        print("particles.png ->", OUT_ATLAS)
+        print("fx_particles.png ->", OUT_ATLAS)
         if argv:
             return
     names = [a for a in argv if a.endswith(".sa")] or sorted(layout)

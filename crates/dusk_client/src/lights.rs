@@ -1,25 +1,23 @@
-//! Map sprite effects (`sprite_psi` emitters, `sprite_light` glows) and the zone darkness.
+//! Map sprite effects (`sprite_fx.txt` particle emitters and lights) and the map darkness
+//! (`docs/visuals.md`).
 //!
-//! What the original does (`ClientMap_buildDrawList`, 0x4b0850; see `docs/formats.md`):
-//! - Each light of an upright sprite sits at the cell's render position + offset.
-//!   `bool_applytop`: `light_source.png` (centred, scaled, tinted with the light colour,
-//!   `BlendAdd`) drawn in the sprite's depth slot just before the sprite.
-//!   `bool_applyground`: the same glow at +(16, 8) px, drawn after the whole upright layer.
-//! - If the map brightness is below 1, a window-sized render texture is cleared to black
-//!   with alpha `1 - brightness`, every light multiplies `shader_light.png` (1024x512, alpha
-//!   ~0 in the centre, 1 at the edges; scaled by the light's scale, at +(16, 8)) into it
-//!   with `BlendMultiply`, and the result is drawn over the map. Brightness eases towards
-//!   `1 - zone_template.night_pct` of the player's zone at rate 1/s.
+//! - Each light of a sprite sits at the cell's render position + offset.
+//!   `top`: [`GLOW`] (centred, scaled, tinted with the light colour, additive) drawn in the
+//!   sprite's depth slot just before the sprite. `ground`: the same glow at +(16, 8) px, drawn
+//!   above the whole upright layer.
+//! - If the map brightness is below 1, a camera-sized quad of black with alpha
+//!   `1 - brightness` is drawn over the map, multiplied around every light by the alpha of
+//!   [`MASK`] (1024x512, ~0 in the centre, 1 at the edges; scaled by the light's scale, at
+//!   +(16, 8)). Brightness is `1 - MapInfo.darkness` of the current map (`DUSK_DARKNESS=0..1`
+//!   overrides it for testing) and eases towards changes at rate 1/s.
 //!
-//! Here the darkness is a camera-sized quad whose shader multiplies the cut-outs of up
-//! to [`MAX_LIGHTS`] visible lights.
+//! The darkness shader multiplies the cut-outs of up to [`MAX_LIGHTS`] visible lights.
 
 use crate::{
     data::GameData,
     map_render::{CurrentMap, MapTile},
     particles::{self, FxMaterial},
     player::Player,
-    unit::Unit,
 };
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::prelude::*;
@@ -35,9 +33,14 @@ impl Plugin for LightsPlugin {
         app.add_plugins(Material2dPlugin::<DarknessMaterial>::default())
             .init_resource::<Brightness>()
             .add_systems(Startup, spawn_darkness)
-            .add_systems(PostUpdate, (zone_brightness, update_darkness).chain().after(particles::debug_camera));
+            .add_systems(PostUpdate, (map_brightness, update_darkness).chain().after(particles::debug_camera));
     }
 }
+
+/// Additive light glow (tools/artgen/lightfx.py).
+pub const GLOW: &str = "fx_light_glow.png";
+/// Darkness cut-out around a light: alpha ~0 in the centre, 1 at the edges (tools/artgen/lightfx.py).
+pub const MASK: &str = "fx_light_mask.png";
 
 /// Lights cut into the darkness per frame (nearest to the camera first).
 pub const MAX_LIGHTS: usize = 64;
@@ -45,7 +48,7 @@ pub const MAX_LIGHTS: usize = 64;
 const GROUND_GLOW_Z: f32 = 0.55;
 const DARKNESS_Z: f32 = 990.0;
 
-/// Map brightness (`ClientMap` +0xb8) and its target (+0xbc).
+/// Map brightness (1 = no darkness) and its target.
 #[derive(Resource)]
 pub struct Brightness {
     pub current: f32,
@@ -58,7 +61,7 @@ impl Default for Brightness {
     }
 }
 
-/// A light's cut-out in the darkness (world position of the `shader_light.png` centre).
+/// A light's cut-out in the darkness (world position of the [`MASK`] centre).
 #[derive(Component)]
 pub struct DarknessHole {
     pub scale: f32,
@@ -75,7 +78,7 @@ pub struct DarknessMaterial {
 
 #[derive(ShaderType, Clone)]
 pub struct DarknessUniform {
-    /// x: darkness alpha (1 - brightness), y: light count, zw: `shader_light.png` size.
+    /// x: darkness alpha (1 - brightness), y: light count, zw: [`MASK`] size.
     pub params: Vec4,
     /// xy: centre (world), z: scale.
     pub lights: [Vec4; MAX_LIGHTS],
@@ -101,9 +104,10 @@ fn spawn_darkness(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<DarknessMaterial>>,
 ) {
-    let light = data.asset_path("shader_light.png").map(|p| assets.load(p)).unwrap_or_default();
+    let light = data.asset_path(MASK).map(|p| assets.load(p)).unwrap_or_default();
+    let size = data.image_size(MASK).unwrap_or(UVec2::new(1024, 512)).as_vec2();
     let material = materials.add(DarknessMaterial {
-        data: DarknessUniform { params: Vec4::new(0.0, 0.0, 1024.0, 512.0), lights: [Vec4::ZERO; MAX_LIGHTS] },
+        data: DarknessUniform { params: Vec4::new(0.0, 0.0, size.x, size.y), lights: [Vec4::ZERO; MAX_LIGHTS] },
         light,
     });
     commands.spawn((
@@ -118,7 +122,7 @@ fn spawn_darkness(
     ));
 }
 
-/// Spawns the `sprite_psi` emitters and `sprite_light` lights of one map sprite.
+/// Spawns the particle emitters and lights of one map sprite.
 /// `pos` is where the sprite's hotspot is drawn (the cell centre), `z` its depth.
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_sprite_effects(
@@ -147,13 +151,13 @@ pub fn spawn_sprite_effects(
         commands.spawn((MapTile, DarknessHole { scale: l.scale }, Transform::from_xyz(ground.x, ground.y, 0.0)));
         let glow = glow
             .get_or_insert_with(|| {
-                let texture = data.asset_path("light_source.png").map(|p| assets.load(p)).unwrap_or_default();
+                let texture = data.asset_path(GLOW).map(|p| assets.load(p)).unwrap_or_default();
                 materials.add(FxMaterial { texture, additive: true })
             })
             .clone();
         let c = l.color;
         let color = Color::srgba_u8((c >> 24) as u8, (c >> 16) as u8, (c >> 8) as u8, c as u8);
-        let size = data.image_size("light_source.png").unwrap_or(UVec2::new(422, 193)).as_vec2() * l.scale;
+        let size = data.image_size(GLOW).unwrap_or(UVec2::new(422, 193)).as_vec2() * l.scale;
         let mesh = meshes.add(particles::quad_mesh(size, color));
         for (on, p, z) in [(l.apply_top, at, z - 0.0005), (l.apply_ground, ground, GROUND_GLOW_Z)] {
             if on {
@@ -170,17 +174,25 @@ pub fn spawn_sprite_effects(
     n
 }
 
-/// Target brightness from the zone under the local player.
-fn zone_brightness(
+/// Darkness of a map: `MapInfo.darkness`, or `DUSK_DARKNESS` when set.
+fn map_darkness(data: &GameData, map: &str) -> f32 {
+    std::env::var("DUSK_DARKNESS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .or_else(|| data.maps.iter().find(|m| m.name == map).map(|m| m.darkness))
+        .unwrap_or(0.0)
+}
+
+/// Target brightness from the current map (once the local player is in it).
+fn map_brightness(
     time: Res<Time>,
     data: Res<GameData>,
     map: Res<CurrentMap>,
-    player: Query<&Unit, With<Player>>,
+    player: Query<(), With<Player>>,
     mut b: ResMut<Brightness>,
 ) {
-    if let Ok(u) = player.single() {
-        let night = map.zone_at(u.pos).and_then(|z| data.zone_night.get(&z)).copied().unwrap_or(0.0);
-        let target = (1.0 - night).clamp(0.0, 1.0);
+    if player.single().is_ok() {
+        let target = (1.0 - map_darkness(&data, &map.name)).clamp(0.0, 1.0);
         if map.is_changed() {
             b.current = target; // no fade on map change
         }

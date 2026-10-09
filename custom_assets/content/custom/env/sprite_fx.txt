@@ -1,6 +1,9 @@
-# psi <sprite> <file.psi> <x> <y>          (offset from the sprite's top-left)
+# particles <sprite> <system> <x> <y>       (data/particles.txt; offset from the sprite's top-left)
 # light <sprite> <rrggbbaa> <x> <y> <ground 0/1> <top 0/1> <scale>  (offset from the cell)
-psi cg_campfire_0.png campfire.psi 20 8
+particles cg_campfire_0.png campfire 20 8
+particles cg_campfire_0.png cairn_sparks 20 4
 light cg_campfire_0.png e25822c8 0 16 1 0 1.0
-psi cg_lamp_0.png small_light_embers.psi 27 3
+particles cg_lamp_0.png lantern_embers 27 3
 light cg_lamp_0.png e25822c8 11 -60 1 0 0.8
+particles green_firefly.psi fireflies 0 -32
+light green_firefly.psi b4782a48 -5 20 1 0 0.4
