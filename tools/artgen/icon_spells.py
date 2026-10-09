@@ -1073,6 +1073,82 @@ def r_draw_the_veil(cv, P):
     cv.paint(veil, "redmark", "lit", bevel=0.06, base=0.15)
 
 
+# Class kit skills 50011-50017 (Stream A).
+
+
+def r_hurled_brand(cv, P):
+    """A burning brand from the cairn, tumbling through the air."""
+    speedlines(cv, "fire", -0.75, 0.05, -0.95, 5, 0.7, seed=7)
+    cv.paint(taper(-0.55, -0.6, 0.2, 0.15, 0.1, 0.075), "fur", "lit", bevel=0.06, base=0.05)
+    cv.paint(taper(0.05, 0.0, 0.2, 0.15, 0.09, 0.08), "fire", "glow", bevel=0.04, lo=0.5, hi=1.0, outline=False)
+    flames(cv, P, cx=0.3, y0=0.05, h=0.75, w=0.2, n=3, ramp="fire", core="flame", halo=0.4)
+
+
+def r_scatter_the_coals(cv, P):
+    """A fistful of live coals bursting on the ground."""
+    cv.paint(ellipse(0, -0.55, 0.85, 0.22), "stone", "lit", bevel=0.08, base=0.05)
+    burst(cv, P, "fire", "flame", 0, -0.35, 0.72, 0.22, 11, core_r=0.12, halo=0.4)
+    for x, y, r in ((-0.55, -0.5, 0.12), (0.5, -0.55, 0.1), (-0.15, -0.7, 0.09), (0.25, -0.25, 0.11), (-0.35, -0.1, 0.08)):
+        cv.paint(circle(x, y, r), "fire", "lit", bevel=0.08, base=0.15)
+    stars(cv, [(0.55, 0.35), (-0.6, 0.45), (0.05, 0.6)], "flame", 0.09)
+
+
+def r_blinding_flare(cv, P):
+    """A flash of fire in front of a wide eye."""
+    burst(cv, P, "fire", "flame", 0.0, 0.0, 0.92, 0.3, 14, core_r=0.0, halo=0.5)
+    eye(cv, P, 0, -0.05, 0.85, iris="ruby", rays=False)
+    stars(cv, [(0.55, 0.5), (-0.55, 0.5), (0.0, 0.72)], "flame", 0.12)
+
+
+def r_between_the_ribs(cv, P):
+    """A knife slipped between bare ribs."""
+    for i, y in enumerate((0.45, 0.15, -0.15, -0.45)):
+        cv.paint(arc(-0.2, y + 0.55, 0.62, 3.6, 5.2 - 0.05 * i, 0.07), "bone", "lit", bevel=0.05)
+    cv.paint(rect(-0.62, 0.0, 0.07, 0.62, rr=0.03), "bone", "lit", bevel=0.05)
+    prop(cv, it.dagger(3, red=True), 0.66, rot=view(diag=135, tilt=10, yaw=-20), off=(0.18, 0.05), shadow=False)
+    drop(cv, "blood", 0.45, -0.55, 0.11)
+
+
+def r_ember_prayer(cv, P):
+    """Hands pressed together over a small cairn flame."""
+    praying(cv, P)
+    flames(cv, P, cx=0, y0=0.45, h=0.45, w=0.12, n=2, ramp="fire", core="flame", halo=0.3)
+
+
+def r_ash_ward(cv, P):
+    """A buckler smeared with grey cairn ash, warm at the edges."""
+    cv.glow(circle(0, 0, 0.8), 0.3, 0.5)
+    prop(cv, it.shield(3, "iron_buckler"), 0.82)
+    cv.paint(poly([(-0.36, 0.2), (0.3, 0.3), (0.34, 0.16), (-0.32, 0.06)]), "stone", "flat", lo=0.6, outline=False)
+    cv.paint(poly([(-0.26, -0.1), (0.24, -0.02), (0.26, -0.14), (-0.22, -0.22)]), "stone", "flat", lo=0.5, outline=False)
+    stars(cv, [(0.62, -0.55), (-0.62, -0.5)], "flame", 0.09)
+
+
+# Auto attacks, potions and NPC spells (Stream A; the icons Stream D may redo).
+
+
+def r_ember_draught(cv, P):
+    """A flask of ember draught, warm in the hand."""
+    cv.glow(circle(0, -0.1, 0.6), 0.4, 0.5)
+    prop(cv, it.flask("fire", 3), 0.8)
+
+
+def r_lamp_tonic(cv, P):
+    """A tall flask of amber lamp oil."""
+    cv.glow(circle(0, -0.1, 0.5), 0.3, 0.5)
+    prop(cv, it.flask("topaz", 3, tall=True), 0.8)
+
+
+def r_set_your_feet(cv, P):
+    """Boots planted on cracked ground under a lowered guard."""
+    cv.paint(ellipse(0, -0.62, 0.85, 0.2), "stone", "lit", bevel=0.1, base=0.1)
+    cracks = union(*[taper(0, -0.62, x, y, 0.04, 0.01) for x, y in ((-0.8, -0.66), (0.78, -0.58), (-0.4, -0.86))])
+    cv.paint(cracks, "dark", "flat", lo=0.4, outline=False)
+    prims = it.boots("pl", 3)[0][:3]
+    cv.obj(prims, view(tilt=10, yaw=-25), fit=0.6, off=(0.0, -0.18))
+    chevron(cv, up=False, ramp="plate", cy=0.55, s=0.55, n=2)
+
+
 DUSK_RULES = [
     (r"^cairnbreaker$", r_cairnbreaker),
     (r"^open vein$", r_open_vein),
@@ -1084,6 +1160,19 @@ DUSK_RULES = [
     (r"^drag-hook$", r_drag_hook),
     (r"^kept ember$", r_kept_ember),
     (r"^draw the veil$", r_draw_the_veil),
+    (r"^hurled brand$", r_hurled_brand),
+    (r"^scatter the coals$", r_scatter_the_coals),
+    (r"^blinding flare$", r_blinding_flare),
+    (r"^between the ribs$", r_between_the_ribs),
+    (r"^ember prayer$", r_ember_prayer),
+    (r"^ash ward$", r_ash_ward),
+    (r"^set your feet$", r_set_your_feet),
+    (r"^attack$", r_sword(q=2)),
+    (r"^shoot$", r_bow),
+    (r"^ember draught$", r_ember_draught),
+    (r"^lamp tonic$", r_lamp_tonic),
+    (r"^gate slam$", r_slam),
+    (r"^mandible nip$", r_bite("chitin")),
 ]
 
 RULES = DUSK_RULES + [
